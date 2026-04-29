@@ -1,0 +1,93 @@
+<!-- ============================================
+     Navbar Component - Tawassul Admin
+     ============================================ -->
+<nav class="navbar" id="navbar">
+
+  <!-- Toggle Sidebar Button -->
+  <button class="navbar-toggle" id="sidebarToggle" title="تبديل القائمة">
+    ☰
+  </button>
+
+  <!-- Search -->
+  <div class="navbar-search">
+    <div style="position:relative;">
+      <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:16px;">🔍</span>
+      <input type="search" placeholder="بحث سريع..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:'Tajawal',sans-serif;font-size:14px;outline:none;" />
+    </div>
+  </div>
+
+  <!-- Spacer -->
+  <div style="flex:1;"></div>
+
+  <!-- Action Buttons -->
+  <div class="navbar-actions">
+
+    <!-- Dark Mode -->
+    <button class="nav-btn dark-toggle" data-tooltip="الوضع الداكن" title="الوضع الداكن">
+      🌙
+    </button>
+
+    <!-- Notifications -->
+    <div class="dropdown" id="notificationDropdown">
+      <button class="nav-btn" id="notificationBtn" title="الإشعارات">
+        🔔
+        <span class="badge" id="notificationBadge">2</span>
+      </button>
+
+      <!-- Notification Dropdown -->
+      <div class="dropdown-menu" style="min-width:320px;left:auto;right:0;">
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary);">الإشعارات</span>
+          <button style="font-size:12px;color:var(--primary);background:none;border:none;cursor:pointer;font-family:Tajawal,sans-serif;">تعليم الكل كمقروء</button>
+        </div>
+        <div id="notificationList" style="max-height:320px;overflow-y:auto;"></div>
+        <div style="padding:12px 20px;text-align:center;border-top:1px solid var(--border-color);">
+          <a href="#" style="font-size:14px;color:var(--primary);font-weight:600;text-decoration:none;">عرض كل الإشعارات</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div style="width:1px;height:28px;background:var(--border-color);margin:0 4px;"></div>
+
+    <!-- Admin Profile -->
+    <div class="admin-profile dropdown" id="profileDropdown">
+      <div class="admin-avatar">أ</div>
+      <div class="admin-info">
+        <div class="admin-name">المدير العام</div>
+        <div class="admin-role">Super Admin</div>
+      </div>
+      <span style="color:var(--text-secondary);font-size:12px;margin-right:4px;">▾</span>
+
+      <!-- Profile Dropdown -->
+      <div class="dropdown-menu" style="right:0;left:auto;min-width:200px;">
+        <div style="padding:16px;border-bottom:1px solid var(--border-color);">
+          <p style="font-size:14px;font-weight:700;color:var(--text-primary);">المدير العام</p>
+          <p style="font-size:12px;color:var(--text-secondary);">admin@tawassul.com</p>
+        </div>
+        <div style="padding:8px;">
+          <a href="../pages/settings.html" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--text-primary);text-decoration:none;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+            <span>⚙️</span> الإعدادات
+          </a>
+          <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.05)'" onmouseout="this.style.background='transparent'">
+            <span>🚪</span> تسجيل الخروج
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</nav>
+
+<script>
+// Profile dropdown toggle
+document.getElementById('profileDropdown')?.addEventListener('click', function(e) {
+  e.stopPropagation();
+  this.classList.toggle('open');
+  document.getElementById('notificationDropdown')?.classList.remove('open');
+});
+document.addEventListener('click', () => {
+  document.getElementById('profileDropdown')?.classList.remove('open');
+});
+</script>

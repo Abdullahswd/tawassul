@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>الطلبات - لوحة تحكم الأكاديمي</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="assets/css/style.css"/>
+</head>
+<body>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+<div class="page-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🎓</div><span class="logo-text">تواصل</span>
+    </div>
+    <nav class="sidebar-nav">
+      <p class="nav-label-group">لوحة التحكم</p>
+      <a href="academic-dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">الرئيسية</span></a>
+      <a href="academic-orders.html" class="nav-item active"><span class="nav-icon">📋</span><span class="nav-text">الطلبات</span></a>
+      <a href="academic-earnings.html" class="nav-item"><span class="nav-icon">💰</span><span class="nav-text">الأرباح</span></a>
+      <p class="nav-label-group">الحساب</p>
+      <a href="academic-settings.html" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-text">الإعدادات</span></a>
+      <a href="academic-profile.html" class="nav-item"><span class="nav-icon">👤</span><span class="nav-text">ملفي الشخصي</span></a>
+    </nav>
+    <div class="sidebar-footer">
+      <a href="academics-list.html" class="nav-item"><span class="nav-icon">🌐</span><span class="nav-text">العودة للمنصة</span></a>
+    </div>
+  </aside>
+
+  <div class="main-content" id="mainContent">
+    <!-- Navbar -->
+    <nav class="navbar" id="navbar">
+      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+      <div class="navbar-spacer"></div>
+      <div class="navbar-actions">
+        <button class="nav-btn dark-toggle">🌙</button>
+        <div class="dropdown">
+          <button class="nav-btn" data-toggle style="position:relative">🔔<span class="n-badge" id="notifBadge">2</span></button>
+          <div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 18px;border-bottom:1px solid var(--border-color)"><span style="font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notifList" style="max-height:280px;overflow-y:auto"></div></div>
+        </div>
+        <div class="dropdown">
+          <div class="admin-avatar-btn" data-toggle>
+            <div class="avatar-circle">م</div>
+            <div><div class="avatar-name">د. محمد السعيد</div><div class="avatar-role">أكاديمي موثق</div></div>
+            <span style="color:var(--text-secondary);font-size:12px">▾</span>
+          </div>
+          <div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="academic-settings.html" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a><div class="dropdown-divider"></div><a href="#" class="dropdown-item" style="border-radius:8px;color:var(--danger)">🚪 خروج</a></div></div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="page-body">
+      <!-- Header -->
+      <div class="page-header anim-up">
+        <div>
+          <div class="breadcrumb"><a href="academic-dashboard.html">الرئيسية</a><span>›</span><span>الطلبات</span></div>
+          <h1 class="page-title">إدارة الطلبات</h1>
+          <p class="page-subtitle">متابعة وإدارة جميع طلبات الطلاب</p>
+        </div>
+      </div>
+
+      <!-- Status tabs & stats -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+        <div class="stat-card anim-up delay-1" style="padding:16px;cursor:pointer;border-bottom:3px solid #6366f1" onclick="filterOrders('')">
+          <div style="font-size:24px;font-weight:900;color:var(--primary)" data-counter="5">0</div>
+          <div style="font-size:13px;color:var(--text-secondary)">جميع الطلبات</div>
+        </div>
+        <div class="stat-card anim-up delay-2" style="padding:16px;cursor:pointer;border-bottom:3px solid #3b82f6" onclick="filterOrders('new')">
+          <div style="font-size:24px;font-weight:900;color:#3b82f6" data-counter="2">0</div>
+          <div style="font-size:13px;color:var(--text-secondary)">جديدة</div>
+        </div>
+        <div class="stat-card anim-up delay-3" style="padding:16px;cursor:pointer;border-bottom:3px solid #f59e0b" onclick="filterOrders('in_progress')">
+          <div style="font-size:24px;font-weight:900;color:#f59e0b" data-counter="3">0</div>
+          <div style="font-size:13px;color:var(--text-secondary)">قيد التنفيذ</div>
+        </div>
+        <div class="stat-card anim-up delay-4" style="padding:16px;cursor:pointer;border-bottom:3px solid #10b981" onclick="filterOrders('completed')">
+          <div style="font-size:24px;font-weight:900;color:#10b981" data-counter="231">0</div>
+          <div style="font-size:13px;color:var(--text-secondary)">مكتملة</div>
+        </div>
+      </div>
+
+      <!-- Filters + Table -->
+      <div class="tbl-container anim-up delay-2">
+        <div class="tbl-header">
+          <h3 class="tbl-title">📋 قائمة الطلبات</h3>
+          <div class="search-box">
+            <span class="s-icon">🔍</span>
+            <input type="text" id="orderSearch" placeholder="بحث برقم أو اسم..." style="width:220px" oninput="filterOrders()"/>
+          </div>
+          <select class="form-input form-select" id="statusFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterOrders()">
+            <option value="">جميع الحالات</option>
+            <option value="new">جديد</option>
+            <option value="in_progress">قيد التنفيذ</option>
+            <option value="completed">مكتمل</option>
+          </select>
+          <select class="form-input form-select" id="serviceFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterOrders()">
+            <option value="">جميع الخدمات</option>
+            <option>الأبحاث والدراسات</option>
+            <option>التحليل الإحصائي</option>
+            <option>الرسائل الجامعية</option>
+          </select>
+        </div>
+
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>رقم الطلب</th>
+                <th>الطالب</th>
+                <th>الخدمة</th>
+                <th>الباقة</th>
+                <th>المبلغ</th>
+                <th>الحالة</th>
+                <th>الموعد النهائي</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="ordersTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination">
+          <span class="pagination-info">عرض 1-5 من <strong>5</strong> طلب</span>
+          <div class="pagination-pages">
+            <button class="page-btn active">1</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="modal-overlay" id="orderDetailModal">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header">
+      <h3 class="modal-title" id="orderDetailTitle">تفاصيل الطلب</h3>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body" id="orderDetailBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-modal-close>إغلاق</button>
+      <button class="btn btn-warning" id="orderUpdateBtn">🔄 تحديث الحالة</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="modal-overlay" id="confirmModal">
+  <div class="modal-box" style="max-width:420px"><div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد</h3><button class="modal-close" data-modal-close>✕</button></div><div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:56px;margin-bottom:12px">⚠️</div><p id="confirmMsg" style="color:var(--text-secondary)"></p></div><div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmOkBtn">تأكيد</button></div></div>
+</div>
+
+<script src="assets/js/main.js"></script>
+<script>
+function renderOrders(data) {
+  const tbody = document.getElementById('ordersTableBody');
+  if (!tbody) return;
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">📭 لا توجد طلبات</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map((o, i) => `
+    <tr>
+      <td><span style="font-weight:700;color:var(--primary)">${o.id}</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="tbl-avatar" style="background:${getAvatarColor(i)};width:34px;height:34px;border-radius:9px;font-size:12px">${o.student.slice(0,2)}</div>
+          <span>${o.student}</span>
+        </div>
+      </td>
+      <td style="font-size:13px;color:var(--text-secondary)">${o.service}</td>
+      <td><span class="badge badge-primary">${o.package}</span></td>
+      <td><strong style="font-size:15px;color:var(--primary)">${o.amount} ر.س</strong></td>
+      <td>${getStatusBadge(o.status)}</td>
+      <td style="color:${o.status !== 'completed' ? '#ef4444' : 'var(--text-secondary)'};font-size:13px">📅 ${o.deadline}</td>
+      <td>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none" title="عرض التفاصيل" onclick="viewOrder('${o.id}')">👁</button>
+          ${o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
+          ${o.status === 'in_progress' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
+          <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,.1);color:#ef4444;border:none" title="إلغاء" onclick="cancelOrder('${o.id}')">✕</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterOrders(statusOverride) {
+  if (statusOverride !== undefined) {
+    document.getElementById('statusFilter').value = statusOverride;
+  }
+  const q = document.getElementById('orderSearch').value.toLowerCase();
+  const st = document.getElementById('statusFilter').value;
+  const sv = document.getElementById('serviceFilter').value;
+  const filtered = ACADEMICS_DATA.orders.filter(o => {
+    return (!q || o.id.toLowerCase().includes(q) || o.student.includes(q))
+        && (!st || o.status === st)
+        && (!sv || o.service.includes(sv));
+  });
+  renderOrders(filtered);
+}
+
+function viewOrder(id) {
+  const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('orderDetailTitle').textContent = `تفاصيل الطلب ${o.id}`;
+  document.getElementById('orderDetailBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الطالب</div><div style="font-weight:700;color:var(--text-primary);margin-top:4px">${o.student}</div></div>
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الخدمة</div><div style="font-weight:700;color:var(--text-primary);margin-top:4px">${o.service}</div></div>
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الباقة</div><div style="font-weight:700;color:var(--primary);margin-top:4px">${o.package}</div></div>
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">المبلغ</div><div style="font-size:20px;font-weight:900;color:var(--primary);margin-top:4px">${o.amount} ر.س</div></div>
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">تاريخ الطلب</div><div style="font-weight:700;margin-top:4px">${o.date}</div></div>
+      <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الموعد النهائي</div><div style="font-weight:700;color:#ef4444;margin-top:4px">${o.deadline}</div></div>
+    </div>
+    <div style="margin-top:14px;padding:14px;background:var(--bg-main);border-radius:12px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:14px;color:var(--text-secondary)">الحالة الحالية</span>
+      <span>${getStatusBadge(o.status)}</span>
+    </div>
+    <div style="margin-top:14px">
+      <label class="form-label">تحديث الحالة</label>
+      <select class="form-input form-select" id="newStatusSelect" style="padding-left:36px">
+        <option value="new" ${o.status==='new'?'selected':''}>جديد</option>
+        <option value="in_progress" ${o.status==='in_progress'?'selected':''}>قيد التنفيذ</option>
+        <option value="completed" ${o.status==='completed'?'selected':''}>مكتمل</option>
+      </select>
+    </div>
+    <input type="hidden" id="currentOrderId" value="${o.id}"/>
+  `;
+  document.getElementById('orderUpdateBtn').onclick = () => {
+    const newStatus = document.getElementById('newStatusSelect').value;
+    const ord = ACADEMICS_DATA.orders.find(x => x.id === id);
+    if (ord) ord.status = newStatus;
+    Modal.close('orderDetailModal');
+    Toast.show('تم تحديث حالة الطلب', 'success');
+    filterOrders();
+  };
+  Modal.open('orderDetailModal');
+}
+
+function acceptOrder(id) {
+  Modal.confirm('قبول الطلب', `هل تريد قبول الطلب ${id} والبدء في التنفيذ؟`, () => {
+    const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+    if (o) o.status = 'in_progress';
+    Toast.show('تم قبول الطلب وبدء التنفيذ ✅', 'success');
+    filterOrders();
+  });
+}
+
+function completeOrder(id) {
+  Modal.confirm('إتمام الطلب', `هل تريد تعليم الطلب ${id} كمكتمل؟`, () => {
+    const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+    if (o) o.status = 'completed';
+    Toast.show('تم إتمام الطلب بنجاح 🎉', 'success');
+    filterOrders();
+  });
+}
+
+function cancelOrder(id) {
+  Modal.confirm('إلغاء الطلب', `هل تريد إلغاء الطلب ${id}؟ لا يمكن التراجع.`, () => {
+    const idx = ACADEMICS_DATA.orders.findIndex(x => x.id === id);
+    if (idx > -1) ACADEMICS_DATA.orders.splice(idx, 1);
+    Toast.show('تم إلغاء الطلب', 'error');
+    filterOrders();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => renderOrders(ACADEMICS_DATA.orders));
+</script>
+</body>
+</html>

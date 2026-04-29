@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تفاصيل الطلب - منصة تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .timeline { position: relative; padding-right: 24px; margin-top: 24px; }
+    .timeline::before { content: ""; position: absolute; right: 8px; top: 0; bottom: 0; width: 2px; background: var(--border-color); }
+    .timeline-step { position: relative; margin-bottom: 24px; }
+    .timeline-step::before { content: ""; position: absolute; right: -21px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg-card); border: 2px solid var(--border-color); z-index: 1; }
+    .timeline-step.active::before { background: var(--primary); border-color: var(--primary); box-shadow: 0 0 0 4px rgba(99,102,241,.2); }
+    .timeline-step.active .ts-title { color: var(--primary); font-weight: 800; }
+    .ts-title { font-size: 15px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
+    .ts-desc { font-size: 13px; color: var(--text-secondary); }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="public-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:24px">🎓</div>
+      <span style="font-size:20px;font-weight:800;color:var(--text-primary)">تواصل للخدمات</span>
+    </div>
+    <nav style="display:flex;gap:16px;align-items:center">
+      <a href="services.html" style="color:var(--text-secondary);font-weight:500;text-decoration:none">الخدمات</a>
+      <a href="orders.html" style="color:var(--primary);font-weight:700">طلباتي</a>
+      <div style="width:1px;height:24px;background:var(--border-color)"></div>
+      <button class="nav-btn dark-toggle" style="background:none;border:none;cursor:pointer;font-size:20px">🌙</button>
+    </nav>
+  </header>
+
+  <!-- Content -->
+  <div style="max-width:1000px;margin:40px auto;padding:0 20px">
+    
+    <div style="margin-bottom:24px;">
+      <a href="orders.html" style="color:var(--text-secondary);font-size:14px;text-decoration:none">← العودة للطلبات</a>
+    </div>
+
+    <!-- Header details -->
+    <div class="card" style="padding:24px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <h1 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-bottom:8px">الطلب <span id="oId" style="color:var(--primary)">#</span></h1>
+        <p style="color:var(--text-secondary);font-size:14px">تاريخ الطلب: <span id="oDate"></span></p>
+      </div>
+      <div style="text-align:left">
+        <span id="oStatus" class="badge"></span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 340px;gap:24px">
+      
+      <!-- Timeline and Messages -->
+      <div>
+        <div class="card" style="padding:32px;margin-bottom:24px">
+          <h3 style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:16px">مراحل الطلب</h3>
+          
+          <div class="timeline">
+            <div class="timeline-step">
+              <div class="ts-title">استلام الطلب</div>
+              <div class="ts-desc">تم إنشاء الطلب بنجاح وهو بانتظار المراجعة</div>
+            </div>
+            <div class="timeline-step">
+              <div class="ts-title">قيد التنفيذ</div>
+              <div class="ts-desc">الأكاديمي يعمل حالياً على إنجاز الخدمة</div>
+            </div>
+            <div class="timeline-step">
+              <div class="ts-title">المراجعة النهائية</div>
+              <div class="ts-desc">الخدمة قيد المراجعة والفحص للتأكد من الجودة</div>
+            </div>
+            <div class="timeline-step">
+              <div class="ts-title">مكتمل</div>
+              <div class="ts-desc">تم تسليم الملفات النهائية بنجاح</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Files Section -->
+        <div class="card" style="padding:32px">
+          <h3 style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:16px">الملفات المرفوعة</h3>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border:1px solid var(--border-color);border-radius:var(--radius-sm)">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:24px">📄</span>
+              <div>
+                <div style="font-size:14px;font-weight:700">Project_Requirements.pdf</div>
+                <div style="font-size:12px;color:var(--text-secondary)">1.2 MB</div>
+              </div>
+            </div>
+            <button class="btn btn-outline" style="padding:6px 12px;font-size:12px">تحميل ↓</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right summary panel -->
+      <div>
+        <div class="card" style="padding:24px;position:sticky;top:90px">
+          <h3 style="font-size:16px;font-weight:800;color:var(--text-primary);margin-bottom:20px;border-bottom:1px solid var(--border-color);padding-bottom:12px">تفاصيل الخدمة</h3>
+          
+          <div style="margin-bottom:16px">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">الخدمة المطلوبة</div>
+            <div id="oService" style="font-size:15px;font-weight:700;color:var(--text-primary)"></div>
+          </div>
+          
+          <div style="margin-bottom:16px">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">المستوى الدراسي</div>
+            <div style="font-size:14px;color:var(--text-primary)">ماجستير</div>
+          </div>
+
+          <div style="margin-bottom:24px">
+            <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">ملاحظات</div>
+            <div style="font-size:13px;color:var(--text-primary);background:var(--bg-main);padding:10px;border-radius:4px;border:1px solid var(--border-color)">
+              يرجى التركيز على أحدث المراجع من 2021 وما فوق.
+            </div>
+          </div>
+
+          <div style="border-top:1px dashed var(--border-color);padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700">الإجمالي المدفوع</span>
+            <span id="oTotal" style="font-size:20px;font-weight:900;color:var(--primary)">0 ر.س</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="data/services.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تفاصيل الخدمة - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div class="logo-text">تواصل</div>
+      </div>
+      <nav class="sidebar-nav">
+        <!-- Main links... -->
+        <a href="student-dashboard.html" class="nav-item"><span class="icon">📊</span><span>لوحة المعلومات</span></a>
+        <a href="services.html" class="nav-item active"><span class="icon">📦</span><span>الخدمات الأكاديمية</span></a>
+        <a href="orders.html" class="nav-item"><span class="icon">📋</span><span>طلباتي</span></a>
+        <a href="chat.html" class="nav-item"><span class="icon">💬</span><span>المحادثات</span></a>
+        <a href="payments.html" class="nav-item"><span class="icon">💳</span><span>المدفوعات</span></a>
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;border-top:1px solid var(--border-color);padding-top:16px">
+          <a href="profile.html" class="nav-item"><span class="icon">👤</span><span>الملف الشخصي</span></a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      <!-- Top Navbar -->
+      <header class="top-navbar">
+        <div style="display:flex;align-items:center;gap:16px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div class="h3">تفاصيل الخدمة</div>
+        </div>
+        <div class="navbar-actions">
+          <button class="icon-btn dark-toggle">🌙</button>
+          <div class="user-profile">
+            <div class="user-avatar user-initials-fill">؟</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content-wrap" style="max-width:1000px;margin:0 auto">
+        
+        <div style="margin-bottom:24px;">
+          <a href="services.html" style="color:var(--text-secondary);font-size:14px">← العودة لقائمة الخدمات</a>
+        </div>
+
+        <div class="card" style="padding:40px;position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;right:0;height:120px;background:linear-gradient(135deg, var(--primary-light), transparent);z-index:0"></div>
+          
+          <div style="position:relative;z-index:1;display:flex;flex-direction:column;gap:24px">
+            <div style="font-size:56px">📊</div>
+            <h1 class="h1">التحليل الإحصائي للبيانات</h1>
+            
+            <p style="font-size:16px;color:var(--text-secondary);line-height:1.8;max-width:800px">
+              خدمة متكاملة للباحثين وطلاب الدراسات العليا تشمل تفريغ وتحليل البيانات المعقدة باستخدام أحدث البرامج (SPSS, AMOS, SAS). 
+              الخدمة تضمن لك تحليلاً دقيقاً وموثوقاً لنتائج استبياناتك واختباراتك، مع تقديم تقرير تفصيلي يسهل عليك فهم ومناقشة النتائج.
+            </p>
+
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:20px;background:var(--bg-body);padding:24px;border-radius:var(--radius-md);border:1px solid var(--border-color)">
+              <div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">يبدأ من</div>
+                <div style="font-size:24px;font-weight:900;color:var(--primary)">400 ر.س</div>
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">مدة التنفيذ المتوقعة</div>
+                <div style="font-size:18px;font-weight:700;color:var(--text-primary)">3 - 5 أيام عمل</div>
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">التقييم العام</div>
+                <div style="font-size:18px;font-weight:700;color:var(--warning)">⭐ 4.9 <span style="font-size:12px;color:var(--text-muted);font-weight:400">(150 تقييم)</span></div>
+              </div>
+            </div>
+
+            <div style="margin-top:16px  solid var(--border-color);padding-top:24px">
+              <h3 class="h3" style="margin-bottom:16px">مميزات الخدمة الأساسية:</h3>
+              <ul style="list-style:none;padding:0;color:var(--text-secondary);line-height:2">
+                <li>✅ تفريغ البيانات وترميز المتغيرات بشكل صحيح وبدقة عالية.</li>
+                <li>✅ إجراء اختبارات الصدق والثبات (ألفا كرونباخ) للأداة المستخدمة.</li>
+                <li>✅ حساب الإحصاء الوصفي (التكرارات، النسب المئوية، المتوسطات الحسابية، والانحرافات المعيارية).</li>
+                <li>✅ التعليق على الجداول وتفسير النتائج بطريقة علمية مبسطة.</li>
+              </ul>
+            </div>
+
+            <div style="margin-top:24px">
+              <a href="create-order.html?sid=2" class="btn btn-primary" style="padding:16px 32px;font-size:16px;width:100%;max-width:300px">اطلب الخدمة الآن 🚀</a>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

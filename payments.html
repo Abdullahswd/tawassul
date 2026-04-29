@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>بوابة الدفع - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .checkout-layout { display: grid; grid-template-columns: 1fr 400px; gap: 32px; max-width: 1100px; margin: 40px auto; }
+    .pm-card { padding: 16px; border: 2px solid var(--border-color); border-radius: 12px; display: flex; align-items: center; gap: 16px; cursor: pointer; transition: all 0.2s; margin-bottom: 16px; }
+    .pm-card.active { border-color: var(--primary); background: rgba(79, 70, 229, 0.05); }
+    .pm-icon { font-size: 24px; }
+    @media (max-width: 768px) {
+      .checkout-layout { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body style="background:var(--bg-main)">
+
+  <nav class="public-nav">
+    <a href="index.html" style="font-size:24px;font-weight:900;color:var(--primary);text-decoration:none">🎓 تواصل - الدفع الآمن</a>
+    <div>
+      <a href="javascript:history.back()" style="color:var(--text-secondary);font-weight:700">← إلغاء والعودة</a>
+    </div>
+  </nav>
+
+  <div class="checkout-layout">
+    
+    <!-- Payment Setup -->
+    <div class="fade-up">
+      <h2 style="font-size:24px;font-weight:800;margin-bottom:24px">اختر طريقة الدفع</h2>
+      
+      <div class="pm-card active" onclick="activatePM(this)">
+        <div class="pm-icon">💳</div>
+        <div>
+          <div style="font-weight:700">بطاقة ائتمانية / مدى</div>
+          <div style="font-size:12px;color:var(--text-secondary)">دفع فوري وآمن 100%</div>
+        </div>
+        <div style="margin-right:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--primary);background:var(--primary);box-shadow:inset 0 0 0 4px var(--bg-card)"></div>
+      </div>
+
+      <div class="pm-card" onclick="activatePM(this)">
+        <div class="pm-icon">🍎</div>
+        <div>
+          <div style="font-weight:700">Apple Pay</div>
+          <div style="font-size:12px;color:var(--text-secondary)">أسرع طريقة عبر أجهزة أبل</div>
+        </div>
+        <div style="margin-right:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--border-color)"></div>
+      </div>
+
+      <div class="pm-card" onclick="activatePM(this)">
+        <div class="pm-icon">💼</div>
+        <div>
+          <div style="font-weight:700">محفظة تواصل</div>
+          <div style="font-size:12px;color:var(--warning)">الرصيد الحالي: 50 ر.س (لا يكفي)</div>
+        </div>
+        <div style="margin-right:auto;width:20px;height:20px;border-radius:50%;border:2px solid var(--border-color)"></div>
+      </div>
+
+      <!-- CC Form -->
+      <div class="card" style="margin-top:32px">
+        <h3 style="font-size:16px;font-weight:800;margin-bottom:20px">بيانات البطاقة</h3>
+        
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">رقم البطاقة</label>
+          <input type="text" class="form-input" placeholder="0000 0000 0000 0000" dir="ltr" style="font-family:monospace">
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">تاريخ الانتهاء</label>
+            <input type="text" class="form-input" placeholder="MM/YY" dir="ltr">
+          </div>
+          <div>
+            <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">CVC/CVV</label>
+            <input type="text" class="form-input" placeholder="123" dir="ltr">
+          </div>
+        </div>
+        
+        <div style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:8px">الاسم على البطاقة</label>
+          <input type="text" class="form-input" placeholder="AHMAD ALZAHRANI" dir="ltr">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Order Summary -->
+    <div class="fade-up" style="animation-delay:0.2s">
+      <div class="card" style="position:sticky;top:100px">
+        <h3 style="font-size:18px;font-weight:800;margin-bottom:24px;border-bottom:1px solid var(--border-color);padding-bottom:12px">ملخص الفاتورة</h3>
+        
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px">
+          <span style="color:var(--text-secondary)">الخدمة: التحليل الإحصائي</span>
+          <span style="font-weight:700">450 ر.س</span>
+        </div>
+        
+        <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px">
+          <span style="color:var(--text-secondary)">رسوم النظام (7%)</span>
+          <span style="font-weight:700">31.5 ر.س</span>
+        </div>
+        
+        <div style="display:flex;justify-content:space-between;margin-bottom:24px;font-size:14px;color:var(--success)">
+          <span>كوبون خصم (TWS20)</span>
+          <span style="font-weight:700">-20 ر.س</span>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:20px;border-top:1px dashed var(--border-color);margin-bottom:32px">
+          <span style="font-size:16px;font-weight:800">الإجمالي المستحق</span>
+          <span style="font-size:28px;font-weight:900;color:var(--primary)">461.5 <span style="font-size:14px;color:var(--text-secondary)">ر.س</span></span>
+        </div>
+
+        <button class="btn btn-primary" style="width:100%;padding:16px;font-size:16px;background:var(--success)" onclick="mockPay()">💳 شـراء وتأكيد الطلب</button>
+        
+        <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:16px">
+          🔒 مدفوعاتك مشفرة ومؤمنة بالكامل للتعاملات الآمنة بخوارزمية 256-bit.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="assets/js/global.js"></script>
+  <script>
+    function activatePM(el) {
+      document.querySelectorAll('.pm-card').forEach(c => {
+        c.classList.remove('active');
+        const circle = c.querySelector('div:last-child');
+        circle.style.borderColor = 'var(--border-color)';
+        circle.style.background = 'transparent';
+        circle.style.boxShadow = 'none';
+      });
+      el.classList.add('active');
+      const activeCircle = el.querySelector('div:last-child');
+      activeCircle.style.borderColor = 'var(--primary)';
+      activeCircle.style.background = 'var(--primary)';
+      activeCircle.style.boxShadow = 'inset 0 0 0 4px var(--bg-card)';
+    }
+
+    function mockPay() {
+      const btn = document.querySelector('button[onclick="mockPay()"]');
+      btn.textContent = 'جاري التحقق من عملية الدفع...';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = '✅ تمت العملية بنجاح!';
+        setTimeout(() => {
+          window.location.href = 'student/student-dashboard.html';
+        }, 1000);
+      }, 2000);
+    }
+  </script>
+</body>
+</html>

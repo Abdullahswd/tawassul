@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>التقييمات والآراء - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+</head>
+<body style="background:var(--bg-main)">
+
+  <nav class="public-nav">
+    <a href="index.html" style="font-size:24px;font-weight:900;color:var(--primary);text-decoration:none">🎓 تواصل</a>
+    <div style="display:flex;gap:12px;align-items:center">
+      <button class="dark-toggle" style="background:none;border:none;font-size:20px;cursor:pointer">🌙</button>
+      <a href="index.html" class="btn btn-outline" style="padding:8px 16px;font-size:14px">← العودة الرئيسية</a>
+    </div>
+  </nav>
+
+  <div style="padding:40px 20px;max-width:1000px;margin:0 auto">
+    
+    <div style="text-align:center;margin-bottom:48px" class="fade-up">
+      <h1 style="font-size:36px;font-weight:900;margin-bottom:16px">آراء التميز والتقييمات المطلقة</h1>
+      <p style="font-size:16px;color:var(--text-secondary);max-width:600px;margin:0 auto">
+        الشفافية في "تواصل" هي أساس النجاح. تصفح آراء زملائك الطلاب عن الأكاديميين المختلفين لضمان جودة الأداء واختيار الأنسب لمتطلباتك.
+      </p>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="card fade-up" style="display:flex;justify-content:center;gap:40px;margin-bottom:40px;text-align:center;animation-delay:0.1s">
+      <div>
+        <div style="font-size:48px;font-weight:900;color:var(--primary)">4.9</div>
+        <div style="color:var(--warning);font-size:20px;margin-bottom:8px">⭐⭐⭐⭐⭐</div>
+        <div style="font-size:14px;color:var(--text-secondary)">متوسط التقييم العام</div>
+      </div>
+      <div style="width:1px;background:var(--border-color)"></div>
+      <div style="display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:32px;font-weight:800;color:var(--text-primary);margin-bottom:4px">+15,000</div>
+        <div style="font-size:14px;color:var(--text-secondary)">مراجعة معتمدة وموثقة</div>
+      </div>
+      <div style="width:1px;background:var(--border-color)"></div>
+      <div style="display:flex;flex-direction:column;justify-content:center">
+        <div style="font-size:32px;font-weight:800;color:var(--success);margin-bottom:4px">98%</div>
+        <div style="font-size:14px;color:var(--text-secondary)">معدل الإنجاز والرضا</div>
+      </div>
+    </div>
+
+    <!-- Reviews Grid -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(400px, 1fr));gap:24px">
+      
+      <!-- Review 1 -->
+      <div class="card fade-up" style="animation-delay:0.2s">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#10b981;color:white;display:flex;align-items:center;justify-content:center;font-weight:800">أ</div>
+            <div>
+              <div style="font-weight:700;font-size:14px">أحمد عبدالله <span style="font-size:11px;color:var(--success);background:rgba(16,185,129,0.1);padding:2px 6px;border-radius:4px;margin-right:4px">موثق</span></div>
+              <div style="font-size:12px;color:var(--text-secondary)">طالب ماجستير إحصاء</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted)">قبل 3 أيام</div>
+        </div>
+        <div style="color:var(--warning);font-size:14px;margin-bottom:12px">⭐⭐⭐⭐⭐</div>
+        <h4 style="font-weight:700;margin-bottom:8px;font-size:15px">محترف في التحليل الإحصائي!</h4>
+        <p style="font-size:14px;color:var(--text-secondary);line-height:1.7">
+          عملت مع د. محمد سعيد على تحليل استبيانات بحثي وحقيقة كان العمل مبهراً ومنظماً، والأهم من ذلك التزامه بالموعد وتسليمه المخرجات قبل الوقت المحدد. 
+        </p>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--border-color);font-size:12px;color:var(--text-secondary)">
+          الأكاديمي المُقيَّم: <a href="#" style="color:var(--primary);font-weight:700">د. محمد سعيد</a>
+        </div>
+      </div>
+
+      <!-- Review 2 -->
+      <div class="card fade-up" style="animation-delay:0.3s">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:40px;height:40px;border-radius:50%;background:#f59e0b;color:white;display:flex;align-items:center;justify-content:center;font-weight:800">س</div>
+            <div>
+              <div style="font-weight:700;font-size:14px">سارة محمد <span style="font-size:11px;color:var(--success);background:rgba(16,185,129,0.1);padding:2px 6px;border-radius:4px;margin-right:4px">موثق</span></div>
+              <div style="font-size:12px;color:var(--text-secondary)">طالبة دكتوراة تاريخ</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted)">اسبوع الماضي</div>
+        </div>
+        <div style="color:var(--warning);font-size:14px;margin-bottom:12px">⭐⭐⭐⭐⭐</div>
+        <h4 style="font-weight:700;margin-bottom:8px;font-size:15px">تدقيق لغوي بلا أخطاء</h4>
+        <p style="font-size:14px;color:var(--text-secondary);line-height:1.7">
+          شكراً للمنصة وللأستاذ فهد، تم المراجعة اللغوية بشكل دقيق جداً وتم استخراج الأخطاء الإملائية والضمائر التي كانت تسبب لي قلقاً. انصح به بشدة لكل باحث.
+        </p>
+        <div style="margin-top:16px;padding-top:16px;border-top:1px dashed var(--border-color);font-size:12px;color:var(--text-secondary)">
+          الأكاديمي المُقيَّم: <a href="#" style="color:var(--primary);font-weight:700">أ. فهد عبدالله</a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="assets/js/global.js"></script>
+</body>
+</html>

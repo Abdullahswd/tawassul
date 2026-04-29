@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>طلباتي - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div class="logo-text">تواصل</div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
+        <a href="student-dashboard.html" class="nav-item">
+          <span class="icon">📊</span>
+          <span>لوحة المعلومات</span>
+        </a>
+        <a href="services.html" class="nav-item">
+          <span class="icon">📦</span>
+          <span>الخدمات الأكاديمية</span>
+        </a>
+        <a href="orders.html" class="nav-item active">
+          <span class="icon">📋</span>
+          <span>طلباتي</span>
+        </a>
+        <a href="chat.html" class="nav-item">
+          <span class="icon">💬</span>
+          <span>المحادثات</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="icon">💳</span>
+          <span>المدفوعات</span>
+        </a>
+        
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
+        <a href="profile.html" class="nav-item">
+          <span class="icon">👤</span>
+          <span>الملف الشخصي</span>
+        </a>
+      </nav>
+      
+      <div style="padding:20px;border-top:1px solid var(--border-color)">
+        <a href="#" class="nav-item" style="color:var(--danger)">
+          <span class="icon">🚪</span>
+          <span>تسجيل الخروج</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      
+      <!-- Top Navbar -->
+      <header class="top-navbar">
+        <div style="display:flex;align-items:center;gap:16px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div class="h3">قائمة الطلبات</div>
+        </div>
+
+        <div class="navbar-actions">
+          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
+          <button class="icon-btn" aria-label="الإشعارات">
+            🔔<span class="badge-dot">3</span>
+          </button>
+          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
+          <div class="user-profile">
+            <div class="user-info" style="text-align:left">
+              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-role">طالب</span>
+            </div>
+            <div class="user-avatar user-initials-fill">؟</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content-wrap">
+        
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px">
+          <div>
+            <h1 class="h1" style="margin-bottom:8px">طلباتي</h1>
+            <p class="text-body">إدارة ومتابعة كافة طلباتك السابقة والحالية.</p>
+          </div>
+          <a href="create-order.html" class="btn btn-primary">➕ طلب جديد</a>
+        </div>
+
+        <!-- Filters -->
+        <div style="display:flex;gap:12px;margin-bottom:24px;overflow-x:auto;padding-bottom:8px">
+          <button class="btn btn-primary" style="border-radius:40px;padding:8px 20px">الكل (12)</button>
+          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">قيد التنفيذ (2)</button>
+          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">بانتظار المراجعة (1)</button>
+          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">مكتملة (10)</button>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="card" style="padding:0;overflow:hidden">
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;text-align:right">
+              <thead>
+                <tr>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">رقم الطلب</th>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">الخدمة والتخصص</th>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">تاريخ الطلب</th>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">السعر الإجمالي</th>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">الحالة</th>
+                  <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">إجراء</th>
+                </tr>
+              </thead>
+              <tbody id="ordersPageBody">
+                
+                <tr>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1045</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <div style="font-weight:700;color:var(--text-primary)">التحليل الإحصائي</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">علم النفس التجريبي</div>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-18</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">450 ر.س</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <span class="status-badge status-progress">
+                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
+                      قيد التنفيذ
+                    </span>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <a href="order-details.html?id=1045" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1042</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <div style="font-weight:700;color:var(--text-primary)">تصميم الاستبيانات</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">إدارة الموارد البشرية</div>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-10</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">200 ر.س</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <span class="status-badge status-completed">
+                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
+                      مكتمل
+                    </span>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <a href="order-details.html?id=1042" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
+                  </td>
+                </tr>
+
+                <tr>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1049</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <div style="font-weight:700;color:var(--text-primary)">التدقيق اللغوي</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">أدب إنجليزي</div>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-20</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">150 ر.س</td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <span class="status-badge status-new">
+                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
+                      بانتظار الدفع
+                    </span>
+                  </td>
+                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                    <a href="order-details.html?id=1049" class="btn btn-primary" style="padding:6px 12px;font-size:13px">ادفع الآن</a>
+                  </td>
+                </tr>
+
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

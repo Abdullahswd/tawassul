@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>الإعدادات - تواصل Admin</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../assets/css/style.css" />
+</head>
+<body>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+<div class="admin-layout">
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
+    <nav class="sidebar-nav">
+      <p class="nav-section-title">القائمة الرئيسية</p>
+      <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
+      <p class="nav-section-title">إدارة المستخدمين</p>
+      <a href="users.html" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span></a>
+      <a href="academics.html" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span></a>
+      <p class="nav-section-title">العمليات</p>
+      <a href="services.html" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
+      <a href="packages.html" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
+      <a href="orders.html" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span></a>
+      <p class="nav-section-title">المالية والتقارير</p>
+      <a href="payments.html" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
+      <a href="reports.html" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
+      <p class="nav-section-title">النظام</p>
+      <a href="settings.html" class="nav-item active"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
+    </nav>
+    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
+  </aside>
+
+  <div class="main-content" id="mainContent">
+    <nav class="navbar" id="navbar">
+      <button class="navbar-toggle" id="sidebarToggle">☰</button>
+      <div style="flex:1"></div>
+      <div class="navbar-actions">
+        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
+        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
+        <div style="width:1px;height:28px;background:var(--border-color)"></div>
+        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
+      </div>
+    </nav>
+
+    <div class="page-content">
+      <div class="page-header animate-fadeInUp">
+        <div>
+          <div class="breadcrumb"><a href="dashboard.html">الرئيسية</a><span>›</span><span>الإعدادات</span></div>
+          <h1 class="page-header-title">إعدادات النظام</h1>
+          <p class="page-header-subtitle">إدارة إعدادات المنصة والتكوينات العامة</p>
+        </div>
+        <button class="btn btn-primary" id="saveAllBtn" onclick="saveAllSettings()">💾 حفظ التغييرات</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:240px 1fr;gap:24px">
+
+        <!-- Settings Sidebar -->
+        <div class="stat-card animate-fadeInUp delay-1" style="padding:12px;height:fit-content">
+          <div id="settingsMenu">
+            <button class="settings-menu-btn active" onclick="showSection('general',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:var(--primary);color:white;font-family:Tajawal,sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:4px;text-align:right">🌐 الإعدادات العامة</button>
+            <button class="settings-menu-btn" onclick="showSection('profile',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">👤 الملف الشخصي</button>
+            <button class="settings-menu-btn" onclick="showSection('security',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">🔒 الأمان</button>
+            <button class="settings-menu-btn" onclick="showSection('notifications',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">🔔 الإشعارات</button>
+            <button class="settings-menu-btn" onclick="showSection('payment',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">💳 بوابات الدفع</button>
+            <button class="settings-menu-btn" onclick="showSection('appearance',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">🎨 المظهر</button>
+            <button class="settings-menu-btn" onclick="showSection('email',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right;transition:all 0.2s">📧 إعدادات البريد</button>
+          </div>
+        </div>
+
+        <!-- Settings Content -->
+        <div>
+
+          <!-- General Settings -->
+          <div id="section-general" class="settings-section animate-fadeInUp delay-2">
+            <div class="stat-card" style="padding:24px;margin-bottom:20px">
+              <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:4px">🌐 الإعدادات العامة</h3>
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">إعدادات المنصة الأساسية</p>
+
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group"><label class="form-label">اسم المنصة</label><input class="form-input" value="تواصل الأكاديمي" /></div>
+                <div class="form-group"><label class="form-label">البريد الرسمي</label><input class="form-input" type="email" value="info@tawassul.com" /></div>
+                <div class="form-group"><label class="form-label">رقم التواصل</label><input class="form-input" value="+966 11 000 0000" /></div>
+                <div class="form-group"><label class="form-label">الموقع الإلكتروني</label><input class="form-input" value="https://tawassul.com" /></div>
+                <div class="form-group"><label class="form-label">اللغة الافتراضية</label>
+                  <select class="form-input form-select" style="padding-left:36px">
+                    <option selected>العربية</option>
+                    <option>English</option>
+                  </select>
+                </div>
+                <div class="form-group"><label class="form-label">المنطقة الزمنية</label>
+                  <select class="form-input form-select" style="padding-left:36px">
+                    <option selected>توقيت الرياض (GMT+3)</option>
+                    <option>توقيت مكة (GMT+3)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group"><label class="form-label">نبذة عن المنصة</label>
+                <textarea class="form-input" rows="3">منصة تواصل الأكاديمي - نربط الطلاب بأفضل الأكاديميين لتقديم خدمات أكاديمية متميزة</textarea>
+              </div>
+
+              <!-- Logo Upload -->
+              <div class="form-group">
+                <label class="form-label">شعار المنصة</label>
+                <div style="display:flex;align-items:center;gap:20px;margin-top:8px">
+                  <div style="width:80px;height:80px;border-radius:16px;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:36px">🎓</div>
+                  <div>
+                    <button class="btn btn-outline btn-sm" onclick="Toast.show('ميزة رفع الشعار تتطلب Backend','info')">📤 رفع شعار جديد</button>
+                    <p style="font-size:12px;color:var(--text-secondary);margin-top:6px">PNG أو SVG، بحد أقصى 2MB</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Quick Toggles -->
+              <div style="border: 1px solid var(--border-color);border-radius:14px;overflow:hidden;margin-top:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+                  <div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">وضع الصيانة</div><div style="font-size:12px;color:var(--text-secondary)">إيقاف الموقع مؤقتاً للصيانة</div></div>
+                  <label class="toggle-switch"><input type="checkbox" /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+                  <div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">قبول التسجيلات الجديدة</div><div style="font-size:12px;color:var(--text-secondary)">السماح للمستخدمين الجدد بالتسجيل</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
+                  <div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">التحقق عبر البريد</div><div style="font-size:12px;color:var(--text-secondary)">إلزام المستخدمين بتأكيد بريدهم</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Commission Settings -->
+            <div class="stat-card" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:4px">💰 إعدادات العمولة</h3>
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">تحديد نسبة عمولة المنصة</p>
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+                <div class="form-group"><label class="form-label">نسبة العمولة (%)</label><input class="form-input" type="number" value="15" min="0" max="50" /></div>
+                <div class="form-group"><label class="form-label">الحد الأدنى للسحب</label><input class="form-input" type="number" value="200" /></div>
+                <div class="form-group"><label class="form-label">دورة الدفع</label>
+                  <select class="form-input form-select" style="padding-left:36px"><option>أسبوعي</option><option selected>شهري</option></select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Profile Section -->
+          <div id="section-profile" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">👤 الملف الشخصي للمدير</h3>
+              <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;padding:20px;background:var(--bg-main);border-radius:14px">
+                <div class="admin-avatar" style="width:72px;height:72px;border-radius:18px;font-size:28px">أ</div>
+                <div>
+                  <div style="font-size:18px;font-weight:700;color:var(--text-primary)">المدير العام</div>
+                  <div style="font-size:14px;color:var(--text-secondary)">admin@tawassul.com</div>
+                  <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="Toast.show('ميزة تغيير الصورة تتطلب Backend','info')">تغيير الصورة</button>
+                </div>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="form-input" value="المدير العام" /></div>
+                <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="form-input" type="email" value="admin@tawassul.com" /></div>
+                <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="form-input" value="+966 5X XXX XXXX" /></div>
+                <div class="form-group"><label class="form-label">الدور الوظيفي</label><input class="form-input" value="مدير النظام" readonly style="opacity:0.6" /></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security Section -->
+          <div id="section-security" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px;margin-bottom:20px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">🔒 تغيير كلمة المرور</h3>
+              <div class="form-group"><label class="form-label">كلمة المرور الحالية</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+              <div class="form-group"><label class="form-label">كلمة المرور الجديدة</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+              <div class="form-group"><label class="form-label">تأكيد كلمة المرور</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+              <button class="btn btn-primary" onclick="Toast.show('تم تحديث كلمة المرور','success')">تحديث كلمة المرور</button>
+            </div>
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">🛡 خيارات الأمان</h3>
+              <div style="border:1px solid var(--border-color);border-radius:14px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+                  <div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">التحقق بخطوتين (2FA)</div><div style="font-size:12px;color:var(--text-secondary)">تأمين إضافي عند تسجيل الدخول</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+                </div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
+                  <div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">تسجيل نشاط الجلسات</div><div style="font-size:12px;color:var(--text-secondary)">تتبع جميع عمليات تسجيل الدخول</div></div>
+                  <label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications Section -->
+          <div id="section-notifications" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">🔔 إعدادات الإشعارات</h3>
+              <div style="border:1px solid var(--border-color);border-radius:14px;overflow:hidden">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)"><div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">إشعارات الطلبات الجديدة</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند وصول طلب جديد</div></div><label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)"><div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">إشعارات الدفعات</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند اكتمال دفعة</div></div><label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)"><div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">بريد يومي ملخص</div><div style="font-size:12px;color:var(--text-secondary)">تقرير يومي بالنشاط</div></div><label class="toggle-switch"><input type="checkbox" /><span class="toggle-slider"></span></label></div>
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px"><div><div style="font-size:14px;font-weight:600;color:var(--text-primary)">إشعارات تسجيل الأكاديميين</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند تسجيل أكاديمي جديد</div></div><label class="toggle-switch"><input type="checkbox" checked /><span class="toggle-slider"></span></label></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Payment Section -->
+          <div id="section-payment" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">💳 بوابات الدفع</h3>
+              <div style="display:flex;flex-direction:column;gap:16px">
+                <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;align-items:center;gap:14px"><div style="font-size:32px">💠</div><div><div style="font-size:15px;font-weight:700;color:var(--text-primary)">Stripe</div><div style="font-size:12px;color:var(--text-secondary)">بوابة دفع دولية</div></div></div>
+                  <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-success">مفعّل</span><button class="btn btn-outline btn-sm">إعداد</button></div>
+                </div>
+                <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
+                  <div style="display:flex;align-items:center;gap:14px"><div style="font-size:32px">🟢</div><div><div style="font-size:15px;font-weight:700;color:var(--text-primary)">Moyasar</div><div style="font-size:12px;color:var(--text-secondary)">بوابة دفع سعودية</div></div></div>
+                  <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-success">مفعّل</span><button class="btn btn-outline btn-sm">إعداد</button></div>
+                </div>
+                <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center;opacity:0.6">
+                  <div style="display:flex;align-items:center;gap:14px"><div style="font-size:32px">🔵</div><div><div style="font-size:15px;font-weight:700;color:var(--text-primary)">PayPal</div><div style="font-size:12px;color:var(--text-secondary)">بوابة دفع عالمية</div></div></div>
+                  <div style="display:flex;align-items:center;gap:10px"><span class="badge badge-secondary">معطّل</span><button class="btn btn-primary btn-sm">تفعيل</button></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Appearance Section -->
+          <div id="section-appearance" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">🎨 المظهر والتخصيص</h3>
+              <div class="form-group">
+                <label class="form-label">اللون الرئيسي للمنصة</label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+                  <div style="width:44px;height:44px;border-radius:50%;background:#6366f1;cursor:pointer;border:3px solid white;box-shadow:0 0 0 2px #6366f1" onclick="selectColor('#6366f1')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#0ea5e9;cursor:pointer" onclick="selectColor('#0ea5e9')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#10b981;cursor:pointer" onclick="selectColor('#10b981')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#f59e0b;cursor:pointer" onclick="selectColor('#f59e0b')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#ef4444;cursor:pointer" onclick="selectColor('#ef4444')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#8b5cf6;cursor:pointer" onclick="selectColor('#8b5cf6')"></div>
+                  <div style="width:44px;height:44px;border-radius:50%;background:#ec4899;cursor:pointer" onclick="selectColor('#ec4899')"></div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">وضع العرض الافتراضي</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px">
+                  <div style="padding:16px;border:2px solid var(--primary);border-radius:12px;cursor:pointer;background:var(--bg-main);display:flex;flex-direction:column;align-items:center;gap:8px">
+                    <span style="font-size:28px">☀️</span>
+                    <span style="font-size:13px;font-weight:600;color:var(--primary)">الوضع الفاتح</span>
+                  </div>
+                  <div style="padding:16px;border:2px solid var(--border-color);border-radius:12px;cursor:pointer;background:var(--bg-main);display:flex;flex-direction:column;align-items:center;gap:8px" onclick="DarkMode.enable()">
+                    <span style="font-size:28px">🌙</span>
+                    <span style="font-size:13px;color:var(--text-secondary)">الوضع الداكن</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Email Section -->
+          <div id="section-email" class="settings-section" style="display:none">
+            <div class="stat-card animate-fadeInUp" style="padding:24px">
+              <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">📧 إعدادات SMTP</h3>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                <div class="form-group"><label class="form-label">SMTP Host</label><input class="form-input" value="smtp.gmail.com" /></div>
+                <div class="form-group"><label class="form-label">SMTP Port</label><input class="form-input" type="number" value="587" /></div>
+                <div class="form-group"><label class="form-label">اسم المستخدم</label><input class="form-input" type="email" value="noreply@tawassul.com" /></div>
+                <div class="form-group"><label class="form-label">كلمة المرور</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="Toast.show('جاري اختبار اتصال SMTP...','info')">🧪 اختبار الاتصال</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/main.js"></script>
+<script>
+document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
+document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
+
+function showSection(id, btn) {
+  document.querySelectorAll('.settings-section').forEach(s => s.style.display = 'none');
+  document.getElementById('section-' + id).style.display = 'block';
+  document.querySelectorAll('.settings-menu-btn').forEach(b => {
+    b.style.background = 'transparent';
+    b.style.color = 'var(--text-secondary)';
+    b.style.fontWeight = '400';
+  });
+  btn.style.background = 'var(--primary)';
+  btn.style.color = 'white';
+  btn.style.fontWeight = '600';
+}
+
+function selectColor(color) {
+  document.documentElement.style.setProperty('--primary', color);
+  document.documentElement.style.setProperty('--primary-dark', color);
+  Toast.show('تم تحديث اللون الرئيسي', 'success');
+}
+
+function saveAllSettings() {
+  const btn = document.getElementById('saveAllBtn');
+  btn.innerHTML = '⏳ جاري الحفظ...';
+  btn.disabled = true;
+  setTimeout(() => {
+    btn.innerHTML = '💾 حفظ التغييرات';
+    btn.disabled = false;
+    Toast.show('تم حفظ جميع الإعدادات بنجاح', 'success');
+  }, 1500);
+}
+</script>
+</body>
+</html>

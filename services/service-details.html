@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تفاصيل الخدمة - منصة تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="public-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="font-size:24px">🎓</div>
+      <span style="font-size:20px;font-weight:800;color:var(--text-primary)">تواصل للخدمات</span>
+    </div>
+    <nav style="display:flex;gap:16px;align-items:center">
+      <a href="services.html" style="color:var(--primary);font-weight:700">الخدمات</a>
+      <a href="orders.html" style="color:var(--text-secondary);font-weight:500;text-decoration:none">طلباتي</a>
+      <div style="width:1px;height:24px;background:var(--border-color)"></div>
+      <button class="nav-btn dark-toggle" style="background:none;border:none;cursor:pointer;font-size:20px">🌙</button>
+    </nav>
+  </header>
+
+  <!-- Content -->
+  <div style="max-width:900px;margin:40px auto;padding:0 20px" id="serviceContent">
+    
+    <div style="margin-bottom:24px;">
+      <a href="services.html" style="color:var(--text-secondary);font-size:14px;text-decoration:none">← العودة للخدمات</a>
+    </div>
+
+    <div class="card" style="padding:40px;position:relative;overflow:hidden">
+      <!-- Background splash -->
+      <div style="position:absolute;top:0;left:0;right:0;height:120px;background:linear-gradient(135deg,rgba(99,102,241,0.1),rgba(99,102,241,0.0));z-index:0"></div>
+      
+      <div style="position:relative;z-index:1">
+        <span class="badge" style="background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-secondary)" id="sCat">📚 القسم</span>
+        
+        <h1 id="sName" style="font-size:32px;font-weight:900;color:var(--text-primary);margin:16px 0">جاري التحميل...</h1>
+        
+        <p id="sDesc" style="font-size:16px;color:var(--text-secondary);line-height:1.8;margin-bottom:32px">
+          وصف الخدمة سيظهر هنا.
+        </p>
+
+        <div style="display:flex;align-items:center;gap:24px;margin-bottom:40px;padding:20px;background:var(--bg-main);border-radius:var(--radius-sm)">
+          <div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">السعر يبدأ من</div>
+            <div id="sPrice" style="font-size:24px;font-weight:800;color:var(--primary)">0 ر.س</div>
+          </div>
+          <div style="width:1px;height:40px;background:var(--border-color)"></div>
+          <div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">مدة التنفيذ المتوقعة</div>
+            <div id="sDuration" style="font-size:18px;font-weight:700;color:var(--text-primary)">-</div>
+          </div>
+        </div>
+
+        <a id="orderBtn" href="create-order.html" class="btn btn-primary" style="padding:14px 32px;font-size:16px;width:100%;">اطلب هذه الخدمة الآن 🚀</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="data/services.js"></script>
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

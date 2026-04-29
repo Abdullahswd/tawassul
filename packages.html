@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>باقات الخدمات - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .pkg-card { padding: 40px 24px; border-radius: 24px; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); background: var(--bg-card); border: 1px solid var(--border-color); display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    .pkg-card:hover { transform: translateY(-12px); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.15); border-color: var(--primary); }
+    .pkg-icon { font-size: 48px; margin-bottom: 24px; }
+    .pkg-popular { border: 2.5px solid var(--primary); }
+    .pkg-popular::before { content: "الأكثر تميزاً"; position: absolute; top: 12px; left: -30px; transform: rotate(-45deg); background: var(--primary); color: white; padding: 4px 40px; font-size: 12px; font-weight: 800; width: 150px; text-align: center; }
+    .pkg-price { font-size: 42px; font-weight: 900; color: var(--text-primary); margin: 20px 0; }
+    .pkg-list { text-align: right; margin-bottom: 32px; flex-grow: 1; list-style: none; padding: 0; }
+    .pkg-list li { margin-bottom: 14px; color: var(--text-secondary); display: flex; align-items: flex-start; gap: 10px; font-size: 14px; line-height: 1.5; }
+    .pkg-list li::before { content: "✓"; color: #10b981; font-weight: 900; }
+    .price-sub { font-size: 14px; color: var(--text-muted); font-weight: 400; }
+  </style>
+</head>
+<body>
+
+  <!-- Minimal Nav -->
+  <nav class="public-nav">
+    <a href="index.html" style="font-size:24px;font-weight:900;color:var(--primary);text-decoration:none">🎓 تواصل</a>
+    <div style="display:flex;gap:12px">
+      <button class="dark-toggle" style="background:none;border:none;font-size:20px;cursor:pointer">🌙</button>
+      <a href="index.html" class="btn btn-outline" style="padding:8px 16px;font-size:14px">← العودة للرئيسية</a>
+    </div>
+  </nav>
+
+  <div style="padding:80px 20px;max-width:1400px;margin:0 auto">
+    
+    <div style="text-align:center;margin-bottom:64px" class="fade-up">
+      <h1 style="font-size:44px;font-weight:900;margin-bottom:20px;background: linear-gradient(135deg, var(--primary), #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">باقات الخدمات الأكاديمية الاحترافية</h1>
+      <p style="font-size:18px;color:var(--text-secondary);max-width:700px;margin:0 auto;line-height:1.8">
+        لقد صممنا باقاتنا لتغطي كافة احتياجاتك البحثية من الفكرة وحتى النشر. اختر الحزمة التي تناسب مرحلة بحثك الحالية بخصومات حصرية.
+      </p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:24px">
+      
+      <!-- Package 1 -->
+      <div class="pkg-card fade-up" style="animation-delay:0.1s">
+        <div class="pkg-icon">🏗️</div>
+        <h3 style="font-size:22px;font-weight:800">باقة البداية</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin:8px 0">للباحثين في مرحلة التأسيس</p>
+        <div class="pkg-price">199<span class="price-sub">ر.س</span></div>
+        
+        <ul class="pkg-list">
+          <li>اختيار عنوان البحث باحترافية.</li>
+          <li>إعداد خطة البحث (Proposal).</li>
+          <li>استشارة أكاديمية متخصصة.</li>
+          <li>تحديد المنهجية والأدوات.</li>
+        </ul>
+        
+        <button class="btn btn-outline" style="width:100%" onclick="alert('جاري الانتقال لعملية الطلب...')">اطلب الباقة</button>
+      </div>
+
+      <!-- Package 2 -->
+      <div class="pkg-card fade-up" style="animation-delay:0.2s">
+        <div class="pkg-icon">📝</div>
+        <h3 style="font-size:22px;font-weight:800">باقة التطوير</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin:8px 0">لتحسين جودة الكتابة واللغة</p>
+        <div class="pkg-price">399<span class="price-sub">ر.س</span></div>
+        
+        <ul class="pkg-list">
+          <li>إعادة صياغة أكاديمية رصينة.</li>
+          <li>تدقيق لغوي ونحوي شامل.</li>
+          <li>توثيق المراجع (APA/MLA).</li>
+          <li>تنسيق الجداول والمصفوفات.</li>
+        </ul>
+        
+        <button class="btn btn-outline" style="width:100%" onclick="alert('جاري الانتقال لعملية الطلب...')">اطلب الباقة</button>
+      </div>
+
+      <!-- Package 3 -->
+      <div class="pkg-card fade-up" style="animation-delay:0.3s">
+        <div class="pkg-icon">📊</div>
+        <h3 style="font-size:22px;font-weight:800">باقة التحليل</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin:8px 0">لمرحلة معالجة وتفسير البيانات</p>
+        <div class="pkg-price">599<span class="price-sub">ر.س</span></div>
+        
+        <ul class="pkg-list">
+          <li>تحليل إحصائي متقدم (SPSS).</li>
+          <li>تفسير النتائج ومناقشتها.</li>
+          <li>إعداد الجداول والرسوم البيانية.</li>
+          <li>اختبار الفرضيات الإحصائية.</li>
+        </ul>
+        
+        <button class="btn btn-outline" style="width:100%" onclick="alert('جاري الانتقال لعملية الطلب...')">اطلب الباقة</button>
+      </div>
+
+      <!-- Package 4 -->
+      <div class="pkg-card fade-up" style="animation-delay:0.4s">
+        <div class="pkg-icon">🔍</div>
+        <h3 style="font-size:22px;font-weight:800">باقة التسليم</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin:8px 0">المراجعة النهائية قبل التسليم</p>
+        <div class="pkg-price">899<span class="price-sub">ر.س</span></div>
+        
+        <ul class="pkg-list">
+          <li>مراجعة شاملة ومنهجية للبحث.</li>
+          <li>فحص وتقليل نسبة الاقتباس.</li>
+          <li>تنسيق نهائي حسب دليل الجامعة.</li>
+          <li>التأكد من اكتمال كافة المرفقات.</li>
+        </ul>
+        
+        <button class="btn btn-outline" style="width:100%" onclick="alert('جاري الانتقال لعملية الطلب...')">اطلب الباقة</button>
+      </div>
+
+      <!-- Package 5 -->
+      <div class="pkg-card pkg-popular fade-up" style="animation-delay:0.5s">
+        <div class="pkg-icon">👑</div>
+        <h3 style="font-size:22px;font-weight:800;color:var(--primary)">باقة النخبة (VIP)</h3>
+        <p style="color:var(--text-muted);font-size:13px;margin:8px 0">الدعم الأكاديمي الكامل والشامل</p>
+        <div class="pkg-price" style="color:var(--primary)">2499<span class="price-sub">ر.س</span></div>
+        
+        <ul class="pkg-list">
+          <li><strong>جميع مميزات الباقات السابقة.</strong></li>
+          <li>تحكيم الأدوات والبحث من مختصين.</li>
+          <li>تدريب مكثف على المناقشة.</li>
+          <li>إعداد عرض PowerPoint والـ Script.</li>
+          <li>دعم فني وأكاديمي VIP 24/7.</li>
+        </ul>
+        
+        <button class="btn btn-primary" style="width:100%" onclick="alert('جاري الانتقال لعملية الطلب...')">اطلب باقة النخبة</button>
+      </div>
+
+    </div>
+
+    <!-- Info Section -->
+    <div style="margin-top:80px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:24px;padding:40px;text-align:center" class="fade-up">
+      <h4 style="font-size:20px;font-weight:800;margin-bottom:16px">لماذا تختار باقاتنا المجمعة؟</h4>
+      <p style="color:var(--text-secondary);font-size:15px;max-width:800px;margin:0 auto 24px">
+        توفر لك الباقات المجمعة خصماً يصل إلى 30% مقارنة بطلب كل خدمة على حدة، بالإضافة إلى أولوية في التنفيذ ومتابعة مستمرة من مدير حساب مخصص لمتابعة رحلتك الأكاديمية.
+      </p>
+      <div style="display:flex;gap:12px;justify-content:center">
+        <a href="services/services.html" class="btn btn-link">تصفح الخدمات الفردية ←</a>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="assets/js/global.js"></script>
+</body>
+</html>

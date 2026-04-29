@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>طلب خدمة جديدة - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    /* Multi-step progress */
+    .steps-container {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      margin-bottom: 32px;
+      padding: 0 20px;
+    }
+    .steps-container::before {
+      content: "";
+      position: absolute;
+      top: 20px;
+      left: 30px;
+      right: 30px;
+      height: 2px;
+      background: var(--border-color);
+      z-index: 0;
+    }
+    .step-indicator {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+      z-index: 1;
+    }
+    .step-indicator .circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--bg-card);
+      border: 2px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      color: var(--text-secondary);
+      transition: all 0.3s;
+    }
+    .step-indicator.active .circle {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+    }
+    .step-indicator.completed .circle {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+    }
+    .step-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .step-indicator.active .step-label {
+      color: var(--primary);
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div class="logo-text">تواصل</div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
+        <a href="student-dashboard.html" class="nav-item">
+          <span class="icon">📊</span>
+          <span>لوحة المعلومات</span>
+        </a>
+        <a href="services.html" class="nav-item active">
+          <span class="icon">📦</span>
+          <span>الخدمات الأكاديمية</span>
+        </a>
+        <a href="orders.html" class="nav-item">
+          <span class="icon">📋</span>
+          <span>طلباتي</span>
+        </a>
+        <a href="chat.html" class="nav-item">
+          <span class="icon">💬</span>
+          <span>المحادثات</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="icon">💳</span>
+          <span>المدفوعات</span>
+        </a>
+        
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
+        <a href="profile.html" class="nav-item">
+          <span class="icon">👤</span>
+          <span>الملف الشخصي</span>
+        </a>
+      </nav>
+      
+      <div style="padding:20px;border-top:1px solid var(--border-color)">
+        <a href="#" class="nav-item" style="color:var(--danger)">
+          <span class="icon">🚪</span>
+          <span>تسجيل الخروج</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      
+      <!-- Top Navbar -->
+      <header class="top-navbar">
+        <div style="display:flex;align-items:center;gap:16px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div class="h3">طلب جديد</div>
+        </div>
+
+        <div class="navbar-actions">
+          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
+          <button class="icon-btn" aria-label="الإشعارات">
+            🔔<span class="badge-dot">3</span>
+          </button>
+          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
+          <div class="user-profile">
+            <div class="user-info" style="text-align:left">
+              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-role">طالب</span>
+            </div>
+            <div class="user-avatar user-initials-fill">؟</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content-wrap" style="max-width:1000px;margin:0 auto">
+        
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px">
+          <div>
+            <h1 class="h1" style="margin-bottom:8px">إنشاء طلب خدمة</h1>
+            <p class="text-body">حدد الخدمة المطلوبة وقم بتزويدنا بالتفاصيل لنقوم بالباقي.</p>
+          </div>
+          <a href="services.html" class="btn btn-outline">إلغاء والعودة</a>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 300px;gap:24px">
+          
+          <!-- Form Section -->
+          <div class="card" style="padding:32px">
+            
+            <div class="steps-container">
+              <div class="step-indicator active"><div class="circle">1</div><div class="step-label">نوع الخدمة</div></div>
+              <div class="step-indicator"><div class="circle">2</div><div class="step-label">التفاصيل الأساسية</div></div>
+              <div class="step-indicator"><div class="circle">3</div><div class="step-label">الملفات والشروحات</div></div>
+            </div>
+
+            <form id="multiOrderForm">
+              
+              <!-- STEP 1 -->
+              <div class="form-step" id="step1">
+                <h3 class="h3" style="margin-bottom:24px">اختيار الخدمة والتخصص</h3>
+                
+                <div class="form-group">
+                  <label class="form-label">الخدمة المطلوبة <span style="color:var(--danger)">*</span></label>
+                  <select class="form-input" id="serviceSelect" required>
+                    <!-- Populated by JS -->
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">التخصص الدقيق <span style="color:var(--danger)">*</span></label>
+                  <input type="text" class="form-input" placeholder="مثال: إدارة الموارد البشرية" required>
+                </div>
+
+              </div>
+
+              <!-- STEP 2 -->
+              <div class="form-step" id="step2" style="display:none">
+                <h3 class="h3" style="margin-bottom:24px">تفاصيل العمل المطلوبة</h3>
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+                  <div class="form-group">
+                    <label class="form-label">المستوى الأكاديمي <span style="color:var(--danger)">*</span></label>
+                    <select class="form-input" required>
+                      <option>بكالوريوس</option>
+                      <option>ماجستير</option>
+                      <option>دكتوراة</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">اللغة <span style="color:var(--danger)">*</span></label>
+                    <select class="form-input" required>
+                      <option>العربية</option>
+                      <option>الإنجليزية</option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="grid-column:1/-1">
+                    <label class="form-label">موعد التسليم المرغوب <span style="color:var(--danger)">*</span></label>
+                    <input type="date" class="form-input" required>
+                  </div>
+                </div>
+              </div>
+
+              <!-- STEP 3 -->
+              <div class="form-step" id="step3" style="display:none">
+                <h3 class="h3" style="margin-bottom:24px">الشروحات والمرفقات</h3>
+                
+                <div class="form-group">
+                  <label class="form-label">وصف دقيق للطلب وملاحظاتك <span style="color:var(--danger)">*</span></label>
+                  <textarea class="form-input" rows="5" placeholder="أدخل متطلبات الطلب بالتفصيل لتسهيل فهم الأكاديمي..." required></textarea>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">المرفقات</label>
+                  <div style="border:2px dashed var(--border-color);border-radius:var(--radius-lg);padding:32px;text-align:center;background:var(--bg-body);cursor:pointer;transition:all 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-color)'" onclick="document.getElementById('fileUpload').click()">
+                    <input type="file" id="fileUpload" multiple style="display:none">
+                    <div style="font-size:32px;margin-bottom:12px">📤</div>
+                    <div style="font-weight:700">اضغط لرفع الملفات والتعليمات</div>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">PDF, DOCX, ZIP بحد أقصى 10MB</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:24px;margin-top:16px">
+                <button type="button" class="btn btn-outline" id="prevBtn" style="display:none">السابق</button>
+                <div style="margin-right:auto">
+                  <button type="button" class="btn btn-primary" id="nextBtn">التالي</button>
+                  <button type="submit" class="btn btn-primary" id="submitBtn" style="display:none;background:var(--success)">✅ إنشاء الطلب</button>
+                </div>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- Summary Sidebar -->
+          <div>
+            <div class="card" style="position:sticky;top:90px">
+              <h3 class="h3" style="margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border-color)">ملخص الطلب</h3>
+              
+              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;color:var(--text-secondary)">
+                <span>السعر المبدئي للخدمة</span>
+                <span id="basePrice" style="font-weight:700;color:var(--text-primary)">0 ر.س</span>
+              </div>
+              
+              <div style="margin-top:20px;border-top:1px dashed var(--border-color);padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700">الإجمالي المتوقع</span>
+                <span id="totalPrice" style="font-size:24px;font-weight:800;color:var(--primary)">0 ر.س</span>
+              </div>
+
+              <div style="margin-top:24px;padding:12px;background:var(--primary-light);border-radius:var(--radius-sm);color:var(--primary);font-size:12px;line-height:1.6">
+                <strong>ملاحظة:</strong>
+                هذا تسعير مبدئي، وسيتم تأكيد السعر النهائي من الأكاديمي بناءً على متطلباتك الدقيقة.
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

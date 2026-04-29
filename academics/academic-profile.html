@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>الملف الشخصي - تواصل الأكاديمي</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="assets/css/style.css"/>
+</head>
+<body>
+
+<!-- Header -->
+<header class="public-header">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-icon" style="font-size:22px">🎓</div>
+    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
+  </div>
+  <nav style="display:flex;gap:6px;align-items:center">
+    <a href="academics-list.html" class="btn btn-ghost btn-sm">← الأكاديميون</a>
+    <a href="academic-register.html" class="btn btn-primary btn-sm">سجّل كأكاديمي</a>
+    <button class="nav-btn dark-toggle" style="margin-right:8px">🌙</button>
+  </nav>
+</header>
+
+<!-- Profile Hero -->
+<div id="profileHero" style="background:linear-gradient(135deg,#1e1b4b,#312e81);padding:48px 32px 0;position:relative;overflow:hidden">
+  <div style="position:absolute;inset:0;background:radial-gradient(circle at 20% 50%,rgba(99,102,241,.3),transparent 60%)"></div>
+  <div style="max-width:1100px;margin:0 auto;position:relative">
+    <div id="profileHeader" style="display:flex;align-items:flex-end;gap:28px;padding-bottom:0">
+      <!-- Avatar -->
+      <div id="profileAvatar" style="width:120px;height:120px;border-radius:24px;border:4px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 8px 28px rgba(0,0,0,.3)">مع</div>
+      <!-- Info -->
+      <div style="flex:1;padding-bottom:24px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <h1 id="profileName" style="font-size:28px;font-weight:900;color:#fff">د. محمد علي السعيد</h1>
+          <span class="badge badge-success" style="background:rgba(16,185,129,.2);color:#6ee7b7">✓ موثّق</span>
+        </div>
+        <p id="profileSpec" style="color:rgba(255,255,255,.75);font-size:15px;margin-bottom:10px">📚 الرياضيات والإحصاء · 🎓 دكتوراه · 🏛 جامعة الملك سعود</p>
+        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+          <span style="color:#f59e0b;font-weight:700;font-size:16px" id="profileRating">⭐ 4.9 (128 تقييم)</span>
+          <span style="color:rgba(255,255,255,.65);font-size:14px" id="profileOrders">✅ 245 طلب مكتمل</span>
+          <span style="color:rgba(255,255,255,.65);font-size:14px">🇸🇦 السعودية</span>
+        </div>
+      </div>
+      <!-- Action box -->
+      <div style="background:rgba(255,255,255,.08);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:20px;min-width:220px;flex-shrink:0;margin-bottom:24px">
+        <div style="font-size:28px;font-weight:900;color:#fff;margin-bottom:4px" id="profilePrice">349 ر.س</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:16px">ابتداءً من / للطلب</div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="Modal.open('requestModal')" style="font-size:15px">📋 طلب خدمة</button>
+        <button class="btn btn-outline btn-block btn-sm" onclick="Toast.show('تمت إضافة إلى المفضلة','success')" style="margin-top:8px;border-color:rgba(255,255,255,.3);color:rgba(255,255,255,.8)">♡ إضافة للمفضلة</button>
+      </div>
+    </div>
+    <!-- Tabs nav -->
+    <div style="display:flex;gap:2px;border-bottom:none;margin-top:8px">
+      <button class="profile-tab-btn active" data-ptab="about" onclick="switchPTab('about',this)">نبذة</button>
+      <button class="profile-tab-btn" data-ptab="quals" onclick="switchPTab('quals',this)">المؤهلات</button>
+      <button class="profile-tab-btn" data-ptab="services" onclick="switchPTab('services',this)">الخدمات</button>
+      <button class="profile-tab-btn" data-ptab="reviews" onclick="switchPTab('reviews',this)">التقييمات</button>
+    </div>
+  </div>
+</div>
+
+<!-- Main body -->
+<div style="max-width:1100px;margin:0 auto;padding:32px">
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:28px">
+
+    <!-- Left (Tab Panels) -->
+    <div>
+
+      <!-- About -->
+      <div id="ptab-about" class="ptab-panel active">
+        <div class="card" style="padding:24px;margin-bottom:20px">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:14px">👤 نبذة تعريفية</h2>
+          <p id="profileBio" style="color:var(--text-secondary);line-height:1.9;font-size:15px">أستاذ متميز في الرياضيات والإحصاء مع خبرة أكثر من 15 عاماً في التدريس والبحث العلمي. متخصص في التحليل الإحصائي والأساليب الكمية ومساعدة الطلاب في إنجاز أبحاثهم العلمية بجودة عالية.</p>
+        </div>
+
+        <!-- Quick stats -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+          <div class="card" style="padding:20px;text-align:center">
+            <div style="font-size:26px;font-weight:900;color:var(--primary)" data-counter="245">0</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">إجمالي الطلبات</div>
+          </div>
+          <div class="card" style="padding:20px;text-align:center">
+            <div style="font-size:26px;font-weight:900;color:var(--success)">94%</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">نسبة الإتمام</div>
+          </div>
+          <div class="card" style="padding:20px;text-align:center">
+            <div style="font-size:26px;font-weight:900;color:#f59e0b">⭐ 4.9</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">متوسط التقييم</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Qualifications -->
+      <div id="ptab-quals" class="ptab-panel" style="display:none">
+        <div class="card" style="padding:24px">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:20px">🎓 المؤهلات الأكاديمية</h2>
+
+          <!-- Bachelor -->
+          <div style="display:flex;gap:16px;padding:18px;background:var(--bg-main);border-radius:14px;margin-bottom:12px">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🏫</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--primary);letter-spacing:1px;margin-bottom:4px">بكالوريوس</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text-primary)">رياضيات وإحصاء</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">🏛 جامعة الملك سعود · 🇸🇦 السعودية · 2005</div>
+            </div>
+            <div style="margin-right:auto"><span class="badge badge-success">موثّق ✓</span></div>
+          </div>
+
+          <!-- Masters -->
+          <div style="display:flex;gap:16px;padding:18px;background:var(--bg-main);border-radius:14px;margin-bottom:12px">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(16,185,129,.1);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📜</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--success);letter-spacing:1px;margin-bottom:4px">ماجستير</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text-primary)">إحصاء تطبيقي</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">🏛 جامعة الملك عبدالعزيز · 🇸🇦 السعودية · 2008</div>
+            </div>
+            <div style="margin-right:auto"><span class="badge badge-success">موثّق ✓</span></div>
+          </div>
+
+          <!-- PhD -->
+          <div style="display:flex;gap:16px;padding:18px;background:var(--bg-main);border-radius:14px">
+            <div style="width:48px;height:48px;border-radius:12px;background:rgba(245,158,11,.1);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">🎓</div>
+            <div>
+              <div style="font-size:12px;font-weight:600;color:var(--warning);letter-spacing:1px;margin-bottom:4px">دكتوراه</div>
+              <div style="font-size:16px;font-weight:700;color:var(--text-primary)">الإحصاء الحيوي والتحليل الكمي</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">🏛 جامعة أوكلاند · 🇳🇿 نيوزيلندا · 2013</div>
+            </div>
+            <div style="margin-right:auto"><span class="badge badge-success">موثّق ✓</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Services -->
+      <div id="ptab-services" class="ptab-panel" style="display:none">
+        <div class="card" style="padding:24px">
+          <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:20px">⚙️ الخدمات المقدَّمة</h2>
+          <div id="profileServices" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+        </div>
+      </div>
+
+      <!-- Reviews -->
+      <div id="ptab-reviews" class="ptab-panel" style="display:none">
+        <div class="card" style="padding:24px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+            <h2 style="font-size:18px;font-weight:700;color:var(--text-primary)">⭐ التقييمات</h2>
+            <div style="text-align:left">
+              <div style="font-size:40px;font-weight:900;color:#f59e0b;line-height:1">4.9</div>
+              <div style="font-size:12px;color:var(--text-secondary)">(128 تقييم)</div>
+            </div>
+          </div>
+          <!-- Rating bars -->
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:13px;color:var(--text-secondary);min-width:24px">5 ⭐</span>
+              <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:82%;background:#f59e0b"></div></div>
+              <span style="font-size:13px;color:var(--text-secondary);min-width:32px">82%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:13px;color:var(--text-secondary);min-width:24px">4 ⭐</span>
+              <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:14%;background:#f59e0b"></div></div>
+              <span style="font-size:13px;color:var(--text-secondary);min-width:32px">14%</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:13px;color:var(--text-secondary);min-width:24px">3 ⭐</span>
+              <div class="progress-bar" style="flex:1"><div class="progress-fill" style="width:4%;background:#f59e0b"></div></div>
+              <span style="font-size:13px;color:var(--text-secondary);min-width:32px">4%</span>
+            </div>
+          </div>
+          <div id="reviewsList"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right sidebar -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+
+      <!-- Contact -->
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📞 التواصل</h3>
+        <button class="btn btn-success btn-block" onclick="Toast.show('سيتواصل معك الأكاديمي عبر واتساب','success')">💬 واتساب</button>
+        <button class="btn btn-outline btn-block btn-sm" onclick="Toast.show('تم إرسال رسالتك','info')" style="margin-top:8px">📧 إرسال رسالة</button>
+      </div>
+
+      <!-- Availability -->
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">📅 التوفر</h3>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block"></span>
+          <span style="font-size:14px;color:var(--text-primary)">متاح حالياً</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-secondary)">⏰ وقت الرد: أقل من ساعة</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">📦 الطلبات الجارية: 3</div>
+      </div>
+
+      <!-- Similar -->
+      <div class="card" style="padding:20px">
+        <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">🎓 أكاديميون مشابهون</h3>
+        <div id="similarAcademics"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Request Service Modal -->
+<div class="modal-overlay" id="requestModal">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <h3 class="modal-title">📋 طلب خدمة</h3>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">الخدمة المطلوبة</label>
+        <select class="form-input form-select" style="padding-left:36px" required>
+          <option value="">اختر الخدمة</option>
+          <option>الأبحاث والدراسات</option>
+          <option>التحليل الإحصائي</option>
+          <option>الرسائل الجامعية</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الباقة</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px">
+          <label style="border:2px solid var(--border-color);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:all .2s" onclick="selectPkg(this)">
+            <div style="font-weight:700;color:var(--text-primary)">البداية</div>
+            <div style="font-size:16px;font-weight:800;color:var(--primary);margin-top:4px">149 ر.س</div>
+          </label>
+          <label style="border:2px solid var(--primary);border-radius:10px;padding:12px;text-align:center;cursor:pointer;background:rgba(99,102,241,.05)" onclick="selectPkg(this)">
+            <div style="font-weight:700;color:var(--primary)">التطوير</div>
+            <div style="font-size:16px;font-weight:800;color:var(--primary);margin-top:4px">349 ر.س</div>
+            <div style="font-size:10px;color:var(--primary);margin-top:2px">الأشهر</div>
+          </label>
+          <label style="border:2px solid var(--border-color);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:all .2s" onclick="selectPkg(this)">
+            <div style="font-weight:700;color:var(--text-primary)">النخبة</div>
+            <div style="font-size:16px;font-weight:800;color:var(--primary);margin-top:4px">1999 ر.س</div>
+          </label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">تفاصيل الطلب</label>
+        <textarea class="form-input" rows="4" placeholder="اشرح ما تحتاجه بالتفصيل..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الموعد النهائي المطلوب</label>
+        <input type="date" class="form-input"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-modal-close>إلغاء</button>
+      <button class="btn btn-primary" onclick="submitRequest()">إرسال الطلب 📋</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.profile-tab-btn{padding:12px 22px;background:none;border:none;border-bottom:3px solid transparent;margin-bottom:-3px;font-family:Tajawal,sans-serif;font-size:14px;font-weight:600;color:rgba(255,255,255,.6);cursor:pointer;transition:all .2s}
+.profile-tab-btn:hover{color:rgba(255,255,255,.9)}
+.profile-tab-btn.active{color:#fff;border-bottom-color:#fff}
+.ptab-panel{display:none}
+.ptab-panel.active{display:block;animation:fadeIn .3s ease}
+</style>
+
+<script src="assets/js/main.js"></script>
+<script>
+function switchPTab(tab, btn) {
+  document.querySelectorAll('.ptab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.profile-tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('ptab-' + tab).style.display = 'block';
+  btn.classList.add('active');
+}
+
+function selectPkg(el) {
+  el.closest('.modal-body').querySelectorAll('label[onclick]').forEach(l => {
+    l.style.borderColor = 'var(--border-color)';
+    l.style.background = 'transparent';
+  });
+  el.style.borderColor = 'var(--primary)';
+  el.style.background = 'rgba(99,102,241,0.05)';
+}
+
+function submitRequest() {
+  Toast.show('تم إرسال طلبك بنجاح! سيتواصل معك الأكاديمي قريباً 🎉', 'success', 4000);
+  Modal.close('requestModal');
+}
+
+function renderProfileServices() {
+  const academic = ACADEMICS_DATA.academics[0]; // Default to first
+  const container = document.getElementById('profileServices');
+  if (!container) return;
+  container.innerHTML = academic.services.map(sId => {
+    const s = ACADEMICS_DATA.services.find(x => x.id === sId);
+    if (!s) return '';
+    return `<div style="display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg-main);border-radius:12px;border:1px solid var(--border-color)"><span style="font-size:24px">${s.icon}</span><span style="font-size:14px;font-weight:600;color:var(--text-primary)">${s.name}</span></div>`;
+  }).join('');
+}
+
+function renderReviews() {
+  const list = document.getElementById('reviewsList');
+  if (!list) return;
+  list.innerHTML = ACADEMICS_DATA.reviews.map((r, i) => `
+    <div style="padding:18px;background:var(--bg-main);border-radius:14px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <div style="width:40px;height:40px;border-radius:50%;background:${getAvatarColor(i)};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${r.avatar}</div>
+        <div style="flex:1">
+          <div style="font-weight:700;color:var(--text-primary)">${r.student}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${r.date}</div>
+        </div>
+        <div style="color:#f59e0b;font-weight:700">⭐ ${r.rating}</div>
+      </div>
+      <p style="font-size:14px;color:var(--text-secondary);line-height:1.7">${r.text}</p>
+    </div>
+  `).join('');
+}
+
+function renderSimilar() {
+  const list = document.getElementById('similarAcademics');
+  if (!list) return;
+  list.innerHTML = ACADEMICS_DATA.academics.slice(1, 4).map((a, i) => `
+    <a href="academic-profile.html?id=${a.id}" style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;transition:background .2s;text-decoration:none" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+      <div style="width:42px;height:42px;border-radius:50%;background:${a.color};display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;flex-shrink:0">${a.avatar}</div>
+      <div style="min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}</div>
+        <div style="font-size:11px;color:var(--text-secondary)">⭐ ${a.rating} · ${a.specialty.slice(0,16)}...</div>
+      </div>
+    </a>
+  `).join('');
+}
+
+document.getElementById('ptab-about').style.display = 'block';
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderProfileServices();
+  renderReviews();
+  renderSimilar();
+});
+</script>
+</body>
+</html>

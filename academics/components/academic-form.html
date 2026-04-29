@@ -1,0 +1,174 @@
+<!--
+  ============================================
+  Academic Form Component - Multi-Step Demo
+  ============================================
+  This file demonstrates all custom form
+  elements used across the academics module.
+  ============================================
+-->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Academic Form Component</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../assets/css/style.css"/>
+</head>
+<body style="padding:40px;background:var(--bg-main)">
+
+<h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:8px">Academic Form - Component Library</h2>
+<p style="color:var(--text-secondary);font-size:14px;margin-bottom:32px">استخدم هذه العناصر في أي صفحة تسجيل أو إعدادات</p>
+
+<!-- ====== Text Input ====== -->
+<div class="card" style="padding:24px;margin-bottom:20px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📝 حقول النص</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div class="form-group">
+      <label class="form-label">حقل عادي</label>
+      <input class="form-input" type="text" placeholder="اكتب هنا..."/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">حقل البريد الإلكتروني</label>
+      <input class="form-input" type="email" placeholder="example@email.com" dir="ltr"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">حقل بخطأ</label>
+      <input class="form-input error" type="text" value="قيمة خاطئة"/>
+      <p class="form-error">هذا الحقل مطلوب ✕</p>
+    </div>
+    <div class="form-group">
+      <label class="form-label">قائمة منسدلة</label>
+      <select class="form-input form-select" style="padding-left:36px">
+        <option>خيار أول</option>
+        <option>خيار ثاني</option>
+        <option>خيار ثالث</option>
+      </select>
+    </div>
+    <div class="form-group" style="grid-column:span 2">
+      <label class="form-label">حقل نصي متعدد الأسطر</label>
+      <textarea class="form-input" rows="3" placeholder="اكتب ملاحظاتك هنا..."></textarea>
+      <p class="form-hint">الحد الأقصى 500 حرف</p>
+    </div>
+  </div>
+</div>
+
+<!-- ====== File Upload ====== -->
+<div class="card" style="padding:24px;margin-bottom:20px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📤 رفع الملفات</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div>
+      <label class="form-label">رفع صورة الشهادة</label>
+      <div class="file-upload-area">
+        <input type="file" accept="image/*,.pdf" style="display:none"/>
+        <span class="upload-icon">📄</span>
+        <p><strong>اضغط للرفع</strong> أو اسحب الملف هنا</p>
+        <p style="font-size:12px;margin-top:4px">PNG، JPG، PDF · بحد أقصى 5MB</p>
+        <div class="upload-info" style="font-size:13px;color:var(--primary);margin-top:8px"></div>
+      </div>
+    </div>
+    <div>
+      <label class="form-label">رفع صورة شخصية</label>
+      <div class="file-upload-area" style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <input type="file" accept="image/*" style="display:none"/>
+        <div style="width:80px;height:80px;border-radius:50%;background:var(--border-color);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:8px">🤵</div>
+        <p><strong>رفع الصورة</strong></p>
+        <p style="font-size:12px;margin-top:4px">PNG، JPG · بحد أقصى 2MB</p>
+        <div class="upload-info" style="font-size:13px;color:var(--primary);margin-top:8px"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Toggle & Checkboxes ====== -->
+<div class="card" style="padding:24px;margin-bottom:20px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🔘 مفاتيح التبديل والاختيار</h3>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:14px">
+      <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
+      <span style="font-size:14px;color:var(--text-primary)">مفعّل</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px">
+      <label class="toggle-switch"><input type="checkbox"/><span class="toggle-slider"></span></label>
+      <span style="font-size:14px;color:var(--text-primary)">معطّل</span>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+        <input type="checkbox" style="width:16px;height:16px;accent-color:var(--primary)"/>
+        <span>خيار أول</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+        <input type="checkbox" style="width:16px;height:16px;accent-color:var(--primary)" checked/>
+        <span>خيار ثاني (محدد)</span>
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ====== Multi-step form demo ====== -->
+<div class="card" style="padding:24px;margin-bottom:20px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🔢 نموذج متعدد الخطوات</h3>
+
+  <!-- Progress bar -->
+  <div style="background:var(--border-color);border-radius:6px;height:4px;margin-bottom:28px;overflow:hidden">
+    <div id="demoProgressBar" style="height:100%;background:linear-gradient(90deg,#6366f1,#818cf8);width:0%;border-radius:6px;transition:width .4s"></div>
+  </div>
+
+  <!-- Steps -->
+  <div class="step-progress">
+    <div class="step-item done"><div class="step-circle">✓</div><div class="step-label">الخطوة 1</div></div>
+    <div class="step-item active"><div class="step-circle">2</div><div class="step-label">الخطوة 2</div></div>
+    <div class="step-item"><div class="step-circle">3</div><div class="step-label">الخطوة 3</div></div>
+    <div class="step-item"><div class="step-circle">4</div><div class="step-label">الخطوة 4</div></div>
+  </div>
+
+  <!-- Content -->
+  <div style="padding:20px;background:var(--bg-main);border-radius:12px;text-align:center;color:var(--text-secondary)">
+    الخطوة الثانية من النموذج - محتوى الفورم هنا
+  </div>
+
+  <!-- Nav buttons -->
+  <div style="display:flex;justify-content:space-between;margin-top:16px">
+    <button class="btn btn-outline">← السابق</button>
+    <button class="btn btn-primary">التالي ←</button>
+  </div>
+</div>
+
+<!-- ====== Buttons showcase ====== -->
+<div class="card" style="padding:24px;margin-bottom:20px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🎨 الأزرار</h3>
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+    <button class="btn btn-primary">الأساسي</button>
+    <button class="btn btn-secondary">الثانوي</button>
+    <button class="btn btn-success">نجاح</button>
+    <button class="btn btn-danger">خطر</button>
+    <button class="btn btn-warning">تحذير</button>
+    <button class="btn btn-outline">محيطي</button>
+    <button class="btn btn-ghost">شبح</button>
+    <button class="btn btn-primary btn-sm">صغير</button>
+    <button class="btn btn-primary btn-lg">كبير</button>
+  </div>
+</div>
+
+<!-- ====== Alerts ====== -->
+<div class="card" style="padding:24px">
+  <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">⚠️ التنبيهات</h3>
+  <div class="alert alert-info"><span>ℹ️</span><span>هذا تنبيه معلوماتي لإرشاد المستخدم.</span></div>
+  <div class="alert alert-success"><span>✅</span><span>تمت العملية بنجاح!</span></div>
+  <div class="alert alert-warning"><span>⚠️</span><span>يرجى الانتباه لهذا التحذير قبل المتابعة.</span></div>
+  <div class="alert alert-danger"><span>❌</span><span>حدث خطأ. يرجى المحاولة مرة أخرى.</span></div>
+</div>
+
+<script src="../assets/js/main.js"></script>
+<script>
+// Animate demo progress bar
+let demoStep = 2;
+const demoBar = document.getElementById('demoProgressBar');
+if (demoBar) demoBar.style.width = ((demoStep - 1) / 3 * 100) + '%';
+
+// Init file uploads
+document.addEventListener('DOMContentLoaded', () => initFileUploads());
+</script>
+</body>
+</html>

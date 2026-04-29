@@ -1,0 +1,184 @@
+<!--
+  ============================================
+  Academic Card Component
+  Usage: include directly or inject via JS
+  ============================================
+
+  Props (data attributes or JS variables):
+  - name, avatar, specialty, degree, university,
+    rating, reviews, orders, price, status, color
+  ============================================
+-->
+
+<!-- ====== Standalone Demo ====== -->
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Academic Card Component</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="../assets/css/style.css"/>
+</head>
+<body style="padding:40px;background:var(--bg-main)">
+
+<h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:24px">Academic Card - Component Demo</h2>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;max-width:1000px">
+
+  <!-- Card Template (rendered by JS) -->
+  <div id="cardDemo"></div>
+
+</div>
+
+<div style="margin-top:40px;background:var(--bg-card);padding:24px;border-radius:16px;border:1px solid var(--border-color)">
+  <h3 style="font-weight:700;margin-bottom:12px;color:var(--text-primary)">JavaScript Usage:</h3>
+  <pre style="font-family:monospace;font-size:13px;color:var(--text-secondary);line-height:1.7">
+// Create a card
+const cardHTML = AcademicCard.render({
+  id: 1,
+  name: 'د. محمد السعيد',
+  avatar: 'مع',
+  specialty: 'الرياضيات والإحصاء',
+  degree: 'دكتوراه',
+  university: 'جامعة الملك سعود',
+  rating: 4.9,
+  reviews: 128,
+  orders: 245,
+  price: 349,
+  color: '#6366f1',
+  status: 'approved'
+});
+document.getElementById('container').innerHTML = cardHTML;
+  </pre>
+</div>
+
+<script src="../assets/js/main.js"></script>
+<script>
+/**
+ * ============================================
+ * AcademicCard - Reusable Component
+ * ============================================
+ */
+const AcademicCard = {
+
+  /**
+   * Render a full academic card
+   * @param {object} academic - academic data object
+   * @param {number} index - for animation delay
+   * @returns {string} HTML string
+   */
+  render(academic, index = 0) {
+    const {
+      id = '', name = 'بدون اسم', avatar = '?', specialty = '',
+      degree = '', university = '', rating = 0, reviews = 0,
+      orders = 0, completedOrders = 0, price = 0,
+      color = '#6366f1', status = 'approved'
+    } = academic;
+
+    return `
+      <div class="academic-card card-hover anim-up" style="animation-delay:${index * 0.08}s;opacity:0" data-id="${id}">
+        <!-- Cover -->
+        <div class="academic-card-cover" style="background:linear-gradient(135deg,${color},${color}99)">
+          <div class="academic-card-avatar" style="background:${color}">${avatar}</div>
+          <div style="position:absolute;top:12px;left:12px">${getStatusBadge(status)}</div>
+          <!-- Degree badge -->
+          <div style="position:absolute;top:12px;right:12px">
+            <span class="badge" style="background:rgba(0,0,0,.3);color:#fff;font-size:11px">${degree}</span>
+          </div>
+        </div>
+
+        <!-- Body -->
+        <div class="academic-card-body">
+          <div class="academic-card-name">${name}</div>
+          <div class="academic-card-spec">📚 ${specialty}</div>
+
+          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+            <span class="badge badge-secondary" style="font-size:11px">🏛 ${university}</span>
+          </div>
+
+          <div class="academic-card-stats">
+            <div class="ac-stat">
+              <span class="ac-stat-value">${orders}</span>
+              <span class="ac-stat-label">إجمالي</span>
+            </div>
+            <div class="ac-stat">
+              <span class="ac-stat-value">${completedOrders || Math.round(orders * 0.95)}</span>
+              <span class="ac-stat-label">مكتمل</span>
+            </div>
+            <div class="ac-stat">
+              <span class="ac-stat-value">${reviews}</span>
+              <span class="ac-stat-label">تقييم</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="academic-card-footer">
+          <div>
+            <div class="star-rating">⭐ ${rating} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">(${reviews})</span></div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary);margin-top:2px">
+              ${price} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">ر.س</span>
+            </div>
+          </div>
+          <a href="../academic-profile.html?id=${id}" class="btn btn-primary btn-sm">عرض الملف ←</a>
+        </div>
+      </div>
+    `;
+  },
+
+  /**
+   * Render a compact / mini card (for sidebars, suggestions)
+   */
+  renderMini(academic) {
+    const { id, name, avatar, specialty, rating, color = '#6366f1' } = academic;
+    return `
+      <a href="../academic-profile.html?id=${id}" style="display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;text-decoration:none;transition:background .2s" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
+        <div style="width:44px;height:44px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;flex-shrink:0">${avatar}</div>
+        <div style="min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">⭐ ${rating} · ${specialty.slice(0,18)}...</div>
+        </div>
+      </a>
+    `;
+  },
+
+  /**
+   * Render a list-view row card
+   */
+  renderList(academic, index = 0) {
+    const { id, name, avatar, specialty, degree, rating, reviews, price, orders, color = '#6366f1', status } = academic;
+    return `
+      <div class="academic-card card-hover anim-up" style="animation-delay:${index * 0.06}s;opacity:0;display:flex;align-items:center;gap:20px;padding:20px">
+        <div style="width:68px;height:68px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0">${avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:800;color:var(--text-primary)">${name}</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin:4px 0">📚 ${specialty} · 🎓 ${degree}</div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span style="color:#f59e0b;font-weight:700">⭐ ${rating}</span>
+            <span style="color:var(--text-secondary);font-size:12px">(${reviews} تقييم)</span>
+            <span style="color:var(--text-secondary);font-size:12px">${orders} طلب</span>
+            ${getStatusBadge(status)}
+          </div>
+        </div>
+        <div style="text-align:left;flex-shrink:0">
+          <div style="font-size:22px;font-weight:900;color:var(--primary);margin-bottom:8px">${price} <span style="font-size:13px;color:var(--text-secondary);font-weight:400">ر.س</span></div>
+          <a href="../academic-profile.html?id=${id}" class="btn btn-primary btn-sm">عرض الملف ←</a>
+        </div>
+      </div>
+    `;
+  }
+};
+
+// Demo render
+document.addEventListener('DOMContentLoaded', () => {
+  const demo = ACADEMICS_DATA.academics[0];
+  document.getElementById('cardDemo').innerHTML = AcademicCard.render(demo, 0);
+});
+
+// Export globally
+window.AcademicCard = AcademicCard;
+</script>
+</body>
+</html>

@@ -1,0 +1,93 @@
+<!--
+  ============================================
+  Academic Sidebar Component
+  Usage: inject this HTML into any dashboard page
+  ============================================
+-->
+<aside class="sidebar" id="sidebar">
+
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="logo-icon">🎓</div>
+    <span class="logo-text">تواصل</span>
+  </div>
+
+  <!-- Profile mini card -->
+  <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07)">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.06)">
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">م</div>
+      <div class="logo-text" style="min-width:0">
+        <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">د. محمد السعيد</div>
+        <div style="font-size:11px;color:#22c55e">● متاح</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+
+    <p class="nav-label-group">لوحة التحكم</p>
+
+    <a href="../academic-dashboard.html" class="nav-item" id="nav-dashboard">
+      <span class="nav-icon">📊</span>
+      <span class="nav-text">الرئيسية</span>
+    </a>
+
+    <a href="../academic-orders.html" class="nav-item" id="nav-orders">
+      <span class="nav-icon">📋</span>
+      <span class="nav-text">الطلبات</span>
+      <span class="nav-text" style="margin-right:auto;background:#ef4444;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700">2</span>
+    </a>
+
+    <a href="../academic-earnings.html" class="nav-item" id="nav-earnings">
+      <span class="nav-icon">💰</span>
+      <span class="nav-text">الأرباح</span>
+    </a>
+
+    <p class="nav-label-group">الحساب</p>
+
+    <a href="../academic-settings.html" class="nav-item" id="nav-settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-text">الإعدادات</span>
+    </a>
+
+    <a href="../academic-profile.html" class="nav-item" id="nav-profile">
+      <span class="nav-icon">👤</span>
+      <span class="nav-text">ملفي الشخصي</span>
+    </a>
+
+  </nav>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <a href="../academics-list.html" class="nav-item">
+      <span class="nav-icon">🌐</span>
+      <span class="nav-text">العودة للمنصة</span>
+    </a>
+    <a href="#" class="nav-item" onclick="Toast?.show('تم تسجيل الخروج','info')">
+      <span class="nav-icon">🚪</span>
+      <span class="nav-text">تسجيل الخروج</span>
+    </a>
+  </div>
+
+</aside>
+
+<!--
+  Include in page <head>:
+  <link rel="stylesheet" href="../assets/css/style.css"/>
+  <script src="../assets/js/main.js"></script>
+  
+  In <body>:
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+  <div class="page-layout">
+    // include this sidebar HTML here
+    <div class="main-content" id="mainContent">
+      // include academic-navbar.html here
+      <div class="page-body">
+        // your page content
+      </div>
+    </div>
+  </div>
+
+  Auto-highlight active link: AcademicSidebar.markActive() is called in main.js on DOMContentLoaded.
+-->

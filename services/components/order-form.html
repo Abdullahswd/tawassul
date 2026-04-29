@@ -1,0 +1,25 @@
+<!-- 
+  ============================================
+  Order Form Component Template
+  Usage: Form wrapper used in create-order.html
+  ============================================
+-->
+<form id="orderForm">
+  <!-- Dynamic insertion points -->
+  <div class="form-group">
+    <label class="form-label">القسم</label>
+    <select id="categorySelect" class="form-input form-select" required></select>
+  </div>
+  <div class="form-group">
+    <label class="form-label">الخدمة</label>
+    <select id="serviceSelect" class="form-input form-select" required></select>
+  </div>
+  
+  <div id="dynamicFields"></div>
+  
+  <div class="form-group">
+    <label class="form-label">وصف الطلب / ملاحظات</label>
+    <textarea class="form-input" rows="4" required></textarea>
+  </div>
+  <button type="submit" class="btn btn-primary">تأكيد وإرسال الطلب</button>
+</form>

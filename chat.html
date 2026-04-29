@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نظام المحادثات المركزي - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .chat-layout { height: 100vh; display: grid; grid-template-columns: 320px 1fr; background: var(--bg-main); overflow: hidden; }
+    .contacts-sidebar { background: var(--bg-card); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; }
+    .chat-header { padding: 16px 20px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; }
+    .contact-item { padding: 16px; display: flex; gap: 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); transition: background 0.2s; }
+    .contact-item:hover { background: var(--bg-main); }
+    .contact-item.active { background: var(--primary-light); }
+    .avatar { width: 44px; height: 44px; border-radius: 50%; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; flex-shrink: 0; }
+    
+    .chat-area { display: flex; flex-direction: column; background: var(--bg-main); }
+    .messages-container { flex-grow: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+    .msg-bubble { max-width: 65%; padding: 12px 16px; border-radius: 12px; font-size: 15px; line-height: 1.6; position: relative; }
+    .msg-received { background: var(--bg-card); border: 1px solid var(--border-color); align-self: flex-start; border-top-right-radius: 0; }
+    .msg-sent { background: var(--primary); color: white; align-self: flex-end; border-top-left-radius: 0; }
+    .msg-time { font-size: 11px; margin-top: 4px; opacity: 0.7; }
+    .msg-received .msg-time { text-align: right; }
+    
+    .chat-input { padding: 16px 24px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; gap: 12px; align-items: center; }
+    .btn-icon { width: 44px; height: 44px; border-radius: 50%; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: background 0.2s; }
+    .btn-icon:hover { background: var(--bg-main); }
+  </style>
+</head>
+<body>
+
+  <div class="chat-layout fade-up">
+    
+    <!-- Contacts Sidebar -->
+    <div class="contacts-sidebar">
+      <div class="chat-header">
+        <h2 style="font-size:18px;font-weight:800;color:var(--text-primary)">الرسائل (3)</h2>
+        <div style="display:flex;gap:8px">
+          <a href="index.html" class="btn-icon" aria-label="العودة">🏠</a>
+          <button class="btn-icon dark-toggle">🌙</button>
+        </div>
+      </div>
+
+      <div style="padding:16px;border-bottom:1px solid var(--border-color)">
+        <input type="text" class="form-input" placeholder="بحث المشروعات وجهات الاتصال..." style="border-radius:40px;padding:10px 16px;font-size:13px">
+      </div>
+
+      <div style="overflow-y:auto;flex-grow:1">
+        <!-- Contact 1 -->
+        <div class="contact-item active">
+          <div class="avatar" style="background:#4f46e5">م</div>
+          <div style="flex-grow:1;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-weight:700;font-size:14px;color:var(--text-primary)">د. محمد سعيد</span>
+              <span style="font-size:11px;color:var(--text-secondary)">الآن</span>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              هل يمكنك إرسال المرفق بصيغة Word؟
+            </div>
+          </div>
+        </div>
+
+        <!-- Contact 2 -->
+        <div class="contact-item">
+          <div class="avatar" style="background:#10b981">أ</div>
+          <div style="flex-grow:1;overflow:hidden">
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-weight:700;font-size:14px;color:var(--text-primary)">أحمد عبدالله (طالب)</span>
+              <span style="font-size:11px;color:var(--text-secondary)">أمس</span>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+              شكراً جزيلاً دكتور، استلمت التعديلات.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Area -->
+    <div class="chat-area">
+      
+      <!-- Current Chat Header -->
+      <div class="chat-header">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="avatar" style="background:#4f46e5;width:40px;height:40px;font-size:16px">م</div>
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--text-primary)">د. محمد سعيد</div>
+            <div style="font-size:12px;color:var(--success)">متصل الآن • الطلب #ORD-1045</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline" style="padding:6px 16px;font-size:13px;border-radius:40px">تفاصيل الطلب 📋</button>
+        </div>
+      </div>
+
+      <!-- Messages Loop -->
+      <div class="messages-container" id="chatStream">
+        <div style="text-align:center;font-size:12px;color:var(--text-muted);margin:8px 0">اليوم, 18 أبريل 2026</div>
+
+        <div class="msg-bubble msg-sent">
+          السلام عليكم دكتور محمد، لقد قمت برفع ملف البيانات للاستبيان وأتمنى البدء في أقرب فرصة.
+          <div class="msg-time">10:05 ص ✓✓</div>
+        </div>
+
+        <div class="msg-bubble msg-received">
+          وعليكم السلام ورحمة الله وبركاته.<br>تم استلام الملف وجاري الاطلاع عليه وتقييم العمل.
+          <div class="msg-time">10:15 ص</div>
+        </div>
+
+        <div class="msg-bubble msg-received">
+          هل يمكنك إرسال المرفق بصيغة Word لنتمكن من إضافة التعليقات عليه مباشرة؟
+          <div class="msg-time">10:16 ص</div>
+        </div>
+      </div>
+
+      <!-- Chat Input form -->
+      <form class="chat-input" id="globalChatForm">
+        <button type="button" class="btn-icon" onclick="document.getElementById('fileUpload').click()" aria-label="إرفاق ملف">📎</button>
+        <input type="file" id="fileUpload" style="display:none">
+        
+        <input type="text" class="form-input" id="messageInput" placeholder="اكتب رسالة..." style="border-radius:40px" required>
+        
+        <button type="submit" class="btn btn-primary" style="border-radius:50%;width:48px;height:48px;padding:0;display:flex;align-items:center;justify-content:center" aria-label="إرسال">
+          <span style="font-size:20px;transform:rotate(180deg)">➔</span>
+        </button>
+      </form>
+
+    </div>
+
+  </div>
+
+  <script src="assets/js/global.js"></script>
+  <script>
+    document.getElementById('globalChatForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = document.getElementById('messageInput');
+      const container = document.getElementById('chatStream');
+      const val = inp.value.trim();
+      if(!val) return;
+
+      const time = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+      container.insertAdjacentHTML('beforeend', `<div class="msg-bubble msg-sent fade-up">${val}<div class="msg-time">${time} ✓</div></div>`);
+      inp.value = '';
+      container.scrollTop = container.scrollHeight;
+
+      // Fake response
+      setTimeout(() => {
+        container.insertAdjacentHTML('beforeend', `<div class="msg-bubble msg-received fade-up">عُلم، سأقوم بالتنفيذ. 👍<div class="msg-time">${time}</div></div>`);
+        container.scrollTop = container.scrollHeight;
+      }, 2000);
+    });
+  </script>
+</body>
+</html>

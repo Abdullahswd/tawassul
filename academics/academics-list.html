@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>الأكاديميون - تواصل الأكاديمي</title>
+  <meta name="description" content="تصفح أفضل الأكاديميين المتخصصين في منصة تواصل الأكاديمية"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="assets/css/style.css"/>
+</head>
+<body>
+
+<!-- ===== PUBLIC HEADER ===== -->
+<header class="public-header" id="mainHeader">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="logo-icon" style="font-size:22px">🎓</div>
+    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
+  </div>
+  <nav style="display:flex;gap:6px;align-items:center">
+    <a href="#" class="btn btn-ghost btn-sm">الرئيسية</a>
+    <a href="academics-list.html" class="btn btn-ghost btn-sm" style="color:var(--primary)">الأكاديميون</a>
+    <a href="#" class="btn btn-ghost btn-sm">الخدمات</a>
+    <a href="academic-register.html" class="btn btn-primary btn-sm">سجّل كأكاديمي</a>
+    <button class="nav-btn dark-toggle" title="الوضع الداكن" style="margin-right:8px">🌙</button>
+  </nav>
+</header>
+
+<!-- ===== HERO SEARCH ===== -->
+<div class="search-hero">
+  <h1>🎓 اكتشف خبراءك الأكاديميين</h1>
+  <p>أكثر من 86 أكاديمي متخصص في شتى المجالات العلمية</p>
+  <div class="hero-search">
+    <input type="search" id="heroSearch" placeholder="ابحث عن تخصص أو اسم أكاديمي..."/>
+    <button onclick="filterAcademics()">🔍 بحث</button>
+  </div>
+  <!-- Quick tags -->
+  <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px">
+    <button class="quick-tag" onclick="setSearchTag('الرياضيات')">الرياضيات</button>
+    <button class="quick-tag" onclick="setSearchTag('برمجة')">برمجة</button>
+    <button class="quick-tag" onclick="setSearchTag('إحصاء')">إحصاء</button>
+    <button class="quick-tag" onclick="setSearchTag('اللغة العربية')">اللغة العربية</button>
+    <button class="quick-tag" onclick="setSearchTag('محاسبة')">محاسبة</button>
+  </div>
+</div>
+
+<!-- ===== MAIN CONTENT ===== -->
+<div class="public-body">
+
+  <!-- Stats Strip -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
+    <div class="card" style="padding:20px;text-align:center">
+      <div style="font-size:28px;font-weight:900;color:var(--primary)" data-counter="86">0</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">أكاديمي متخصص</div>
+    </div>
+    <div class="card" style="padding:20px;text-align:center">
+      <div style="font-size:28px;font-weight:900;color:var(--success)" data-counter="1248">0</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">طالب مستفيد</div>
+    </div>
+    <div class="card" style="padding:20px;text-align:center">
+      <div style="font-size:28px;font-weight:900;color:var(--warning)" data-counter="342">0</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">طلب مكتمل</div>
+    </div>
+    <div class="card" style="padding:20px;text-align:center">
+      <div style="font-size:28px;font-weight:900;color:#f59e0b">4.8</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">متوسط التقييم ⭐</div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters-bar">
+    <div class="search-box" style="flex:1;max-width:300px">
+      <span class="s-icon">🔍</span>
+      <input type="text" id="listSearch" placeholder="بحث..." style="width:100%;" oninput="filterAcademics()"/>
+    </div>
+
+    <select class="form-input form-select" id="specialtyFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterAcademics()">
+      <option value="">جميع التخصصات</option>
+      <option>الرياضيات والإحصاء</option>
+      <option>اللغة العربية وآدابها</option>
+      <option>علوم الحاسب والذكاء الاصطناعي</option>
+      <option>الفيزياء والهندسة</option>
+      <option>المحاسبة والمالية</option>
+      <option>علم النفس والتربية</option>
+    </select>
+
+    <select class="form-input form-select" id="degreeFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterAcademics()">
+      <option value="">جميع الدرجات</option>
+      <option>بكالوريوس</option>
+      <option>ماجستير</option>
+      <option>دكتوراه</option>
+    </select>
+
+    <select class="form-input form-select" id="sortFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterAcademics()">
+      <option value="rating">الأعلى تقييماً</option>
+      <option value="orders">الأكثر طلباً</option>
+      <option value="price-asc">الأقل سعراً</option>
+      <option value="price-desc">الأعلى سعراً</option>
+    </select>
+
+    <button class="btn btn-outline btn-sm" onclick="clearFilters()">✕ مسح</button>
+
+    <!-- View toggle -->
+    <div style="display:flex;gap:4px;margin-right:auto">
+      <button class="btn btn-icon btn-primary btn-sm" id="gridViewBtn" onclick="setView('grid')" title="شبكة">⊞</button>
+      <button class="btn btn-icon btn-outline btn-sm" id="listViewBtn" onclick="setView('list')" title="قائمة">≡</button>
+    </div>
+  </div>
+
+  <!-- Results count -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+    <p id="resultsCount" style="font-size:14px;color:var(--text-secondary)">عرض <strong>6</strong> أكاديمي</p>
+  </div>
+
+  <!-- Academics Grid -->
+  <div id="academicsGrid" class="academics-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;margin-bottom:40px"></div>
+
+  <!-- Empty state -->
+  <div id="emptyState" style="display:none;text-align:center;padding:80px 20px">
+    <div style="font-size:64px;margin-bottom:16px">🔍</div>
+    <h3 style="font-size:20px;font-weight:700;color:var(--text-primary);margin-bottom:8px">لم يتم العثور على نتائج</h3>
+    <p style="color:var(--text-secondary)">جرّب تغيير معايير البحث أو <a href="#" onclick="clearFilters();return false" style="color:var(--primary)">مسح الفلاتر</a></p>
+  </div>
+
+  <!-- CTA Banner -->
+  <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);border-radius:var(--radius);padding:40px;text-align:center;position:relative;overflow:hidden;margin-top:20px">
+    <div style="position:absolute;inset:0;background:radial-gradient(circle at 30% 50%,rgba(99,102,241,.3),transparent 60%)"></div>
+    <div style="position:relative">
+      <h2 style="font-size:26px;font-weight:900;color:#fff;margin-bottom:10px">هل أنت أكاديمي متميز؟</h2>
+      <p style="color:rgba(255,255,255,.7);font-size:15px;margin-bottom:20px">انضم لمنصة تواصل وابدأ في تقديم خدماتك لآلاف الطلاب</p>
+      <a href="academic-register.html" class="btn btn-primary btn-lg">🚀 سجّل الآن مجاناً</a>
+    </div>
+  </div>
+
+</div><!-- /public-body -->
+
+<style>
+.quick-tag{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);border:1px solid rgba(255,255,255,.3);padding:6px 16px;border-radius:20px;font-family:Tajawal,sans-serif;font-size:13px;cursor:pointer;transition:all .2s}
+.quick-tag:hover{background:rgba(255,255,255,.25);transform:translateY(-1px)}
+</style>
+
+<script src="assets/js/main.js"></script>
+<script>
+let currentView = 'grid';
+
+function renderAcademics(data) {
+  const grid = document.getElementById('academicsGrid');
+  const empty = document.getElementById('emptyState');
+  const count = document.getElementById('resultsCount');
+  if (!grid) return;
+
+  count.innerHTML = `عرض <strong>${data.length}</strong> أكاديمي`;
+
+  if (!data.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  if (currentView === 'list') {
+    grid.style.gridTemplateColumns = '1fr';
+    grid.innerHTML = data.map((a, i) => `
+      <div class="academic-card anim-up" style="animation-delay:${i*.07}s;opacity:0;display:flex;align-items:center;gap:20px;padding:20px">
+        <div style="width:72px;height:72px;border-radius:50%;background:${a.color};display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#fff;flex-shrink:0">${a.avatar}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:17px;font-weight:800;color:var(--text-primary)">${a.name}</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin:4px 0">📚 ${a.specialty} · 🎓 ${a.degree}</div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="color:#f59e0b;font-weight:700">⭐ ${a.rating}</span>
+            <span style="color:var(--text-secondary);font-size:12px">(${a.reviews} تقييم)</span>
+            <span class="badge badge-success">مقبول</span>
+          </div>
+        </div>
+        <div style="text-align:left;flex-shrink:0">
+          <div style="font-size:20px;font-weight:900;color:var(--primary);margin-bottom:8px">${a.price} <span style="font-size:12px;color:var(--text-secondary)">ر.س</span></div>
+          <a href="academic-profile.html?id=${a.id}" class="btn btn-primary btn-sm">عرض الملف</a>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(300px,1fr))';
+    grid.innerHTML = data.map((a, i) => `
+      <div class="academic-card card-hover anim-up" style="animation-delay:${i*.07}s;opacity:0">
+        <div class="academic-card-cover" style="background:linear-gradient(135deg,${a.color},${a.color}99)">
+          <div class="academic-card-avatar" style="background:${a.color}">${a.avatar}</div>
+          <div style="position:absolute;top:12px;left:12px">${getStatusBadge('approved')}</div>
+        </div>
+        <div class="academic-card-body">
+          <div class="academic-card-name">${a.name}</div>
+          <div class="academic-card-spec">📚 ${a.specialty}</div>
+          <div style="display:flex;gap:10px;margin-bottom:14px; flex-wrap:wrap">
+            <span class="badge badge-primary">🎓 ${a.degree}</span>
+            <span class="badge badge-secondary">🏛 ${a.university}</span>
+          </div>
+          <div class="academic-card-stats">
+            <div class="ac-stat"><span class="ac-stat-value">${a.orders}</span><span class="ac-stat-label">طلب</span></div>
+            <div class="ac-stat"><span class="ac-stat-value">${a.completedOrders}</span><span class="ac-stat-label">مكتمل</span></div>
+            <div class="ac-stat"><span class="ac-stat-value">${a.reviews}</span><span class="ac-stat-label">تقييم</span></div>
+          </div>
+        </div>
+        <div class="academic-card-footer">
+          <div>
+            <div class="star-rating">⭐ ${a.rating} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">(${a.reviews})</span></div>
+            <div style="font-size:18px;font-weight:800;color:var(--primary);margin-top:2px">${a.price} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">ر.س</span></div>
+          </div>
+          <a href="academic-profile.html?id=${a.id}" class="btn btn-primary btn-sm">عرض الملف ←</a>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function filterAcademics() {
+  const q = (document.getElementById('listSearch')?.value || document.getElementById('heroSearch')?.value || '').toLowerCase().trim();
+  const spec = document.getElementById('specialtyFilter')?.value || '';
+  const deg = document.getElementById('degreeFilter')?.value || '';
+  const sort = document.getElementById('sortFilter')?.value || 'rating';
+
+  let data = ACADEMICS_DATA.academics.filter(a => {
+    const matchQ = !q || a.name.toLowerCase().includes(q) || a.specialty.toLowerCase().includes(q);
+    const matchS = !spec || a.specialty.includes(spec);
+    const matchD = !deg || a.degree === deg;
+    return matchQ && matchS && matchD;
+  });
+
+  if (sort === 'rating') data.sort((a,b) => b.rating - a.rating);
+  else if (sort === 'orders') data.sort((a,b) => b.orders - a.orders);
+  else if (sort === 'price-asc') data.sort((a,b) => a.price - b.price);
+  else if (sort === 'price-desc') data.sort((a,b) => b.price - a.price);
+
+  renderAcademics(data);
+}
+
+function clearFilters() {
+  ['listSearch','heroSearch','specialtyFilter','degreeFilter'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  filterAcademics();
+}
+
+function setSearchTag(tag) {
+  const search = document.getElementById('heroSearch');
+  if (search) search.value = tag;
+  const listSearch = document.getElementById('listSearch');
+  if (listSearch) listSearch.value = tag;
+  filterAcademics();
+  document.querySelector('.public-body')?.scrollIntoView({ behavior: 'smooth' });
+}
+
+function setView(view) {
+  currentView = view;
+  document.getElementById('gridViewBtn')?.classList.toggle('btn-primary', view === 'grid');
+  document.getElementById('gridViewBtn')?.classList.toggle('btn-outline', view !== 'grid');
+  document.getElementById('listViewBtn')?.classList.toggle('btn-primary', view === 'list');
+  document.getElementById('listViewBtn')?.classList.toggle('btn-outline', view !== 'list');
+  filterAcademics();
+}
+
+document.addEventListener('DOMContentLoaded', () => filterAcademics());
+</script>
+</body>
+</html>

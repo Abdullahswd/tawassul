@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تسجيل الدخول - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .auth-bg { background: linear-gradient(135deg, var(--bg-main) 0%, rgba(79, 70, 229, 0.05) 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .auth-card { max-width: 480px; width: 100%; padding: 40px; margin: 0 auto; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+    .type-btn { padding: 12px; border: 2px solid var(--border-color); border-radius: 12px; text-align: center; cursor: pointer; transition: all 0.2s; font-weight: 700; color: var(--text-secondary); background: transparent; width: 100%; }
+    .type-btn.active { border-color: var(--primary); background: rgba(79,70,229,0.05); color: var(--primary); }
+  </style>
+</head>
+<body class="auth-bg">
+
+  <div class="card auth-card fade-up">
+    
+    <div style="text-align:center;margin-bottom:32px">
+      <a href="index.html" style="font-size:32px;font-weight:900;color:var(--primary);text-decoration:none">🎓 تواصل</a>
+      <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-top:16px;margin-bottom:8px">مرحباً بك مجدداً 👋</h2>
+      <p style="color:var(--text-secondary);font-size:14px">قم بتسجيل الدخول للمتابعة إلى حسابك</p>
+    </div>
+
+    <!-- User Type Toggle -->
+    <div style="display:flex;gap:12px;margin-bottom:32px">
+      <button class="type-btn active" onclick="setUser('student', this)">بصفتي طالب</button>
+      <button class="type-btn" onclick="setUser('academic', this)">بصفتي أكاديمي</button>
+    </div>
+
+    <form id="loginForm" onsubmit="handleLogin(event)">
+      <div style="margin-bottom:20px">
+        <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">البريد الإلكتروني</label>
+        <input type="email" class="form-input" placeholder="ahmad@example.com" dir="ltr" required>
+      </div>
+
+      <div style="margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <label class="text-sm font-bold" style="color:var(--text-primary)">كلمة المرور</label>
+          <a href="forgot-password.html" style="font-size:12px;color:var(--primary);font-weight:600;text-decoration:none">نسيت كلمة المرور؟</a>
+        </div>
+        <input type="password" class="form-input" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;padding:14px;font-size:16px" id="submitBtn">تسجيل الدخول</button>
+    </form>
+
+    <div style="margin-top:32px;text-align:center;font-size:14px;color:var(--text-secondary)">
+      ليس لديك حساب بعد؟ 
+      <a href="register.html" style="color:var(--primary);font-weight:700;text-decoration:none">إنشاء حساب جديد</a>
+    </div>
+
+  </div>
+
+  <script src="assets/js/global.js"></script>
+  <script>
+    let selectedType = 'student';
+    function setUser(type, btn) {
+      selectedType = type;
+      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      btn.textContent = 'جاري التحقق...';
+      btn.disabled = true;
+
+      // Mock redirect based on type
+      setTimeout(() => {
+        if(selectedType === 'student') {
+          window.location.href = 'student/student-dashboard.html';
+        } else {
+          window.location.href = 'academics/academic-dashboard.html';
+        }
+      }, 1000);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>المحادثة - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    .chat-layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      height: calc(100vh - 134px); /* 100vh minus header and padding */
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    
+    .chat-sidebar {
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-card);
+    }
+    
+    .chat-list {
+      flex-grow: 1;
+      overflow-y: auto;
+    }
+    
+    .chat-contact {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .chat-contact:hover { background: var(--bg-hover); }
+    .chat-contact.active { background: var(--primary-light); }
+    
+    .chat-main {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-body);
+    }
+    
+    .chat-header {
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .chat-messages {
+      flex-grow: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    
+    .msg {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      position: relative;
+    }
+    .msg-received {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      align-self: flex-start;
+      border-top-right-radius: 4px;
+    }
+    .msg-sent {
+      background: var(--primary);
+      color: white;
+      align-self: flex-end;
+      border-top-left-radius: 4px;
+    }
+    .msg-time {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 6px;
+      text-align: right;
+    }
+    .msg-sent .msg-time { color: rgba(255,255,255,0.7); text-align: left;}
+    
+    .chat-input-area {
+      padding: 16px 24px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    
+    @media (max-width: 768px) {
+      .chat-layout { grid-template-columns: 1fr; height: calc(100vh - 100px); }
+      .chat-sidebar { display: none; }
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div class="logo-text">تواصل</div>
+      </div>
+      <nav class="sidebar-nav">
+        <!-- ... nav logic omitted for space ... -->
+        <a href="student-dashboard.html" class="nav-item"><span class="icon">📊</span><span>لوحة المعلومات</span></a>
+        <a href="services.html" class="nav-item"><span class="icon">📦</span><span>الخدمات الأكاديمية</span></a>
+        <a href="orders.html" class="nav-item"><span class="icon">📋</span><span>طلباتي</span></a>
+        <a href="chat.html" class="nav-item active"><span class="icon">💬</span><span>المحادثات</span></a>
+        <a href="payments.html" class="nav-item"><span class="icon">💳</span><span>المدفوعات</span></a>
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;border-top:1px solid var(--border-color);padding-top:16px">
+          <a href="profile.html" class="nav-item"><span class="icon">👤</span><span>الملف الشخصي</span></a>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      <!-- Top Navbar -->
+      <header class="top-navbar">
+        <div style="display:flex;align-items:center;gap:16px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div class="h3">تواصل مع الأكاديميين</div>
+        </div>
+        <div class="navbar-actions">
+          <button class="icon-btn dark-toggle">🌙</button>
+          <div class="user-profile">
+            <div class="user-avatar user-initials-fill">؟</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content-wrap" style="padding:20px;display:flex;flex-direction:column">
+        
+        <div class="chat-layout shadow-sm">
+          
+          <!-- Contacts Sidebar -->
+          <div class="chat-sidebar">
+            <div style="padding:16px;border-bottom:1px solid var(--border-color)">
+              <input type="text" class="form-input" placeholder="بحث المشروعات..." style="border-radius:40px;padding:10px 16px;font-size:13px">
+            </div>
+            <div class="chat-list">
+              
+              <div class="chat-contact active">
+                <div style="width:40px;height:40px;border-radius:50%;background:#4f46e5;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">م</div>
+                <div style="overflow:hidden">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline">
+                    <span style="font-weight:700;font-size:14px;color:var(--text-primary)">د. محمد سعيد</span>
+                    <span style="font-size:11px;color:var(--text-muted)">الآن</span>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    الطلب #ORD-1045
+                  </div>
+                </div>
+              </div>
+
+              <div class="chat-contact">
+                <div style="width:40px;height:40px;border-radius:50%;background:#10b981;color:white;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0">ف</div>
+                <div style="overflow:hidden">
+                  <div style="display:flex;justify-content:space-between;align-items:baseline">
+                    <span style="font-weight:700;font-size:14px;color:var(--text-primary)">أ. فهد عبدالله</span>
+                    <span style="font-size:11px;color:var(--text-muted)">أمس</span>
+                  </div>
+                  <div style="font-size:12px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    تم تسليم الطلب، شكراً لك.
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Chat Area -->
+          <div class="chat-main">
+            <!-- Header -->
+            <div class="chat-header">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div style="width:40px;height:40px;border-radius:50%;background:#4f46e5;color:white;display:flex;align-items:center;justify-content:center;font-weight:800">م</div>
+                <div>
+                  <div style="font-weight:700;font-size:15px;color:var(--text-primary)">د. محمد سعيد</div>
+                  <div style="font-size:12px;color:var(--success)">متصل الآن • الطلب #ORD-1045</div>
+                </div>
+              </div>
+              <button class="btn btn-outline" style="padding:6px 16px;font-size:13px">تفاصيل الطلب 📋</button>
+            </div>
+
+            <!-- Messages -->
+            <div class="chat-messages" id="chatMessages">
+              <div style="text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:16px">اليوم, 18 أبريل 2026</div>
+              
+              <div class="msg msg-sent">
+                السلام عليكم دكتور محمد، لقد قمت برفع ملف البيانات للاستبيان وأتمنى البدء في أقرب فرصة.
+                <div class="msg-time">10:05 ص ✓✓</div>
+              </div>
+
+              <div class="msg msg-received">
+                وعليكم السلام ورحمة الله وبركاته. أهلاً بك يا أحمد.<br>تم استلام الملف وجاري الاطلاع عليه.
+                <div class="msg-time">10:15 ص</div>
+              </div>
+
+              <div class="msg msg-received">
+                هل تفضل تنسيق جداول المخرجات بصيغة APA؟
+                <div class="msg-time">10:16 ص</div>
+              </div>
+
+            </div>
+
+            <!-- Input Box -->
+            <form id="chatForm" class="chat-input-area">
+              <button type="button" class="icon-btn" aria-label="إرفاق ملف" onclick="document.getElementById('chatFileInput').click()">📎</button>
+              <input type="file" id="chatFileInput" style="display:none">
+              
+              <input type="text" id="chatInput" placeholder="اكتب رسالتك هنا..." class="form-input" style="border-radius:40px;padding:12px 20px" required>
+              
+              <button type="submit" class="btn btn-primary" style="border-radius:50%;width:48px;height:48px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0" aria-label="إرسال">
+                <span style="transform:rotate(180deg)">➔</span>
+              </button>
+            </form>
+
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+  <script>
+    // Simple Chat Demo Script
+    document.addEventListener('DOMContentLoaded', () => {
+      const chatForm = document.getElementById('chatForm');
+      const chatInput = document.getElementById('chatInput');
+      const chatMessages = document.getElementById('chatMessages');
+
+      if(chatForm) {
+        chatForm.addEventListener('submit', (e) => {
+          e.preventDefault();
+          const val = chatInput.value.trim();
+          if(!val) return;
+
+          // Add sent message
+          const time = new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' });
+          const mHtml = `<div class="msg msg-sent">${val}<div class="msg-time">${time} ✓</div></div>`;
+          chatMessages.insertAdjacentHTML('beforeend', mHtml);
+          chatInput.value = '';
+          chatMessages.scrollTop = chatMessages.scrollHeight;
+
+          // Fake response
+          setTimeout(() => {
+            const resp = `<div class="msg msg-received">تم تسجيل ملاحظتك وسأعمل عليها. 👍<div class="msg-time">${time}</div></div>`;
+            chatMessages.insertAdjacentHTML('beforeend', resp);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+          }, 1500);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

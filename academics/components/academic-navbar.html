@@ -1,0 +1,89 @@
+<!--
+  ============================================
+  Academic Navbar Component
+  ============================================
+-->
+<nav class="navbar" id="navbar">
+
+  <!-- Sidebar toggle -->
+  <button class="sidebar-toggle" id="sidebarToggle" aria-label="تبديل القائمة الجانبية">☰</button>
+
+  <!-- Search (optional) -->
+  <div class="navbar-search">
+    <span class="s-icon">🔍</span>
+    <input type="text" id="globalSearch" placeholder="بحث سريع..." aria-label="بحث"/>
+  </div>
+
+  <div class="navbar-spacer"></div>
+
+  <!-- Actions -->
+  <div class="navbar-actions">
+
+    <!-- Dark mode -->
+    <button class="nav-btn dark-toggle" title="تبديل المظهر" aria-label="تبديل المظهر الداكن">🌙</button>
+
+    <!-- Notifications dropdown -->
+    <div class="dropdown" id="notifDropdown">
+      <button class="nav-btn" data-toggle aria-label="الإشعارات" style="position:relative">
+        🔔
+        <span class="n-badge" id="notifBadge">2</span>
+      </button>
+      <div class="dropdown-menu" style="right:0;left:auto;min-width:320px;padding:0;overflow:hidden">
+        <!-- Header -->
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span>
+          <button onclick="markAllRead()" style="font-size:12px;color:var(--primary);background:none;border:none;cursor:pointer;font-family:Tajawal,sans-serif">تعليم الكل مقروء</button>
+        </div>
+        <!-- List -->
+        <div id="notifList" style="max-height:320px;overflow-y:auto"></div>
+        <!-- Footer -->
+        <div style="padding:12px;text-align:center;border-top:1px solid var(--border-color)">
+          <a href="#" style="font-size:13px;color:var(--primary);font-weight:500">عرض جميع الإشعارات ←</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Divider -->
+    <div style="width:1px;height:28px;background:var(--border-color)"></div>
+
+    <!-- Profile dropdown -->
+    <div class="dropdown" id="profileDropdown">
+      <div class="admin-avatar-btn" data-toggle>
+        <div class="avatar-circle" id="navAvatarCircle">م</div>
+        <div>
+          <div class="avatar-name" id="navAvatarName">د. محمد السعيد</div>
+          <div class="avatar-role">أكاديمي موثق ✓</div>
+        </div>
+        <span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span>
+      </div>
+      <div class="dropdown-menu" style="right:0;left:auto;min-width:200px">
+        <div style="padding:8px">
+          <a href="../academic-profile.html" class="dropdown-item" style="border-radius:8px">👤 ملفي الشخصي</a>
+          <a href="../academic-settings.html" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a>
+          <a href="../academic-earnings.html" class="dropdown-item" style="border-radius:8px">💰 الأرباح</a>
+          <div class="dropdown-divider"></div>
+          <a href="../academics-list.html" class="dropdown-item" style="border-radius:8px">🌐 المنصة</a>
+          <div class="dropdown-divider"></div>
+          <a href="#" class="dropdown-item" style="border-radius:8px;color:var(--danger)" onclick="Toast?.show('تم تسجيل الخروج','info')">🚪 تسجيل الخروج</a>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</nav>
+
+<!--
+  Script: markAllRead is defined here, called by button above.
+  main.js handles: DarkMode, AcademicSidebar, renderNotifications
+-->
+<script>
+function markAllRead() {
+  if (window.ACADEMICS_DATA) {
+    ACADEMICS_DATA.notifications.forEach(n => n.read = true);
+    const badge = document.getElementById('notifBadge');
+    if (badge) badge.textContent = '0';
+    renderNotifications?.();
+    Toast?.show('تم تعليم جميع الإشعارات كمقروءة', 'success');
+  }
+}
+</script>

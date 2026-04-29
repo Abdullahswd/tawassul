@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة الطالب - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  
+  <div class="mobile-overlay" id="mobileOverlay"></div>
+
+  <div class="app-container">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="logo-icon">🎓</div>
+        <div class="logo-text">تواصل</div>
+      </div>
+      
+      <nav class="sidebar-nav">
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
+        <a href="student-dashboard.html" class="nav-item active">
+          <span class="icon">📊</span>
+          <span>لوحة المعلومات</span>
+        </a>
+        <a href="services.html" class="nav-item">
+          <span class="icon">📦</span>
+          <span>الخدمات الأكاديمية</span>
+        </a>
+        <a href="orders.html" class="nav-item">
+          <span class="icon">📋</span>
+          <span>طلباتي</span>
+        </a>
+        <a href="chat.html" class="nav-item">
+          <span class="icon">💬</span>
+          <span>المحادثات</span>
+        </a>
+        <a href="payments.html" class="nav-item">
+          <span class="icon">💳</span>
+          <span>المدفوعات</span>
+        </a>
+        
+        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
+        <a href="profile.html" class="nav-item">
+          <span class="icon">👤</span>
+          <span>الملف الشخصي</span>
+        </a>
+      </nav>
+      
+      <div style="padding:20px;border-top:1px solid var(--border-color)">
+        <a href="#" class="nav-item" style="color:var(--danger)">
+          <span class="icon">🚪</span>
+          <span>تسجيل الخروج</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-area">
+      
+      <!-- Top Navbar -->
+      <header class="top-navbar">
+        <div style="display:flex;align-items:center;gap:16px">
+          <button class="menu-toggle" id="menuToggle">☰</button>
+          <div class="h3" style="display:none">مرحباً <span class="user-name-fill"></span> 👋</div>
+        </div>
+
+        <div class="navbar-actions">
+          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
+          <button class="icon-btn" aria-label="الإشعارات">
+            🔔<span class="badge-dot">3</span>
+          </button>
+          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
+          <div class="user-profile">
+            <div class="user-info" style="text-align:left">
+              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-role">طالب</span>
+            </div>
+            <div class="user-avatar user-initials-fill">؟</div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Page Content -->
+      <div class="content-wrap">
+        
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px" class="anim-fade-up">
+          <div>
+            <h1 class="h1" style="margin-bottom:8px">مرحباً بك مجددا، <span class="user-name-fill"></span>! 👋</h1>
+            <p class="text-body">إليك ملخص سريع لحالة طلباتك ونشاطك على المنصة.</p>
+          </div>
+          <div style="display:none; /* or shown on desktop */">
+            <a href="create-order.html" class="btn btn-primary">➕ طلب خدمة جديدة</a>
+          </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:24px;margin-bottom:40px">
+          <div class="card anim-fade-up" style="animation-delay:0.1s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--primary)">
+            <div style="width:60px;height:60px;border-radius:16px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px">📋</div>
+            <div>
+              <div class="text-body" style="font-weight:700">إجمالي الطلبات</div>
+              <div class="h1" id="statTotal">--</div>
+            </div>
+          </div>
+          
+          <div class="card anim-fade-up" style="animation-delay:0.2s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--warning)">
+            <div style="width:60px;height:60px;border-radius:16px;background:rgba(245,158,11,0.1);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:28px">⏳</div>
+            <div>
+              <div class="text-body" style="font-weight:700">طلبات قيد التنفيذ</div>
+              <div class="h1" id="statActive">--</div>
+            </div>
+          </div>
+          
+          <div class="card anim-fade-up" style="animation-delay:0.3s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--success)">
+            <div style="width:60px;height:60px;border-radius:16px;background:rgba(16,185,129,0.1);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:28px">✅</div>
+            <div>
+              <div class="text-body" style="font-weight:700">الطلبات المكتملة</div>
+              <div class="h1" id="statCompleted">--</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Orders & Activities -->
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px">
+          
+          <!-- Recent Orders -->
+          <div class="card anim-fade-up" style="animation-delay:0.4s;padding:0;overflow:hidden">
+            <div style="padding:24px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
+              <h2 class="h2">آخر الطلبات</h2>
+              <a href="orders.html" class="btn btn-outline" style="padding:8px 16px;font-size:13px">عرض الكل ←</a>
+            </div>
+            <div style="overflow-x:auto">
+              <table style="width:100%;border-collapse:collapse;text-align:right">
+                <thead>
+                  <tr>
+                    <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">رقم الطلب</th>
+                    <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">الخدمة</th>
+                    <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">التاريخ</th>
+                    <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">الحالة</th>
+                    <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="recentOrdersBody">
+                  <tr><td colspan="5" style="text-align:center;padding:32px">جاري التحميل...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Quick Actions / Notifications -->
+          <div style="display:flex;flex-direction:column;gap:24px">
+            
+            <div class="card anim-fade-up" style="animation-delay:0.5s;background:linear-gradient(135deg, var(--primary), var(--secondary));color:white;border:none">
+              <h3 style="font-size:20px;font-weight:800;margin-bottom:16px">تحتاج مساعدة في بحثك؟</h3>
+              <p style="font-size:14px;opacity:0.9;margin-bottom:24px">اكتشف خدماتنا الأكاديمية المتنوعة وابدأ بطلب خدمتك الآن.</p>
+              <a href="create-order.html" class="btn" style="background:white;color:var(--primary);width:100%">🚀 اطلب خدمة جديدة</a>
+            </div>
+
+            <div class="card anim-fade-up" style="animation-delay:0.6s">
+              <h3 class="h3" style="margin-bottom:16px">آخر الإشعارات</h3>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                
+                <div style="display:flex;gap:12px;align-items:flex-start">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--primary);margin-top:8px;flex-shrink:0"></div>
+                  <div>
+                    <div style="font-size:14px;font-weight:700">رسالة جديدة</div>
+                    <div style="font-size:13px;color:var(--text-secondary)">قام الأكاديمي "د. محمد" بالرد على رسالتك.</div>
+                  </div>
+                </div>
+
+                <div style="display:flex;gap:12px;align-items:flex-start">
+                  <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:8px;flex-shrink:0"></div>
+                  <div>
+                    <div style="font-size:14px;font-weight:700">اكتمال طلب</div>
+                    <div style="font-size:13px;color:var(--text-secondary)">تم تسليم طلب "تصميم الاستبيانات" بنجاح.</div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/js/main.js"></script>
+</body>
+</html>

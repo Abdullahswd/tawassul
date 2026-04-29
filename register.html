@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إنشاء حساب - تواصل</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/global.css">
+  <style>
+    .auth-bg { background: linear-gradient(135deg, var(--bg-main) 0%, rgba(79, 70, 229, 0.05) 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 40px 20px; }
+    .auth-card { max-width: 600px; width: 100%; padding: 40px; margin: 0 auto; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1); }
+    .type-sel { display: flex; flex-direction: column; gap: 8px; padding: 20px; border: 2px solid var(--border-color); border-radius: 12px; cursor: pointer; transition: all 0.2s; }
+    .type-sel:hover { border-color: rgba(79,70,229,0.4); }
+    .type-sel.active { border-color: var(--primary); background: rgba(79,70,229,0.05); }
+  </style>
+</head>
+<body class="auth-bg">
+
+  <div class="card auth-card fade-up">
+    
+    <div style="text-align:center;margin-bottom:32px">
+      <a href="index.html" style="font-size:32px;font-weight:900;color:var(--primary);text-decoration:none">🎓 تواصل</a>
+      <h2 style="font-size:24px;font-weight:800;color:var(--text-primary);margin-top:16px;margin-bottom:8px">كن متصلاً بشبكة المعرفة</h2>
+      <p style="color:var(--text-secondary);font-size:14px">اختر نوع الحساب الذي ترغب بإنشائه</p>
+    </div>
+
+    <div id="step1">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px">
+        <div class="type-sel active" onclick="selectType('student', this)">
+          <div style="font-size:32px">👨‍🎓</div>
+          <div style="font-weight:800;color:var(--text-primary);font-size:18px">حساب طالب</div>
+          <div style="font-size:12px;color:var(--text-secondary)">أبحث عن خدمات أكاديمية واحصائيات وبحوث.</div>
+        </div>
+        <div class="type-sel" onclick="selectType('academic', this)">
+          <div style="font-size:32px">👨‍🏫</div>
+          <div style="font-weight:800;color:var(--text-primary);font-size:18px">حساب أكاديمي</div>
+          <div style="font-size:12px;color:var(--text-secondary)">أنا متخصص وأرغب بتقديم خدماتي للطلاب.</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:14px;font-size:16px" onclick="nextStep()">المتابعة ←</button>
+    </div>
+
+    <div id="step2" style="display:none">
+      <form onsubmit="handleRegister(event)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+          <div>
+            <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">الاسم الأول</label>
+            <input type="text" class="form-input" required>
+          </div>
+          <div>
+            <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">العائلة</label>
+            <input type="text" class="form-input" required>
+          </div>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">البريد الإلكتروني</label>
+          <input type="email" class="form-input" dir="ltr" required>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">رقم الجوال</label>
+          <input type="tel" class="form-input" dir="ltr" required>
+        </div>
+
+        <div style="margin-bottom:24px">
+          <label class="block text-sm font-bold mb-2" style="color:var(--text-primary)">كلمة المرور</label>
+          <input type="password" class="form-input" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;padding:14px;font-size:16px" id="regBtn">إنشاء الحساب الآن</button>
+      </form>
+    </div>
+
+    <div style="margin-top:32px;text-align:center;font-size:14px;color:var(--text-secondary)">
+      لديك حساب بالفعل؟ 
+      <a href="login.html" style="color:var(--primary);font-weight:700;text-decoration:none">تسجيل الدخول</a>
+    </div>
+
+  </div>
+
+  <script src="assets/js/global.js"></script>
+  <script>
+    let uType = 'student';
+    function selectType(t, element) {
+      uType = t;
+      document.querySelectorAll('.type-sel').forEach(el => el.classList.remove('active'));
+      element.classList.add('active');
+    }
+
+    function nextStep() {
+      if(uType === 'academic') {
+        // Academics have a complex registration page in academics/
+        window.location.href = 'academics/academic-register.html';
+      } else {
+        document.getElementById('step1').style.display = 'none';
+        document.getElementById('step2').style.display = 'block';
+      }
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      const btn = document.getElementById('regBtn');
+      btn.textContent = 'جاري الإنشاء...';
+      btn.disabled = true;
+      setTimeout(()=> {
+        alert('تم إنشاء الحساب بنجاح! سيتم تحويلك.');
+        window.location.href = 'login.html';
+      }, 1500);
+    }
+  </script>
+</body>
+</html>
