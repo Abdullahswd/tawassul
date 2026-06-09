@@ -1,4 +1,26 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+requireStudent();
+
+$user = currentUser();
+$order_id = (int)($_GET['id'] ?? 0);
+
+if (!$order_id) {
+    header('Location: orders.php');
+    exit;
+}
+
+$order = getOrderById($order_id);
+
+if (!$order || $order['student_id'] !== $user['id']) {
+    header('Location: orders.php');
+    exit;
+}
+
+$badge = orderStatusLabel($order['status']);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -96,7 +118,7 @@
       </nav>
       
       <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="#" class="nav-item" style="color:var(--danger)">
+        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
           <span class="icon">🚪</span>
           <span>تسجيل الخروج</span>
         </a>
@@ -110,21 +132,21 @@
       <header class="top-navbar">
         <div style="display:flex;align-items:center;gap:16px">
           <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">تفاصيل الطلب #ORD-1045</div>
+          <div class="h3">تفاصيل الطلب <?= e($order['order_number']) ?></div>
         </div>
 
         <div class="navbar-actions">
           <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
           <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot">3</span>
+            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
           </button>
           <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
           <div class="user-profile">
             <div class="user-info" style="text-align:left">
-              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-name"><?= e($user['name']) ?></span>
               <span class="user-role">طالب</span>
             </div>
-            <div class="user-avatar user-initials-fill">؟</div>
+            <div class="user-avatar"><?= e($user['avatar']) ?></div>
           </div>
         </div>
       </header>
@@ -138,15 +160,14 @@
 
         <div class="card" style="padding:24px;display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">
           <div>
-            <h1 class="h1" style="margin-bottom:8px">التحليل الإحصائي</h1>
-            <p class="text-body" style="font-weight:700">تخصص: علم النفس التجريبي</p>
+            <h1 class="h1" style="margin-bottom:8px"><?= e($order['service_icon']) ?> <?= e($order['service_name']) ?></h1>
+            <p class="text-body" style="font-weight:700">تخصص: <?= e($order['specialty']) ?></p>
           </div>
           <div style="text-align:left">
-            <span class="status-badge status-progress" style="font-size:14px;padding:8px 16px;margin-bottom:8px">
-              <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
-              الحالة: قيد التنفيذ
+            <span class="badge <?= $badge['class'] ?>" style="font-size:14px;padding:8px 16px;margin-bottom:8px">
+              الحالة: <?= $badge['label'] ?>
             </span>
-            <div style="font-size:12px;color:var(--text-secondary)">تاريخ التسليم المتوقع: 2026-04-28</div>
+            <div style="font-size:12px;color:var(--text-secondary)">موعد التسليم المرغوب: <?= formatDate($order['deadline']) ?></div>
           </div>
         </div>
 
@@ -159,21 +180,25 @@
             <div class="card">
               <h2 class="h2" style="margin-bottom:20px">تفاصيل الطلب</h2>
               
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+              <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:24px">
                 <div>
                   <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">المستوى الأكاديمي</div>
-                  <div style="font-weight:700">ماجستير</div>
+                  <div style="font-weight:700"><?= e($order['academic_level']) ?></div>
                 </div>
                 <div>
                   <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">لغة العمل</div>
-                  <div style="font-weight:700">العربية</div>
+                  <div style="font-weight:700"><?= e($order['language']) ?></div>
+                </div>
+                <div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">الباقة المحددة</div>
+                  <div style="font-weight:700"><?= e($order['package_name'] ?: 'خدمة مخصصة') ?></div>
                 </div>
               </div>
 
               <div>
                 <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">الوصف والملاحظات</div>
                 <div style="background:var(--bg-body);padding:16px;border-radius:var(--radius-sm);border:1px solid var(--border-color);line-height:1.7;font-size:14px">
-                  أحتاج لتحليل الاستبيان المرفق باستخدام برنامج SPSS. المقاييس المستخدمة هي مقياس ليكرت الخماسي. أتمنى التأكد من حساب الثبات والصدق والارتباطات بين المتغيرات.
+                  <?= nl2br(e($order['description'])) ?>
                 </div>
               </div>
             </div>
@@ -181,16 +206,7 @@
             <!-- Attachments -->
             <div class="card">
               <h2 class="h2" style="margin-bottom:20px">الملفات المرفوعة</h2>
-              <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border:1px solid var(--border-color);border-radius:var(--radius-sm);margin-bottom:12px">
-                <div style="display:flex;align-items:center;gap:12px">
-                  <span style="font-size:24px">📊</span>
-                  <div>
-                    <div style="font-weight:700;font-size:14px;color:var(--text-primary)">Data_Survey_Responses.xlsx</div>
-                    <div style="font-size:12px;color:var(--text-secondary)">2.4 MB</div>
-                  </div>
-                </div>
-                <button class="btn btn-outline" style="padding:6px 12px;font-size:12px">تحميل</button>
-              </div>
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">لا توجد ملفات مرفوعة حالياً للطلب.</p>
 
               <!-- Draggable file upload UI -->
               <div style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:24px;text-align:center;background:var(--bg-body);margin-top:20px;cursor:pointer">
@@ -206,10 +222,19 @@
             
             <!-- Academic Profile -->
             <div class="card" style="text-align:center;padding:32px 24px">
-              <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg, var(--secondary), var(--primary));color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;margin:0 auto 16px">م</div>
-              <h3 class="h3" style="margin-bottom:4px">د. محمد سعيد</h3>
-              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">أستاذ الإحصاء التحليلي</p>
-              <a href="chat.php?academic=1045" class="btn btn-primary" style="width:100%">💬 تواصل مع الأكاديمي</a>
+              <?php if ($order['academic_id']): ?>
+                <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg, var(--secondary), var(--primary));color:white;display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;margin:0 auto 16px">
+                  <?= e(mb_substr($order['academic_name'], 0, 1, 'UTF-8')) ?>
+                </div>
+                <h3 class="h3" style="margin-bottom:4px"><?= e($order['academic_name']) ?></h3>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">تم تعيين الأكاديمي للطلب.</p>
+                <a href="chat.php?order_id=<?= $order['id'] ?>" class="btn btn-primary" style="width:100%">💬 تواصل مع الأكاديمي</a>
+              <?php else: ?>
+                <div style="width:80px;height:80px;border-radius:50%;background:var(--bg-body);border:1.5px dashed var(--border-color);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px">⏳</div>
+                <h3 class="h3" style="margin-bottom:4px;color:var(--text-secondary)">قيد التعيين</h3>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;line-height:1.5">يقوم فريق الدعم بمراجعة الطلب لربطك بأفضل أكاديمي متخصص.</p>
+                <button class="btn btn-outline" style="width:100%" disabled>بانتظار الأكاديمي...</button>
+              <?php endif; ?>
             </div>
 
             <!-- Timeline -->
@@ -218,22 +243,23 @@
               
               <div class="timeline">
                 <div class="timeline-item done">
-                  <div class="ti-title">تم استلام الطلب</div>
-                  <div class="ti-desc">تم تأكيد الدفع وقبول الأكاديمي للطلب.</div>
-                  <div class="ti-date">18 أبريل 2026 - 10:00 ص</div>
+                  <div class="ti-title">تم تقديم الطلب</div>
+                  <div class="ti-desc">تم تسجيل طلبك بنجاح على المنصة.</div>
+                  <div class="ti-date"><?= formatDate($order['created_at']) ?></div>
                 </div>
-                <div class="timeline-item active">
+                <div class="timeline-item <?= ($order['status'] !== 'new') ? 'done' : 'active' ?>">
+                  <div class="ti-title">الربط والتعيين</div>
+                  <div class="ti-desc">
+                    <?= $order['academic_id'] ? 'تم تعيين الأكاديمي وقبول العمل.' : 'جاري البحث عن أكاديمي متخصص للطلب.' ?>
+                  </div>
+                </div>
+                <div class="timeline-item <?= in_array($order['status'], ['in_progress', 'revision', 'completed']) ? 'active' : '' ?>">
                   <div class="ti-title">قيد التنفيذ</div>
-                  <div class="ti-desc">الأكاديمي بدأ العمل على تحليل البيانات.</div>
-                  <div class="ti-date">19 أبريل 2026 - 02:30 م</div>
+                  <div class="ti-desc">يقوم الأكاديمي حالياً بالعمل على الملفات.</div>
                 </div>
-                <div class="timeline-item">
-                  <div class="ti-title">المراجعة الأولية</div>
-                  <div class="ti-desc">بانتظار تسليم المسودة الأولى للمراجعة.</div>
-                </div>
-                <div class="timeline-item">
-                  <div class="ti-title">تم التسليم</div>
-                  <div class="ti-desc">اكتمل العمل بشكل نهائي وتم رفع الملفات لمراجعتك.</div>
+                <div class="timeline-item <?= ($order['status'] === 'completed') ? 'done' : '' ?>">
+                  <div class="ti-title">اكتمال وتسليم</div>
+                  <div class="ti-desc">مراجعة الملفات النهائية وتنزيلها.</div>
                 </div>
               </div>
             </div>
@@ -249,4 +275,3 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-

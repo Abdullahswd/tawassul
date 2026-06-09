@@ -1,4 +1,30 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+requireStudent();
+
+$user = currentUser();
+$orders = getOrdersByStudent($user['id']);
+
+// Simple filter logic via PHP array filters
+$filter = $_GET['filter'] ?? 'all';
+if ($filter === 'progress') {
+    $orders = array_filter($orders, function($o) {
+        return in_array($o['status'], ['new', 'accepted', 'in_progress', 'revision']);
+    });
+} elseif ($filter === 'completed') {
+    $orders = array_filter($orders, function($o) {
+        return $o['status'] === 'completed';
+    });
+}
+
+// Counts for filter bar
+$db = db();
+$cnt_all = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'])->fetchColumn();
+$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'accepted', 'in_progress', 'revision')")->fetchColumn();
+$cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status = 'completed'")->fetchColumn();
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -52,7 +78,7 @@
       </nav>
       
       <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="#" class="nav-item" style="color:var(--danger)">
+        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
           <span class="icon">🚪</span>
           <span>تسجيل الخروج</span>
         </a>
@@ -72,15 +98,15 @@
         <div class="navbar-actions">
           <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
           <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot">3</span>
+            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
           </button>
           <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
           <div class="user-profile">
             <div class="user-info" style="text-align:left">
-              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-name"><?= e($user['name']) ?></span>
               <span class="user-role">طالب</span>
             </div>
-            <div class="user-avatar user-initials-fill">؟</div>
+            <div class="user-avatar"><?= e($user['avatar']) ?></div>
           </div>
         </div>
       </header>
@@ -98,10 +124,9 @@
 
         <!-- Filters -->
         <div style="display:flex;gap:12px;margin-bottom:24px;overflow-x:auto;padding-bottom:8px">
-          <button class="btn btn-primary" style="border-radius:40px;padding:8px 20px">الكل (12)</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">قيد التنفيذ (2)</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">بانتظار المراجعة (1)</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">مكتملة (10)</button>
+          <a href="orders.php?filter=all" class="btn <?= $filter === 'all' ? 'btn-primary' : 'btn-outline' ?>" style="border-radius:40px;padding:8px 20px">الكل (<?= $cnt_all ?>)</a>
+          <a href="orders.php?filter=progress" class="btn <?= $filter === 'progress' ? 'btn-primary' : 'btn-outline' ?>" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">قيد التنفيذ (<?= $cnt_progress ?>)</a>
+          <a href="orders.php?filter=completed" class="btn <?= $filter === 'completed' ? 'btn-primary' : 'btn-outline' ?>" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">مكتملة (<?= $cnt_completed ?>)</a>
         </div>
 
         <!-- Orders Table -->
@@ -118,65 +143,36 @@
                   <th style="padding:16px;font-size:13px;color:var(--text-secondary);border-bottom:1px solid var(--border-color);background:var(--bg-body)">إجراء</th>
                 </tr>
               </thead>
-              <tbody id="ordersPageBody">
-                
-                <tr>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1045</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <div style="font-weight:700;color:var(--text-primary)">التحليل الإحصائي</div>
-                    <div style="font-size:12px;color:var(--text-secondary)">علم النفس التجريبي</div>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-18</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">450 ر.س</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-progress">
-                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
-                      قيد التنفيذ
-                    </span>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <a href="order-details.php?id=1045" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1042</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <div style="font-weight:700;color:var(--text-primary)">تصميم الاستبيانات</div>
-                    <div style="font-size:12px;color:var(--text-secondary)">إدارة الموارد البشرية</div>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-10</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">200 ر.س</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-completed">
-                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
-                      مكتمل
-                    </span>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <a href="order-details.php?id=1042" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700">#ORD-1049</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <div style="font-weight:700;color:var(--text-primary)">التدقيق اللغوي</div>
-                    <div style="font-size:12px;color:var(--text-secondary)">أدب إنجليزي</div>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-20</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)">150 ر.س</td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-new">
-                      <span style="width:8px;height:8px;border-radius:50%;background:currentColor"></span>
-                      بانتظار الدفع
-                    </span>
-                  </td>
-                  <td style="padding:16px; border-bottom:1px solid var(--border-color)">
-                    <a href="order-details.php?id=1049" class="btn btn-primary" style="padding:6px 12px;font-size:13px">ادفع الآن</a>
-                  </td>
-                </tr>
-
+              <tbody>
+                <?php if (empty($orders)): ?>
+                  <tr>
+                    <td colspan="6" style="text-align:center;padding:40px;color:var(--text-secondary)">
+                      لا توجد أي طلبات مطابقة للفلتر المحدد.
+                    </td>
+                  </tr>
+                <?php else: ?>
+                  <?php foreach ($orders as $o): 
+                    $badge = orderStatusLabel($o['status']);
+                  ?>
+                    <tr>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700"><?= e($o['order_number']) ?></td>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                        <div style="font-weight:700;color:var(--text-primary)"><?= e($o['service_icon']) ?> <?= e($o['service_name']) ?></div>
+                        <div style="font-size:12px;color:var(--text-secondary)"><?= e($o['specialty']) ?></div>
+                      </td>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)"><?= formatDate($o['created_at']) ?></td>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700; color:var(--primary)"><?= formatMoney($o['amount']) ?></td>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                        <span class="badge <?= $badge['class'] ?>">
+                          <?= $badge['label'] ?>
+                        </span>
+                      </td>
+                      <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                        <a href="order-details.php?id=<?= $o['id'] ?>" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </tbody>
             </table>
           </div>
@@ -189,4 +185,3 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-

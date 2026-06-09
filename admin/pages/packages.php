@@ -1,4 +1,32 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$db = db();
+
+// Fetch packages
+$packages_stmt = $db->query("
+    SELECT p.id, p.name, p.price, p.color, p.features_json, p.is_active AS active,
+           (SELECT COUNT(*) FROM orders o WHERE o.package_id = p.id) AS orders
+    FROM packages p
+    ORDER BY p.price ASC
+");
+$packages = $packages_stmt->fetchAll();
+
+$packages = array_map(function($p) {
+    $p['id'] = (int)$p['id'];
+    $p['price'] = (float)$p['price'];
+    $p['active'] = (bool)$p['active'];
+    $p['orders'] = (int)$p['orders'];
+    $p['features'] = json_decode($p['features_json'] ?? '[]', true);
+    if (!is_array($p['features'])) {
+        $p['features'] = [];
+    }
+    return $p;
+}, $packages);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -12,39 +40,10 @@
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="admin-layout">
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item active"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span><span class="nav-badge" style="background:#ef4444">5</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search"><div style="position:relative"><input type="search" placeholder="بحث..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:Tajawal,sans-serif;font-size:14px;outline:none" /></div></div>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
-        <div style="width:1px;height:28px;background:var(--border-color)"></div>
-        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <div class="page-content">
       <div class="page-header animate-fadeInUp">
@@ -104,6 +103,8 @@
 
 <script src="../assets/js/main.js"></script>
 <script>
+MOCK_DATA.packages = <?= json_encode($packages) ?>;
+
 document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
 document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
 
@@ -123,11 +124,11 @@ function renderPackages() {
           </div>
         </div>
         <h3 style="font-size:22px;font-weight:800;color:var(--text-primary);margin-bottom:4px">باقة ${p.name}</h3>
-        <div style="font-size:32px;font-weight:900;color:${p.color};margin-bottom:4px">${p.price} <span style="font-size:16px;font-weight:500;color:var(--text-secondary)">ر.س / شهرياً</span></div>
+        <div style="font-size:32px;font-weight:900;color:${p.color};margin-bottom:4px">${p.price} <span style="font-size:16px;font-weight:500;color:var(--text-secondary)">ر.س</span></div>
         <div style="font-size:13px;color:var(--text-secondary);margin-bottom:20px"><strong style="color:var(--primary)">${p.orders}</strong> طلب مكتمل</div>
         <div class="divider"></div>
         <ul style="list-style:none;margin-top:16px">
-          ${p.features.map(f => `<li style="display:flex;align-items:center;gap:8px;padding:6px 0;color:var(--text-primary);font-size:14px"><span style="width:20px;height:20px;border-radius:50%;background:${p.color}22;color:${p.color};display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">✓</span>${f}</li>`).join('')}
+          ${(p.features || []).map(f => `<li style="display:flex;align-items:center;gap:8px;padding:6px 0;color:var(--text-primary);font-size:14px"><span style="width:20px;height:20px;border-radius:50%;background:${p.color}22;color:${p.color};display:inline-flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0">✓</span>${f}</li>`).join('')}
         </ul>
       </div>
       <div style="padding:12px 20px;background:var(--bg-main);display:flex;gap:8px">
@@ -140,7 +141,26 @@ function renderPackages() {
 
 function togglePackage(id) {
   const p = MOCK_DATA.packages.find(x => x.id === id);
-  if (p) { p.active = !p.active; Toast.show(`تم ${p.active?'تفعيل':'إيقاف'} باقة ${p.name}`, p.active?'success':'warning'); }
+  if (!p) return;
+  const fd = new FormData();
+  fd.append('action', 'toggle');
+  fd.append('id', id);
+  fetch('../ajax/manage_package.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        p.active = res.active ? true : false;
+        Toast.show(`تم ${p.active ? 'تفعيل' : 'إيقاف'} باقة ${p.name}`, p.active ? 'success' : 'warning');
+        renderPackages();
+      } else {
+        Toast.show(res.message || 'حدث خطأ ما', 'error');
+        renderPackages();
+      }
+    })
+    .catch(() => {
+      Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+      renderPackages();
+    });
 }
 
 function openEditPackage(id) {
@@ -153,7 +173,7 @@ function openEditPackage(id) {
     document.getElementById('pkgPrice').value = p.price;
     document.getElementById('pkgColor').value = p.color;
     document.getElementById('pkgActive').checked = p.active;
-    document.getElementById('pkgFeatures').value = p.features.join('\n');
+    document.getElementById('pkgFeatures').value = (p.features || []).join('\n');
   } else {
     document.getElementById('packageModalTitle').textContent = 'إضافة باقة جديدة';
     document.getElementById('pkgName').value = '';
@@ -168,31 +188,68 @@ function openEditPackage(id) {
 function savePackage() {
   const id = parseInt(document.getElementById('editPackageId').value);
   const name = document.getElementById('pkgName').value.trim();
-  const price = parseInt(document.getElementById('pkgPrice').value);
+  const price = parseFloat(document.getElementById('pkgPrice').value);
   const color = document.getElementById('pkgColor').value;
-  const active = document.getElementById('pkgActive').checked;
-  const features = document.getElementById('pkgFeatures').value.split('\n').filter(f => f.trim());
-  if (!name || !price) { Toast.show('يرجى ملء جميع الحقول', 'error'); return; }
-  if (id) {
-    const p = MOCK_DATA.packages.find(x => x.id === id);
-    if (p) Object.assign(p, { name, price, color, active, features });
-    Toast.show('تم تحديث الباقة', 'success');
-  } else {
-    MOCK_DATA.packages.push({ id: Date.now(), name, price, color, features, active, orders: 0 });
-    Toast.show('تم إضافة الباقة', 'success');
-  }
-  Modal.close('packageModal');
-  renderPackages();
-  drawChart();
+  const active = document.getElementById('pkgActive').checked ? 1 : 0;
+  const featuresStr = document.getElementById('pkgFeatures').value;
+  const features = featuresStr.split('\n').map(f => f.trim()).filter(f => f);
+  
+  if (!name || isNaN(price) || price <= 0) { Toast.show('يرجى ملء جميع الحقول بصورة صحيحة', 'error'); return; }
+  
+  const fd = new FormData();
+  fd.append('action', 'save');
+  fd.append('id', id || 0);
+  fd.append('name', name);
+  fd.append('price', price);
+  fd.append('color', color);
+  fd.append('active', active);
+  fd.append('features', features.join('\n'));
+  
+  fetch('../ajax/manage_package.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        if (id) {
+          const p = MOCK_DATA.packages.find(x => x.id === id);
+          if (p) Object.assign(p, { name, price, color, active: active ? true : false, features });
+          Toast.show('تم تحديث الباقة بنجاح', 'success');
+        } else {
+          MOCK_DATA.packages.push({ id: parseInt(res.id), name, price, color, features, active: active ? true : false, orders: 0 });
+          Toast.show('تم إضافة الباقة بنجاح', 'success');
+        }
+        Modal.close('packageModal');
+        renderPackages();
+        drawChart();
+      } else {
+        Toast.show(res.message || 'حدث خطأ ما', 'error');
+      }
+    })
+    .catch(() => {
+      Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+    });
 }
 
 function deletePackage(id, name) {
   Modal.confirm('حذف الباقة', `هل تريد حذف باقة "${name}"؟`, () => {
-    const idx = MOCK_DATA.packages.findIndex(p => p.id === id);
-    if (idx > -1) MOCK_DATA.packages.splice(idx, 1);
-    Toast.show('تم حذف الباقة', 'success');
-    renderPackages();
-    drawChart();
+    const fd = new FormData();
+    fd.append('action', 'delete');
+    fd.append('id', id);
+    fetch('../ajax/manage_package.php', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          const idx = MOCK_DATA.packages.findIndex(p => p.id === id);
+          if (idx > -1) MOCK_DATA.packages.splice(idx, 1);
+          Toast.show('تم حذف الباقة بنجاح', 'success');
+          renderPackages();
+          drawChart();
+        } else {
+          Toast.show(res.message || 'حدث خطأ ما', 'error');
+        }
+      })
+      .catch(() => {
+        Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+      });
   });
 }
 
@@ -210,4 +267,3 @@ window.addEventListener('resize', drawChart);
 </script>
 </body>
 </html>
-

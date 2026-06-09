@@ -1,4 +1,70 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$stats = getAdminDashboardStats();
+
+// Database connection
+$db = db();
+
+// Fetch recent orders
+$recent_orders_stmt = $db->query("
+    SELECT o.order_number AS id, u.name AS student, s.name AS service, o.amount, o.status
+    FROM orders o
+    JOIN users u ON o.student_id = u.id
+    JOIN services s ON o.service_id = s.id
+    ORDER BY o.created_at DESC
+    LIMIT 5
+");
+$recent_orders = $recent_orders_stmt->fetchAll();
+
+// Fetch top academics
+$top_academics_stmt = $db->query("
+    SELECT avatar_initials AS avatar, name, specialty, rating, total_orders AS orders
+    FROM academics
+    WHERE status = 'approved'
+    ORDER BY rating DESC, total_orders DESC
+    LIMIT 5
+");
+$top_academics = $top_academics_stmt->fetchAll();
+
+// Fetch donut distribution
+$donut_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
+$donut_inprogress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
+$donut_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+
+// Fetch monthly chart stats (default orders count & revenue by month)
+$current_year = date('Y');
+$orders_by_month = array_fill(1, 12, 0);
+$revenue_by_month = array_fill(1, 12, 0);
+
+$monthly_orders_stmt = $db->prepare("
+    SELECT MONTH(created_at) AS m, COUNT(*) AS cnt
+    FROM orders
+    WHERE YEAR(created_at) = ?
+    GROUP BY MONTH(created_at)
+");
+$monthly_orders_stmt->execute([$current_year]);
+foreach ($monthly_orders_stmt->fetchAll() as $row) {
+    $orders_by_month[$row['m']] = (int)$row['cnt'];
+}
+
+$monthly_rev_stmt = $db->prepare("
+    SELECT MONTH(paid_at) AS m, SUM(amount) AS rev
+    FROM payments
+    WHERE YEAR(paid_at) = ? AND status = 'paid'
+    GROUP BY MONTH(paid_at)
+");
+$monthly_rev_stmt->execute([$current_year]);
+foreach ($monthly_rev_stmt->fetchAll() as $row) {
+    $revenue_by_month[$row['m']] = (float)$row['rev'];
+}
+
+$chart_orders = array_values($orders_by_month);
+$chart_revenue = array_values($revenue_by_month);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -17,84 +83,12 @@
 <!-- Admin Layout -->
 <div class="admin-layout">
 
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">🎓</div>
-      <span class="logo-text">تواصل Admin</span>
-    </div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item active"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span><span class="nav-badge">1,248</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span><span class="nav-badge">86</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span><span class="nav-badge" style="background:#ef4444">5</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer">
-      <a href="#" class="nav-item" onclick="event.preventDefault();Toast.show('تم تسجيل الخروج','info')">
-        <span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span>
-      </a>
-    </div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <!-- Main Content -->
   <div class="main-content" id="mainContent">
 
-    <!-- Navbar -->
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search">
-        <div style="position:relative">
-          <span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary)">🔍</span>
-          <input type="search" placeholder="بحث سريع..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:Tajawal,sans-serif;font-size:14px;outline:none" />
-        </div>
-      </div>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown">
-          <button class="nav-btn" id="notificationBtn" title="الإشعارات">🔔<span class="badge" id="notificationBadge">2</span></button>
-          <div class="dropdown-menu" style="min-width:320px;right:0;left:auto">
-            <div style="padding:14px 20px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
-              <span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span>
-              <button style="font-size:12px;color:var(--primary);background:none;border:none;cursor:pointer;font-family:Tajawal,sans-serif">تعليم الكل كمقروء</button>
-            </div>
-            <div id="notificationList" style="max-height:320px;overflow-y:auto"></div>
-            <div style="padding:12px 20px;text-align:center;border-top:1px solid var(--border-color)">
-              <a href="#" style="font-size:14px;color:var(--primary);font-weight:600;text-decoration:none">عرض كل الإشعارات</a>
-            </div>
-          </div>
-        </div>
-        <div style="width:1px;height:28px;background:var(--border-color);margin:0 4px"></div>
-        <div class="admin-profile dropdown" id="profileDropdown">
-          <div class="admin-avatar">أ</div>
-          <div class="admin-info">
-            <div class="admin-name">المدير العام</div>
-            <div class="admin-role">Super Admin</div>
-          </div>
-          <span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span>
-          <div class="dropdown-menu" style="right:0;left:auto;min-width:200px">
-            <div style="padding:16px;border-bottom:1px solid var(--border-color)">
-              <p style="font-size:14px;font-weight:700;color:var(--text-primary)">المدير العام</p>
-              <p style="font-size:12px;color:var(--text-secondary)">admin@tawassul.com</p>
-            </div>
-            <div style="padding:8px">
-              <a href="settings.php" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--text-primary);text-decoration:none;font-size:14px">⚙️ الإعدادات</a>
-              <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 تسجيل الخروج</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <!-- Page Content -->
     <div class="page-content">
@@ -124,33 +118,33 @@
 
         <div class="stat-card animate-fadeInUp delay-1">
           <div class="card-icon" style="background:rgba(99,102,241,0.1)">👥</div>
-          <div class="card-value" data-counter="1248">0</div>
+          <div class="card-value" data-counter="<?= $stats['total_students'] ?>"><?= $stats['total_students'] ?></div>
           <div class="card-label">إجمالي الطلاب</div>
-          <div class="card-trend up">▲ 8.3% مقارنة بالشهر الماضي</div>
+          <div class="card-trend up">مجموع المسجلين</div>
           <div class="card-bg-blob" style="background:#6366f1"></div>
         </div>
 
         <div class="stat-card animate-fadeInUp delay-2">
           <div class="card-icon" style="background:rgba(14,165,233,0.1)">🎓</div>
-          <div class="card-value" data-counter="86">0</div>
+          <div class="card-value" data-counter="<?= $stats['total_academics'] ?>"><?= $stats['total_academics'] ?></div>
           <div class="card-label">الأكاديميون المسجلون</div>
-          <div class="card-trend up">▲ 5.7% مقارنة بالشهر الماضي</div>
+          <div class="card-trend up">مقبولون ومستعدون</div>
           <div class="card-bg-blob" style="background:#0ea5e9"></div>
         </div>
 
         <div class="stat-card animate-fadeInUp delay-3">
           <div class="card-icon" style="background:rgba(245,158,11,0.1)">📋</div>
-          <div class="card-value" data-counter="342">0</div>
+          <div class="card-value" data-counter="<?= $stats['total_orders'] ?>"><?= $stats['total_orders'] ?></div>
           <div class="card-label">إجمالي الطلبات</div>
-          <div class="card-trend up">▲ 12.5% مقارنة بالشهر الماضي</div>
+          <div class="card-trend up">كل الحالات</div>
           <div class="card-bg-blob" style="background:#f59e0b"></div>
         </div>
 
         <div class="stat-card animate-fadeInUp delay-4">
           <div class="card-icon" style="background:rgba(16,185,129,0.1)">💰</div>
-          <div class="card-value" data-counter="84600" data-suffix=" ر.س">0</div>
+          <div class="card-value" data-counter="<?= (int)$stats['total_revenue'] ?>" data-suffix=" ر.س">0</div>
           <div class="card-label">إجمالي الأرباح</div>
-          <div class="card-trend up">▲ 22.1% مقارنة بالشهر الماضي</div>
+          <div class="card-trend up">المدفوعات الناجحة</div>
           <div class="card-bg-blob" style="background:#10b981"></div>
         </div>
 
@@ -183,15 +177,15 @@
           <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#10b981;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">مكتملة</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">186</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $donut_completed ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">جارية</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">112</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $donut_inprogress ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:8px"><span style="width:12px;height:12px;border-radius:50%;background:#3b82f6;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">جديدة</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">44</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $donut_new ?></span>
             </div>
           </div>
         </div>
@@ -238,6 +232,15 @@
 
 <script src="../assets/js/main.js"></script>
 <script>
+// Live Database MOCK_DATA replacement
+MOCK_DATA.orders = <?= json_encode($recent_orders) ?>;
+MOCK_DATA.academics = <?= json_encode($top_academics) ?>;
+MOCK_DATA.chartData = {
+  months: ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+  orders: <?= json_encode($chart_orders) ?>,
+  revenue: <?= json_encode($chart_revenue) ?>,
+};
+
 // Profile dropdown
 document.getElementById('profileDropdown')?.addEventListener('click', function(e){
   e.stopPropagation();
@@ -255,7 +258,7 @@ function renderRecentOrders() {
   const orders = MOCK_DATA.orders.slice(0, 5);
   tbody.innerHTML = orders.map((o, i) => `
     <tr>
-      <td><a href="order-details.php" style="color:var(--primary);font-weight:600;text-decoration:none">${o.id}</a></td>
+      <td><a href="order-details.php?id=${o.id}" style="color:var(--primary);font-weight:600;text-decoration:none">${o.id}</a></td>
       <td>
         <div style="display:flex;align-items:center;gap:10px">
           <div class="table-avatar" style="background:${getAvatarColor(i)}">${o.student.slice(0,2)}</div>
@@ -276,14 +279,14 @@ function renderTopAcademics() {
   list.innerHTML = MOCK_DATA.academics.map((a, i) => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;margin-bottom:4px;transition:background 0.2s" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
       <div style="width:10px;height:10px;border-radius:50%;font-size:18px;font-weight:800;color:var(--text-secondary);text-align:center;min-width:24px">${i+1}</div>
-      <div class="table-avatar" style="background:${getAvatarColor(i)}">${a.avatar}</div>
+      <div class="table-avatar" style="background:${getAvatarColor(i)}">${a.avatar || 'أك'}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.name}</div>
-        <div style="font-size:12px;color:var(--text-secondary)">${a.specialty}</div>
+        <div style="font-size:12px;color:var(--text-secondary)">${a.specialty || 'تخصص عام'}</div>
       </div>
       <div style="text-align:left;flex-shrink:0">
         <div style="font-size:13px;font-weight:700;color:var(--text-primary)">${a.orders} طلب</div>
-        <div style="font-size:12px;color:#f59e0b">⭐ ${a.rating}</div>
+        <div style="font-size:12px;color:#f59e0b">⭐ ${parseFloat(a.rating).toFixed(1)}</div>
       </div>
     </div>
   `).join('');
@@ -311,13 +314,13 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTopAcademics();
   setTimeout(() => {
     drawMainChart();
-    Charts.drawDonutChart('donutChart', [186, 112, 44], ['مكتملة', 'جارية', 'جديدة'], ['#10b981', '#f59e0b', '#3b82f6']);
+    Charts.drawDonutChart('donutChart', [<?= $donut_completed ?>, <?= $donut_inprogress ?>, <?= $donut_new ?>], ['مكتملة', 'جارية', 'جديدة'], ['#10b981', '#f59e0b', '#3b82f6']);
   }, 200);
 });
 
 window.addEventListener('resize', () => {
   drawMainChart();
-  Charts.drawDonutChart('donutChart', [186, 112, 44], ['مكتملة', 'جارية', 'جديدة'], ['#10b981', '#f59e0b', '#3b82f6']);
+  Charts.drawDonutChart('donutChart', [<?= $donut_completed ?>, <?= $donut_inprogress ?>, <?= $donut_new ?>], ['مكتملة', 'جارية', 'جديدة'], ['#10b981', '#f59e0b', '#3b82f6']);
 });
 </script>
 </body>

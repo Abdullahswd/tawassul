@@ -1,4 +1,13 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/config/auth.php';
+if (isLoggedIn()) {
+    session_unset();
+    session_destroy();
+    // Restart a clean empty session
+    session_start();
+}
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">

@@ -1,4 +1,29 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$db = db();
+
+// Fetch orders
+$orders_stmt = $db->query("
+    SELECT o.order_number AS id, u.name AS student, COALESCE(a.name, 'غير معين') AS academic, s.name AS service, COALESCE(p.name, 'مخصصة') AS package, o.amount, o.status, DATE(o.created_at) AS date
+    FROM orders o
+    JOIN users u ON o.student_id = u.id
+    JOIN services s ON o.service_id = s.id
+    LEFT JOIN academics a ON o.academic_id = a.id
+    LEFT JOIN packages p ON o.package_id = p.id
+    ORDER BY o.created_at DESC
+");
+$orders = $orders_stmt->fetchAll();
+
+// Count stats
+$cnt_all = count($orders);
+$cnt_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
+$cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -12,39 +37,10 @@
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="admin-layout">
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item active"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span><span class="nav-badge" style="background:#ef4444">5</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search"><div style="position:relative"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary)">🔍</span><input type="search" placeholder="بحث في الطلبات..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:Tajawal,sans-serif;font-size:14px;outline:none" /></div></div>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
-        <div style="width:1px;height:28px;background:var(--border-color)"></div>
-        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <div class="page-content">
       <div class="page-header animate-fadeInUp">
@@ -59,16 +55,16 @@
       <!-- Status Cards -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
         <div class="stat-card animate-fadeInUp delay-1" style="padding:18px;cursor:pointer" onclick="filterByStatus('')">
-          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px" data-counter="342">0</div><div class="card-label">جميع الطلبات</div></div><div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0;font-size:22px">📋</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px" data-counter="<?= $cnt_all ?>"><?= $cnt_all ?></div><div class="card-label">جميع الطلبات</div></div><div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0;font-size:22px">📋</div></div>
         </div>
         <div class="stat-card animate-fadeInUp delay-2" style="padding:18px;cursor:pointer;border-bottom:3px solid #3b82f6" onclick="filterByStatus('new')">
-          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#3b82f6" data-counter="44">0</div><div class="card-label">طلبات جديدة</div></div><div class="card-icon" style="background:rgba(59,130,246,0.1);margin:0;font-size:22px">⭐</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#3b82f6" data-counter="<?= $cnt_new ?>"><?= $cnt_new ?></div><div class="card-label">طلبات جديدة</div></div><div class="card-icon" style="background:rgba(59,130,246,0.1);margin:0;font-size:22px">⭐</div></div>
         </div>
         <div class="stat-card animate-fadeInUp delay-3" style="padding:18px;cursor:pointer;border-bottom:3px solid #f59e0b" onclick="filterByStatus('in_progress')">
-          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#f59e0b" data-counter="112">0</div><div class="card-label">قيد التنفيذ</div></div><div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0;font-size:22px">⟳</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#f59e0b" data-counter="<?= $cnt_progress ?>"><?= $cnt_progress ?></div><div class="card-label">قيد التنفيذ</div></div><div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0;font-size:22px">⟳</div></div>
         </div>
         <div class="stat-card animate-fadeInUp delay-4" style="padding:18px;cursor:pointer;border-bottom:3px solid #10b981" onclick="filterByStatus('completed')">
-          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#10b981" data-counter="186">0</div><div class="card-label">مكتملة</div></div><div class="card-icon" style="background:rgba(16,185,129,0.1);margin:0;font-size:22px">✅</div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px;color:#10b981" data-counter="<?= $cnt_completed ?>"><?= $cnt_completed ?></div><div class="card-label">مكتملة</div></div><div class="card-icon" style="background:rgba(16,185,129,0.1);margin:0;font-size:22px">✅</div></div>
         </div>
       </div>
 
@@ -114,7 +110,7 @@
         </div>
 
         <div class="pagination">
-          <span class="pagination-info">عرض 1-6 من <strong>342</strong> طلب</span>
+          <span class="pagination-info">عرض 1-<?= count($orders) ?> من <strong><?= $cnt_all ?></strong> طلب</span>
           <div class="pagination-pages">
             <button class="page-btn">‹</button>
             <button class="page-btn active">1</button>
@@ -140,6 +136,7 @@
 document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
 document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
 
+MOCK_DATA.orders = <?= json_encode($orders) ?>;
 let currentOrders = [...MOCK_DATA.orders];
 
 function renderOrders(data) {
@@ -159,16 +156,14 @@ function renderOrders(data) {
         </div>
       </td>
       <td style="font-size:13px;color:var(--text-secondary)">${o.academic}</td>
-      <td style="font-size:13px">${o.service.slice(0,14)}...</td>
+      <td style="font-size:13px">${o.service}</td>
       <td><span class="badge badge-primary">${o.package}</span></td>
       <td><strong>${o.amount.toLocaleString('ar')} ر.س</strong></td>
       <td>${getStatusBadge(o.status)}</td>
       <td style="color:var(--text-secondary);font-size:13px">${o.date}</td>
       <td>
         <div style="display:flex;gap:5px">
-          <a href="order-details.php" class="btn btn-sm btn-outline btn-icon" title="التفاصيل">👁</a>
-          <button class="btn btn-sm btn-icon" style="background:rgba(99,102,241,0.1);color:#6366f1;border:none" title="تغيير الحالة" onclick="changeStatus('${o.id}')">🔄</button>
-          <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" title="حذف" onclick="deleteOrder('${o.id}')">🗑</button>
+          <a href="order-details.php?id=${o.id}" class="btn btn-sm btn-outline btn-icon" title="التفاصيل">👁</a>
         </div>
       </td>
     </tr>
@@ -186,8 +181,11 @@ function applyFilters() {
   const sv = document.getElementById('orderServiceFilter').value;
   const dt = document.getElementById('dateFilter').value;
   const filtered = MOCK_DATA.orders.filter(o => {
-    const matchQ = !q || o.id.toLowerCase().includes(q) || o.student.includes(q) || o.academic.includes(q);
-    const matchSt = !st || o.status === st;
+    const matchQ = !q || o.id.toLowerCase().includes(q) || o.student.toLowerCase().includes(q) || o.academic.toLowerCase().includes(q);
+    let matchSt = !st || o.status === st;
+    if (st === 'in_progress') {
+       matchSt = ['accepted', 'in_progress', 'revision'].includes(o.status);
+    }
     const matchSv = !sv || o.service.includes(sv);
     const matchDt = !dt || o.date === dt;
     return matchQ && matchSt && matchSv && matchDt;

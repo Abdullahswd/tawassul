@@ -1,4 +1,65 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$order_no = $_GET['id'] ?? '';
+if (!$order_no) {
+    header('Location: orders.php');
+    exit;
+}
+
+$db = db();
+
+// Fetch order
+$stmt = $db->prepare("
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon,
+           p.name AS package_name, p.price AS package_price,
+           u.name AS student_name, u.email AS student_email, u.phone AS student_phone,
+           a.name AS academic_name, a.email AS academic_email, a.specialty AS academic_specialty, a.rating AS academic_rating
+    FROM orders o
+    JOIN users u ON o.student_id = u.id
+    JOIN services s ON o.service_id = s.id
+    LEFT JOIN academics a ON o.academic_id = a.id
+    LEFT JOIN packages p ON o.package_id = p.id
+    WHERE o.order_number = ? LIMIT 1
+");
+$stmt->execute([$order_no]);
+$order = $stmt->fetch();
+
+if (!$order) {
+    header('Location: orders.php');
+    exit;
+}
+
+// Handle status updates
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
+    $new_status = $_POST['status'] ?? '';
+    if (in_array($new_status, ['new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled'])) {
+        updateOrderStatus($order['id'], $new_status);
+        
+        // Add a notification for the student
+        createNotification(
+            $order['student_id'],
+            'student',
+            'تحديث حالة الطلب 🔔',
+            'تم تحديث حالة طلبك ' . $order['order_number'] . ' لتصبح: ' . orderStatusLabel($new_status)['label'],
+            '🔔',
+            'student/order-details.php?id=' . $order['id']
+        );
+        
+        header('Location: order-details.php?id=' . $order['order_number'] . '&updated=1');
+        exit;
+    }
+}
+
+$badge = orderStatusLabel($order['status']);
+
+// Platform fees
+$platform_fee = round($order['amount'] * 0.15, 2);
+$academic_net = round($order['amount'] - $platform_fee, 2);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -12,49 +73,21 @@
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="admin-layout">
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item active"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
-        <div style="width:1px;height:28px;background:var(--border-color)"></div>
-        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <div class="page-content">
       <div class="page-header animate-fadeInUp">
         <div>
           <div class="breadcrumb"><a href="dashboard.php">الرئيسية</a><span>›</span><a href="orders.php">الطلبات</a><span>›</span><span>تفاصيل الطلب</span></div>
-          <h1 class="page-header-title">تفاصيل الطلب #ORD-002</h1>
-          <p class="page-header-subtitle">تاريخ الطلب: 2024-05-03</p>
+          <h1 class="page-header-title">تفاصيل الطلب <?= e($order['order_number']) ?></h1>
+          <p class="page-header-subtitle">تاريخ الطلب: <?= formatDate($order['created_at']) ?></p>
         </div>
         <div style="display:flex;gap:10px">
           <a href="orders.php" class="btn btn-outline">← العودة للطلبات</a>
-          <button class="btn btn-primary" onclick="Toast.show('تم طباعة الطلب','info')">🖨 طباعة</button>
+          <button class="btn btn-primary" onclick="window.print()">🖨 طباعة</button>
         </div>
       </div>
 
@@ -67,12 +100,12 @@
           <div class="stat-card animate-fadeInUp delay-1" style="padding:0;overflow:hidden">
             <div style="padding:20px 24px;background:linear-gradient(135deg,#6366f1,#4f46e5);color:white;display:flex;align-items:center;justify-content:space-between">
               <div>
-                <h3 style="font-size:18px;font-weight:800">#ORD-002</h3>
-                <p style="font-size:13px;opacity:0.8;margin-top:2px">الرسائل الجامعية · باقة التحليل</p>
+                <h3 style="font-size:18px;font-weight:800"><?= e($order['order_number']) ?></h3>
+                <p style="font-size:13px;opacity:0.8;margin-top:2px"><?= e($order['service_icon']) ?> <?= e($order['service_name']) ?> · <?= e($order['package_name'] ?: 'طلب خدمة مخصصة') ?></p>
               </div>
               <div style="text-align:left">
-                <div style="font-size:28px;font-weight:900">649 ر.س</div>
-                <span style="background:rgba(255,255,255,0.2);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600">⟳ قيد التنفيذ</span>
+                <div style="font-size:28px;font-weight:900"><?= formatMoney($order['amount']) ?></div>
+                <span style="background:rgba(255,255,255,0.2);padding:3px 12px;border-radius:20px;font-size:12px;font-weight:600"><?= $badge['label'] ?></span>
               </div>
             </div>
 
@@ -80,37 +113,37 @@
             <div style="padding:24px">
               <div style="display:flex;align-items:center;justify-content:space-between;position:relative;margin-bottom:24px">
                 <div style="position:absolute;top:16px;right:40px;left:40px;height:2px;background:var(--border-color);z-index:0"></div>
-                <div style="position:absolute;top:16px;right:40px;width:50%;height:2px;background:var(--primary);z-index:1"></div>
+                <div style="position:absolute;top:16px;right:40px;width:<?= $order['status'] === 'completed' ? '100%' : ($order['status'] === 'in_progress' ? '50%' : '25%') ?>;height:2px;background:var(--primary);z-index:1"></div>
                 <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px">
                   <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">✓</div>
                   <span style="font-size:12px;font-weight:600;color:var(--primary)">جديد</span>
                 </div>
                 <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px">
-                  <div style="width:32px;height:32px;border-radius:50%;background:var(--primary);color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">✓</div>
-                  <span style="font-size:12px;font-weight:600;color:var(--primary)">قيد التنفيذ</span>
+                  <div style="width:32px;height:32px;border-radius:50%;background:<?= in_array($order['status'], ['in_progress', 'revision', 'completed']) ? 'var(--primary)' : 'var(--border-color)' ?>;color:<?= in_array($order['status'], ['in_progress', 'revision', 'completed']) ? 'white' : 'var(--text-secondary)' ?>;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">2</div>
+                  <span style="font-size:12px;color:<?= in_array($order['status'], ['in_progress', 'revision', 'completed']) ? 'var(--primary)' : 'var(--text-secondary)' ?>">قيد التنفيذ</span>
                 </div>
                 <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px">
-                  <div style="width:32px;height:32px;border-radius:50%;background:var(--border-color);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;font-size:14px">3</div>
-                  <span style="font-size:12px;color:var(--text-secondary)">مراجعة</span>
+                  <div style="width:32px;height:32px;border-radius:50%;background:<?= in_array($order['status'], ['revision', 'completed']) ? 'var(--primary)' : 'var(--border-color)' ?>;color:<?= in_array($order['status'], ['revision', 'completed']) ? 'white' : 'var(--text-secondary)' ?>;display:flex;align-items:center;justify-content:center;font-size:14px">3</div>
+                  <span style="font-size:12px;color:<?= in_array($order['status'], ['revision', 'completed']) ? 'var(--primary)' : 'var(--text-secondary)' ?>">مراجعة</span>
                 </div>
                 <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px">
-                  <div style="width:32px;height:32px;border-radius:50%;background:var(--border-color);color:var(--text-secondary);display:flex;align-items:center;justify-content:center;font-size:14px">4</div>
-                  <span style="font-size:12px;color:var(--text-secondary)">مكتمل</span>
+                  <div style="width:32px;height:32px;border-radius:50%;background:<?= $order['status'] === 'completed' ? 'var(--success)' : 'var(--border-color)' ?>;color:<?= $order['status'] === 'completed' ? 'white' : 'var(--text-secondary)' ?>;display:flex;align-items:center;justify-content:center;font-size:14px">4</div>
+                  <span style="font-size:12px;color:<?= $order['status'] === 'completed' ? 'var(--success)' : 'var(--text-secondary)' ?>">مكتمل</span>
                 </div>
               </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
                 <div style="background:var(--bg-main);padding:14px;border-radius:12px">
                   <div class="form-label">تاريخ الإنشاء</div>
-                  <div style="font-weight:600;color:var(--text-primary);margin-top:4px">2024-05-03</div>
+                  <div style="font-weight:600;color:var(--text-primary);margin-top:4px"><?= formatDate($order['created_at']) ?></div>
                 </div>
                 <div style="background:var(--bg-main);padding:14px;border-radius:12px">
                   <div class="form-label">الموعد النهائي</div>
-                  <div style="font-weight:600;color:#ef4444;margin-top:4px">2024-05-10</div>
+                  <div style="font-weight:600;color:#ef4444;margin-top:4px"><?= formatDate($order['deadline']) ?></div>
                 </div>
                 <div style="background:var(--bg-main);padding:14px;border-radius:12px">
-                  <div class="form-label">المبلغ المدفوع</div>
-                  <div style="font-weight:700;font-size:18px;color:var(--success);margin-top:4px">649 ر.س</div>
+                  <div class="form-label">المبلغ الإجمالي</div>
+                  <div style="font-weight:700;font-size:18px;color:var(--success);margin-top:4px"><?= formatMoney($order['amount']) ?></div>
                 </div>
               </div>
             </div>
@@ -119,48 +152,15 @@
           <!-- Files -->
           <div class="stat-card animate-fadeInUp delay-2" style="padding:20px">
             <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📎 الملفات المرفوعة</h3>
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--bg-main);border:1px solid var(--border-color)">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;font-size:20px">📄</div>
-                <div style="flex:1">
-                  <div style="font-size:14px;font-weight:600;color:var(--text-primary)">متطلبات_الرسالة.pdf</div>
-                  <div style="font-size:12px;color:var(--text-secondary)">2.4 MB · رُفع في 2024-05-03</div>
-                </div>
-                <button class="btn btn-sm btn-outline" onclick="Toast.show('جاري تحميل الملف...','info')">⬇ تحميل</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--bg-main);border:1px solid var(--border-color)">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.1);display:flex;align-items:center;justify-content:center;font-size:20px">📊</div>
-                <div style="flex:1">
-                  <div style="font-size:14px;font-weight:600;color:var(--text-primary)">البيانات_الإحصائية.xlsx</div>
-                  <div style="font-size:12px;color:var(--text-secondary)">890 KB · رُفع في 2024-05-04</div>
-                </div>
-                <button class="btn btn-sm btn-outline" onclick="Toast.show('جاري تحميل الملف...','info')">⬇ تحميل</button>
-              </div>
-              <div style="display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;background:var(--bg-main);border:1px solid var(--border-color)">
-                <div style="width:40px;height:40px;border-radius:10px;background:rgba(245,158,11,0.1);display:flex;align-items:center;justify-content:center;font-size:20px">🖼</div>
-                <div style="flex:1">
-                  <div style="font-size:14px;font-weight:600;color:var(--text-primary)">المخطط_التصميمي.jpg</div>
-                  <div style="font-size:12px;color:var(--text-secondary)">1.1 MB · رُفع في 2024-05-05</div>
-                </div>
-                <button class="btn btn-sm btn-outline" onclick="Toast.show('جاري تحميل الملف...','info')">⬇ تحميل</button>
-              </div>
-            </div>
-            <div style="margin-top:12px;padding:12px;border:2px dashed var(--border-color);border-radius:12px;text-align:center;cursor:pointer" onclick="Toast.show('ميزة رفع الملفات تتطلب Backend','info')">
-              <span style="color:var(--text-secondary);font-size:14px">+ رفع ملف جديد</span>
-            </div>
+            <p style="font-size:13px;color:var(--text-secondary)">لا يوجد أي ملفات مرفوعة حالياً للطلب.</p>
           </div>
 
           <!-- Notes -->
           <div class="stat-card animate-fadeInUp delay-3" style="padding:20px">
             <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📝 ملاحظات الطلب</h3>
             <div style="background:var(--bg-main);padding:16px;border-radius:12px;color:var(--text-secondary);font-size:14px;line-height:1.8;margin-bottom:16px">
-              الطالبة تطلب بحثاً شاملاً في مجال الدراسات الإنسانية مع التركيز على المنهجية الوصفية التحليلية. يجب أن يشمل البحث مراجعة الأدبيات والإطار النظري وتحليل البيانات.
+              <?= nl2br(e($order['description'])) ?>
             </div>
-            <div class="form-group">
-              <label class="form-label">إضافة ملاحظة</label>
-              <textarea class="form-input" rows="3" placeholder="أضف ملاحظة للأكاديمي أو الطالب..."></textarea>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="Toast.show('تم إضافة الملاحظة','success')">إرسال الملاحظة</button>
           </div>
 
         </div>
@@ -172,21 +172,11 @@
           <div class="stat-card animate-fadeInUp delay-1" style="padding:20px">
             <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px">👤 بيانات الطالب</h3>
             <div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-main);border-radius:12px;margin-bottom:12px">
-              <div class="table-avatar" style="width:52px;height:52px;border-radius:14px;font-size:20px;background:#6366f1">سع</div>
+              <div class="table-avatar" style="width:52px;height:52px;border-radius:14px;font-size:20px;background:#6366f1">👨‍🎓</div>
               <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text-primary)">سارة عبدالله الغامدي</div>
-                <div style="font-size:12px;color:var(--text-secondary)">sara@email.com</div>
-                <div style="font-size:12px;color:var(--text-secondary)">0507654321</div>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div style="background:var(--bg-main);padding:10px;border-radius:10px;text-align:center">
-                <div style="font-size:18px;font-weight:800;color:var(--primary)">3</div>
-                <div style="font-size:11px;color:var(--text-secondary)">طلبات سابقة</div>
-              </div>
-              <div style="background:var(--bg-main);padding:10px;border-radius:10px;text-align:center">
-                <div style="font-size:18px;font-weight:800;color:var(--success)">مميز</div>
-                <div style="font-size:11px;color:var(--text-secondary)">تصنيف العميل</div>
+                <div style="font-size:15px;font-weight:700;color:var(--text-primary)"><?= e($order['student_name']) ?></div>
+                <div style="font-size:12px;color:var(--text-secondary)"><?= e($order['student_email']) ?></div>
+                <div style="font-size:12px;color:var(--text-secondary)"><?= e($order['student_phone']) ?></div>
               </div>
             </div>
           </div>
@@ -194,34 +184,37 @@
           <!-- Academic Info -->
           <div class="stat-card animate-fadeInUp delay-2" style="padding:20px">
             <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🎓 بيانات الأكاديمي</h3>
-            <div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-main);border-radius:12px;margin-bottom:12px">
-              <div class="table-avatar" style="width:52px;height:52px;border-radius:14px;font-size:20px;background:#10b981">في</div>
-              <div>
-                <div style="font-size:15px;font-weight:700;color:var(--text-primary)">أ. فاطمة يوسف</div>
-                <div style="font-size:12px;color:var(--text-secondary)">fatima@email.com</div>
-                <div style="font-size:12px;color:#f59e0b;font-weight:600">⭐ 4.7 تقييم</div>
+            <?php if ($order['academic_id']): ?>
+              <div style="display:flex;align-items:center;gap:14px;padding:16px;background:var(--bg-main);border-radius:12px;margin-bottom:12px">
+                <div class="table-avatar" style="width:52px;height:52px;border-radius:14px;font-size:20px;background:#10b981">👨‍🏫</div>
+                <div>
+                  <div style="font-size:15px;font-weight:700;color:var(--text-primary)"><?= e($order['academic_name']) ?></div>
+                  <div style="font-size:12px;color:var(--text-secondary)"><?= e($order['academic_email']) ?></div>
+                  <div style="font-size:12px;color:#f59e0b;font-weight:600">⭐ <?= parseFloat($order['academic_rating'])->toFixed(1) ?> تقييم</div>
+                </div>
               </div>
-            </div>
-            <div style="background:var(--bg-main);padding:10px;border-radius:10px;margin-bottom:8px">
-              <div style="font-size:12px;color:var(--text-secondary)">التخصص</div>
-              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">اللغة العربية</div>
-            </div>
-            <div style="background:var(--bg-main);padding:10px;border-radius:10px">
-              <div style="font-size:12px;color:var(--text-secondary)">الطلبات المكتملة</div>
-              <div style="font-size:18px;font-weight:800;color:var(--primary)">12</div>
-            </div>
+              <div style="background:var(--bg-main);padding:10px;border-radius:10px;margin-bottom:8px">
+                <div style="font-size:12px;color:var(--text-secondary)">التخصص</div>
+                <div style="font-size:13px;font-weight:600;color:var(--text-primary)"><?= e($order['academic_specialty']) ?></div>
+              </div>
+            <?php else: ?>
+              <p style="font-size:13px;color:var(--text-secondary)">لم يتم تعيين أكاديمي لهذا الطلب بعد.</p>
+            <?php endif; ?>
           </div>
 
           <!-- Change Status -->
           <div class="stat-card animate-fadeInUp delay-3" style="padding:20px">
             <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🔄 تغيير حالة الطلب</h3>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <button class="btn btn-info" style="justify-content:center" onclick="changeOrderStatus('new')">⭐ طلب جديد</button>
-              <button class="btn btn-warning" style="justify-content:center" onclick="changeOrderStatus('in_progress')">⟳ قيد التنفيذ</button>
-              <button class="btn btn-success" style="justify-content:center" onclick="changeOrderStatus('completed')">✓ مكتمل</button>
-              <hr class="divider" />
-              <button class="btn btn-danger" style="justify-content:center" onclick="Modal.confirm('إلغاء الطلب','هل تريد إلغاء هذا الطلب؟',()=>Toast.show('تم إلغاء الطلب','error'))">✕ إلغاء الطلب</button>
-            </div>
+            <form method="POST" action="order-details.php?id=<?= e($order['order_number']) ?>">
+              <input type="hidden" name="action" value="update_status">
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <button type="submit" name="status" value="new" class="btn btn-info" style="justify-content:center">⭐ طلب جديد</button>
+                <button type="submit" name="status" value="in_progress" class="btn btn-warning" style="justify-content:center">⟳ قيد التنفيذ</button>
+                <button type="submit" name="status" value="completed" class="btn btn-success" style="justify-content:center">✓ مكتمل</button>
+                <hr class="divider" />
+                <button type="submit" name="status" value="cancelled" class="btn btn-danger" style="justify-content:center">✕ إلغاء الطلب</button>
+              </div>
+            </form>
           </div>
 
           <!-- Payment Summary -->
@@ -229,21 +222,20 @@
             <h3 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:16px">💰 ملخص الدفع</h3>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)">
               <span style="font-size:13px;color:var(--text-secondary)">سعر الباقة</span>
-              <span style="font-weight:600">649 ر.س</span>
+              <span style="font-weight:600"><?= formatMoney($order['amount']) ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)">
               <span style="font-size:13px;color:var(--text-secondary)">العمولة (15%)</span>
-              <span style="font-weight:600;color:var(--primary)">97 ر.س</span>
+              <span style="font-weight:600;color:var(--primary)"><?= formatMoney($platform_fee) ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)">
               <span style="font-size:13px;color:var(--text-secondary)">نصيب الأكاديمي</span>
-              <span style="font-weight:600;color:var(--success)">552 ر.س</span>
+              <span style="font-weight:600;color:var(--success)"><?= formatMoney($academic_net) ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0 0">
               <span style="font-size:15px;font-weight:700;color:var(--text-primary)">إجمالي الإيراد</span>
-              <span style="font-size:20px;font-weight:800;color:var(--primary)">649 ر.س</span>
+              <span style="font-size:20px;font-weight:800;color:var(--primary)"><?= formatMoney($order['amount']) ?></span>
             </div>
-            <span class="badge badge-success" style="display:inline-flex;margin-top:12px">✓ مدفوع</span>
           </div>
 
         </div>
@@ -251,24 +243,6 @@
     </div>
   </div>
 </div>
-
-<!-- Confirm Modal -->
-<div class="modal-overlay" id="confirmModal">
-  <div class="modal-box" style="max-width:420px"><div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد</h3><button class="modal-close" data-modal-close>✕</button></div><div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:64px;margin-bottom:16px">⚠️</div><p id="confirmMessage" style="color:var(--text-secondary);font-size:15px"></p></div><div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmBtn">تأكيد</button></div></div>
-</div>
-
 <script src="../assets/js/main.js"></script>
-<script>
-document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
-document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
-
-function changeOrderStatus(status) {
-  const labels = { new: 'جديد', in_progress: 'قيد التنفيذ', completed: 'مكتمل' };
-  Modal.confirm('تغيير حالة الطلب', `هل تريد تغيير حالة الطلب إلى "${labels[status]}"؟`, () => {
-    Toast.show(`تم تغيير الحالة إلى: ${labels[status]}`, 'success');
-  });
-}
-</script>
 </body>
 </html>
-

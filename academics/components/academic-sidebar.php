@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   ============================================
   Academic Sidebar Component
   Usage: inject this HTML into any dashboard page
@@ -28,30 +28,30 @@
 
     <p class="nav-label-group">لوحة التحكم</p>
 
-    <a href="../academic-dashboard.php" class="nav-item" id="nav-dashboard">
+    <a href="academic-dashboard.php" class="nav-item" id="nav-dashboard">
       <span class="nav-icon">📊</span>
       <span class="nav-text">الرئيسية</span>
     </a>
 
-    <a href="../academic-orders.php" class="nav-item" id="nav-orders">
+    <a href="academic-orders.php" class="nav-item" id="nav-orders">
       <span class="nav-icon">📋</span>
       <span class="nav-text">الطلبات</span>
       <span class="nav-text" style="margin-right:auto;background:#ef4444;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700">2</span>
     </a>
 
-    <a href="../academic-earnings.php" class="nav-item" id="nav-earnings">
+    <a href="academic-earnings.php" class="nav-item" id="nav-earnings">
       <span class="nav-icon">💰</span>
       <span class="nav-text">الأرباح</span>
     </a>
 
     <p class="nav-label-group">الحساب</p>
 
-    <a href="../academic-settings.php" class="nav-item" id="nav-settings">
+    <a href="academic-settings.php" class="nav-item" id="nav-settings">
       <span class="nav-icon">⚙️</span>
       <span class="nav-text">الإعدادات</span>
     </a>
 
-    <a href="../academic-profile.php" class="nav-item" id="nav-profile">
+    <a href="academic-profile.php" class="nav-item" id="nav-profile">
       <span class="nav-icon">👤</span>
       <span class="nav-text">ملفي الشخصي</span>
     </a>
@@ -60,7 +60,7 @@
 
   <!-- Footer -->
   <div class="sidebar-footer">
-    <a href="../academics-list.php" class="nav-item">
+    <a href="academics-list.php" class="nav-item">
       <span class="nav-icon">🌐</span>
       <span class="nav-text">العودة للمنصة</span>
     </a>

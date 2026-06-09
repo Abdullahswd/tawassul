@@ -12,93 +12,12 @@
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="page-layout">
 
-  <!-- ===== SIDEBAR ===== -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">🎓</div>
-      <span class="logo-text">تواصل</span>
-    </div>
-    <nav class="sidebar-nav">
-      <p class="nav-label-group">لوحة التحكم</p>
-      <a href="academic-dashboard.php" class="nav-item active">
-        <span class="nav-icon">📊</span><span class="nav-text">الرئيسية</span>
-      </a>
-      <a href="academic-orders.php" class="nav-item">
-        <span class="nav-icon">📋</span><span class="nav-text">الطلبات</span>
-        <span style="margin-right:auto;background:#ef4444;color:#fff;font-size:11px;padding:1px 7px;border-radius:10px;font-weight:700">2</span>
-      </a>
-      <a href="academic-earnings.php" class="nav-item">
-        <span class="nav-icon">💰</span><span class="nav-text">الأرباح</span>
-      </a>
-      <p class="nav-label-group">الحساب</p>
-      <a href="academic-settings.php" class="nav-item">
-        <span class="nav-icon">⚙️</span><span class="nav-text">الإعدادات</span>
-      </a>
-      <a href="academic-profile.php" class="nav-item">
-        <span class="nav-icon">👤</span><span class="nav-text">ملفي الشخصي</span>
-      </a>
-    </nav>
-    <div class="sidebar-footer">
-      <a href="academics-list.php" class="nav-item">
-        <span class="nav-icon">🌐</span><span class="nav-text">العودة للمنصة</span>
-      </a>
-      <a href="#" class="nav-item" onclick="Toast.show('تم تسجيل الخروج','info')">
-        <span class="nav-icon">🚪</span><span class="nav-text">تسجيل الخروج</span>
-      </a>
-    </div>
-  </aside>
+  <?php include 'components/academic-sidebar.php'; ?>
 
   <!-- ===== MAIN ===== -->
   <div class="main-content" id="mainContent">
 
-    <!-- Navbar -->
-    <nav class="navbar" id="navbar">
-      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search">
-        <span class="s-icon">🔍</span>
-        <input type="text" placeholder="بحث..."/>
-      </div>
-      <div class="navbar-spacer"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle">🌙</button>
-        <!-- Notifications -->
-        <div class="dropdown">
-          <button class="nav-btn" data-toggle style="position:relative">
-            🔔
-            <span class="n-badge" id="notifBadge">2</span>
-          </button>
-          <div class="dropdown-menu" style="right:0;left:auto;min-width:320px">
-            <div style="padding:14px 18px;border-bottom:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center">
-              <span style="font-weight:700;color:var(--text-primary)">الإشعارات</span>
-              <button onclick="Toast.show('تم تعليم الكل كمقروء','success')" style="font-size:12px;color:var(--primary);background:none;border:none;cursor:pointer;font-family:Tajawal,sans-serif">تعليم الكل كمقروء</button>
-            </div>
-            <div id="notifList" style="max-height:320px;overflow-y:auto"></div>
-            <div style="padding:12px;text-align:center;border-top:1px solid var(--border-color)">
-              <a href="#" style="font-size:13px;color:var(--primary)">عرض جميع الإشعارات</a>
-            </div>
-          </div>
-        </div>
-        <!-- Profile -->
-        <div class="dropdown">
-          <div class="admin-avatar-btn" data-toggle>
-            <div class="avatar-circle">م</div>
-            <div>
-              <div class="avatar-name">د. محمد السعيد</div>
-              <div class="avatar-role">أكاديمي موثق ✓</div>
-            </div>
-            <span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span>
-          </div>
-          <div class="dropdown-menu" style="right:0;left:auto;min-width:200px">
-            <div style="padding:8px">
-              <a href="academic-profile.php" class="dropdown-item" style="border-radius:8px">👤 ملفي الشخصي</a>
-              <a href="academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a>
-              <div class="dropdown-divider"></div>
-              <a href="#" class="dropdown-item" style="border-radius:8px;color:var(--danger)">🚪 تسجيل الخروج</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </nav>
+    <?php include 'components/academic-navbar.php'; ?>
 
     <!-- ===== PAGE BODY ===== -->
     <div class="page-body">

@@ -1,4 +1,32 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+requireStudent();
+
+$user = currentUser();
+$db = db();
+
+// Compute stats
+$total_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'])->fetchColumn();
+$active_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'accepted', 'in_progress', 'revision')")->fetchColumn();
+$completed_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status = 'completed'")->fetchColumn();
+
+// Fetch last 3 orders
+$orders_stmt = $db->prepare("
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon
+    FROM orders o
+    JOIN services s ON o.service_id = s.id
+    WHERE o.student_id = ?
+    ORDER BY o.created_at DESC
+    LIMIT 3
+");
+$orders_stmt->execute([$user['id']]);
+$recent_orders = $orders_stmt->fetchAll();
+
+// Fetch last 3 notifications
+$notifications = getNotifications($user['id'], 'student');
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -52,7 +80,7 @@
       </nav>
       
       <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="#" class="nav-item" style="color:var(--danger)">
+        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
           <span class="icon">🚪</span>
           <span>تسجيل الخروج</span>
         </a>
@@ -66,21 +94,21 @@
       <header class="top-navbar">
         <div style="display:flex;align-items:center;gap:16px">
           <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3" style="display:none">مرحباً <span class="user-name-fill"></span> 👋</div>
+          <div class="h3">لوحة التحكم</div>
         </div>
 
         <div class="navbar-actions">
           <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
           <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot">3</span>
+            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
           </button>
           <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
           <div class="user-profile">
             <div class="user-info" style="text-align:left">
-              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-name"><?= e($user['name']) ?></span>
               <span class="user-role">طالب</span>
             </div>
-            <div class="user-avatar user-initials-fill">؟</div>
+            <div class="user-avatar"><?= e($user['avatar']) ?></div>
           </div>
         </div>
       </header>
@@ -90,10 +118,10 @@
         
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px" class="anim-fade-up">
           <div>
-            <h1 class="h1" style="margin-bottom:8px">مرحباً بك مجددا، <span class="user-name-fill"></span>! 👋</h1>
+            <h1 class="h1" style="margin-bottom:8px">مرحباً بك مجدداً، <?= e($user['name']) ?>! 👋</h1>
             <p class="text-body">إليك ملخص سريع لحالة طلباتك ونشاطك على المنصة.</p>
           </div>
-          <div style="display:none; /* or shown on desktop */">
+          <div>
             <a href="create-order.php" class="btn btn-primary">➕ طلب خدمة جديدة</a>
           </div>
         </div>
@@ -104,7 +132,7 @@
             <div style="width:60px;height:60px;border-radius:16px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px">📋</div>
             <div>
               <div class="text-body" style="font-weight:700">إجمالي الطلبات</div>
-              <div class="h1" id="statTotal">--</div>
+              <div class="h1"><?= $total_orders ?></div>
             </div>
           </div>
           
@@ -112,7 +140,7 @@
             <div style="width:60px;height:60px;border-radius:16px;background:rgba(245,158,11,0.1);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:28px">⏳</div>
             <div>
               <div class="text-body" style="font-weight:700">طلبات قيد التنفيذ</div>
-              <div class="h1" id="statActive">--</div>
+              <div class="h1"><?= $active_orders ?></div>
             </div>
           </div>
           
@@ -120,7 +148,7 @@
             <div style="width:60px;height:60px;border-radius:16px;background:rgba(16,185,129,0.1);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:28px">✅</div>
             <div>
               <div class="text-body" style="font-weight:700">الطلبات المكتملة</div>
-              <div class="h1" id="statCompleted">--</div>
+              <div class="h1"><?= $completed_orders ?></div>
             </div>
           </div>
         </div>
@@ -146,7 +174,27 @@
                   </tr>
                 </thead>
                 <tbody id="recentOrdersBody">
-                  <tr><td colspan="5" style="text-align:center;padding:32px">جاري التحميل...</td></tr>
+                  <?php if (empty($recent_orders)): ?>
+                    <tr><td colspan="5" style="text-align:center;padding:32px">ليس لديك أي طلبات حالياً.</td></tr>
+                  <?php else: ?>
+                    <?php foreach ($recent_orders as $o): 
+                      $badge = orderStatusLabel($o['status']);
+                    ?>
+                      <tr>
+                        <td style="padding:16px; border-bottom:1px solid var(--border-color); font-weight:700"><?= e($o['order_number']) ?></td>
+                        <td style="padding:16px; border-bottom:1px solid var(--border-color)"><?= e($o['service_icon']) ?> <?= e($o['service_name']) ?></td>
+                        <td style="padding:16px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)"><?= formatDate($o['created_at']) ?></td>
+                        <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                          <span class="badge <?= $badge['class'] ?>">
+                            <?= $badge['label'] ?>
+                          </span>
+                        </td>
+                        <td style="padding:16px; border-bottom:1px solid var(--border-color)">
+                          <a href="order-details.php?id=<?= $o['id'] ?>" class="btn btn-outline" style="padding:6px 12px;font-size:13px">التفاصيل</a>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
                 </tbody>
               </table>
             </div>
@@ -164,23 +212,19 @@
             <div class="card anim-fade-up" style="animation-delay:0.6s">
               <h3 class="h3" style="margin-bottom:16px">آخر الإشعارات</h3>
               <div style="display:flex;flex-direction:column;gap:12px">
-                
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                  <div style="width:8px;height:8px;border-radius:50%;background:var(--primary);margin-top:8px;flex-shrink:0"></div>
-                  <div>
-                    <div style="font-size:14px;font-weight:700">رسالة جديدة</div>
-                    <div style="font-size:13px;color:var(--text-secondary)">قام الأكاديمي "د. محمد" بالرد على رسالتك.</div>
-                  </div>
-                </div>
-
-                <div style="display:flex;gap:12px;align-items:flex-start">
-                  <div style="width:8px;height:8px;border-radius:50%;background:var(--success);margin-top:8px;flex-shrink:0"></div>
-                  <div>
-                    <div style="font-size:14px;font-weight:700">اكتمال طلب</div>
-                    <div style="font-size:13px;color:var(--text-secondary)">تم تسليم طلب "تصميم الاستبيانات" بنجاح.</div>
-                  </div>
-                </div>
-
+                <?php if (empty($notifications)): ?>
+                  <div style="font-size:13px;color:var(--text-secondary);text-align:center;padding:16px">لا توجد إشعارات جديدة.</div>
+                <?php else: ?>
+                  <?php foreach ($notifications as $n): ?>
+                    <div style="display:flex;gap:12px;align-items:flex-start">
+                      <div style="font-size:18px;flex-shrink:0"><?= e($n['icon'] ?: '🔔') ?></div>
+                      <div>
+                        <div style="font-size:14px;font-weight:700"><?= e($n['title']) ?></div>
+                        <div style="font-size:13px;color:var(--text-secondary)"><?= e($n['message']) ?></div>
+                      </div>
+                    </div>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </div>
             </div>
 
@@ -195,4 +239,3 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-

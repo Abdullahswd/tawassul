@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   ============================================
   Academic Navbar Component
   ============================================
@@ -58,11 +58,11 @@
       </div>
       <div class="dropdown-menu" style="right:0;left:auto;min-width:200px">
         <div style="padding:8px">
-          <a href="../academic-profile.php" class="dropdown-item" style="border-radius:8px">👤 ملفي الشخصي</a>
-          <a href="../academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a>
-          <a href="../academic-earnings.php" class="dropdown-item" style="border-radius:8px">💰 الأرباح</a>
+          <a href="academic-profile.php" class="dropdown-item" style="border-radius:8px">👤 ملفي الشخصي</a>
+          <a href="academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a>
+          <a href="academic-earnings.php" class="dropdown-item" style="border-radius:8px">💰 الأرباح</a>
           <div class="dropdown-divider"></div>
-          <a href="../academics-list.php" class="dropdown-item" style="border-radius:8px">🌐 المنصة</a>
+          <a href="academics-list.php" class="dropdown-item" style="border-radius:8px">🌐 المنصة</a>
           <div class="dropdown-divider"></div>
           <a href="#" class="dropdown-item" style="border-radius:8px;color:var(--danger)" onclick="Toast?.show('تم تسجيل الخروج','info')">🚪 تسجيل الخروج</a>
         </div>

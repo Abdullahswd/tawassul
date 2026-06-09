@@ -1,4 +1,27 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$db = db();
+
+// Fetch all services
+$services_stmt = $db->query("
+    SELECT s.id, s.name, s.icon, s.is_active AS active,
+           (SELECT COUNT(*) FROM orders o WHERE o.service_id = s.id) AS orders
+    FROM services s
+    ORDER BY s.id ASC
+");
+$services = $services_stmt->fetchAll();
+
+$services = array_map(function($s) {
+    $s['id'] = (int)$s['id'];
+    $s['active'] = (bool)$s['active'];
+    $s['orders'] = (int)$s['orders'];
+    return $s;
+}, $services);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -12,46 +35,17 @@
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="admin-layout">
 
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item active"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span><span class="nav-badge" style="background:#ef4444">5</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search"><div style="position:relative"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary)">🔍</span><input type="search" placeholder="بحث..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:Tajawal,sans-serif;font-size:14px;outline:none" /></div></div>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
-        <div style="width:1px;height:28px;background:var(--border-color)"></div>
-        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <div class="page-content">
       <div class="page-header animate-fadeInUp">
         <div>
           <div class="breadcrumb"><a href="dashboard.php">الرئيسية</a><span>›</span><span>الخدمات</span></div>
           <h1 class="page-header-title">إدارة الخدمات</h1>
-          <p class="page-header-subtitle">إدارة أقسام الخدمات الأكاديمية الـ 12</p>
+          <p class="page-header-subtitle">إدارة أقسام الخدمات الأكاديمية</p>
         </div>
         <button class="btn btn-primary" onclick="openAddService()">+ إضافة خدمة</button>
       </div>
@@ -110,6 +104,8 @@
 
 <script src="../assets/js/main.js"></script>
 <script>
+MOCK_DATA.services = <?= json_encode($services) ?>;
+
 document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
 document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
 
@@ -156,10 +152,26 @@ function renderServices() {
 
 function toggleService(id) {
   const s = MOCK_DATA.services.find(x => x.id === id);
-  if (s) {
-    s.active = !s.active;
-    Toast.show(`تم ${s.active ? 'تفعيل' : 'إيقاف'} خدمة ${s.name}`, s.active ? 'success' : 'warning');
-  }
+  if (!s) return;
+  const fd = new FormData();
+  fd.append('action', 'toggle');
+  fd.append('id', id);
+  fetch('../ajax/manage_service.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        s.active = res.active ? true : false;
+        Toast.show(`تم ${s.active ? 'تفعيل' : 'إيقاف'} خدمة ${s.name}`, s.active ? 'success' : 'warning');
+        renderServices();
+      } else {
+        Toast.show(res.message || 'حدث خطأ ما', 'error');
+        renderServices();
+      }
+    })
+    .catch(() => {
+      Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+      renderServices();
+    });
 }
 
 function openAddService() {
@@ -191,26 +203,58 @@ function saveService() {
   const name = document.getElementById('serviceName').value.trim();
   if (!name) { Toast.show('يرجى إدخال اسم الخدمة', 'error'); return; }
   const icon = selectedIcon;
-  const active = document.getElementById('serviceActive').checked;
-  if (editId) {
-    const s = MOCK_DATA.services.find(x => x.id === editId);
-    if (s) { s.name = name; s.icon = icon; s.active = active; }
-    Toast.show('تم تحديث الخدمة بنجاح', 'success');
-  } else {
-    const newId = Math.max(...MOCK_DATA.services.map(s => s.id)) + 1;
-    MOCK_DATA.services.push({ id: newId, name, icon, orders: 0, active });
-    Toast.show('تم إضافة الخدمة بنجاح', 'success');
-  }
-  Modal.close('serviceModal');
-  renderServices();
+  const active = document.getElementById('serviceActive').checked ? 1 : 0;
+  
+  const fd = new FormData();
+  fd.append('action', 'save');
+  fd.append('id', editId || 0);
+  fd.append('name', name);
+  fd.append('icon', icon);
+  fd.append('active', active);
+  
+  fetch('../ajax/manage_service.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        if (editId) {
+          const s = MOCK_DATA.services.find(x => x.id === editId);
+          if (s) { s.name = name; s.icon = icon; s.active = active ? true : false; }
+          Toast.show('تم تحديث الخدمة بنجاح', 'success');
+        } else {
+          MOCK_DATA.services.push({ id: parseInt(res.id), name, icon, orders: 0, active: active ? true : false });
+          Toast.show('تم إضافة الخدمة بنجاح', 'success');
+        }
+        Modal.close('serviceModal');
+        renderServices();
+      } else {
+        Toast.show(res.message || 'حدث خطأ ما', 'error');
+      }
+    })
+    .catch(() => {
+      Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+    });
 }
 
 function deleteService(id, name) {
   Modal.confirm('حذف الخدمة', `هل تريد حذف خدمة "${name}"؟`, () => {
-    const idx = MOCK_DATA.services.findIndex(s => s.id === id);
-    if (idx > -1) MOCK_DATA.services.splice(idx, 1);
-    Toast.show('تم حذف الخدمة', 'success');
-    renderServices();
+    const fd = new FormData();
+    fd.append('action', 'delete');
+    fd.append('id', id);
+    fetch('../ajax/manage_service.php', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          const idx = MOCK_DATA.services.findIndex(s => s.id === id);
+          if (idx > -1) MOCK_DATA.services.splice(idx, 1);
+          Toast.show('تم حذف الخدمة', 'success');
+          renderServices();
+        } else {
+          Toast.show(res.message || 'حدث خطأ ما', 'error');
+        }
+      })
+      .catch(() => {
+        Toast.show('حدث خطأ في الاتصال بالخادم', 'error');
+      });
   });
 }
 
@@ -218,4 +262,3 @@ document.addEventListener('DOMContentLoaded', renderServices);
 </script>
 </body>
 </html>
-

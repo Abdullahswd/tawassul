@@ -13,45 +13,10 @@
 <div class="page-layout">
 
   <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-icon">🎓</div><span class="logo-text">تواصل</span>
-    </div>
-    <nav class="sidebar-nav">
-      <p class="nav-label-group">لوحة التحكم</p>
-      <a href="academic-dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">الرئيسية</span></a>
-      <a href="academic-orders.php" class="nav-item active"><span class="nav-icon">📋</span><span class="nav-text">الطلبات</span></a>
-      <a href="academic-earnings.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-text">الأرباح</span></a>
-      <p class="nav-label-group">الحساب</p>
-      <a href="academic-settings.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-text">الإعدادات</span></a>
-      <a href="academic-profile.php" class="nav-item"><span class="nav-icon">👤</span><span class="nav-text">ملفي الشخصي</span></a>
-    </nav>
-    <div class="sidebar-footer">
-      <a href="academics-list.php" class="nav-item"><span class="nav-icon">🌐</span><span class="nav-text">العودة للمنصة</span></a>
-    </div>
-  </aside>
+  <?php include 'components/academic-sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-    <!-- Navbar -->
-    <nav class="navbar" id="navbar">
-      <button class="sidebar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-spacer"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle">🌙</button>
-        <div class="dropdown">
-          <button class="nav-btn" data-toggle style="position:relative">🔔<span class="n-badge" id="notifBadge">2</span></button>
-          <div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 18px;border-bottom:1px solid var(--border-color)"><span style="font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notifList" style="max-height:280px;overflow-y:auto"></div></div>
-        </div>
-        <div class="dropdown">
-          <div class="admin-avatar-btn" data-toggle>
-            <div class="avatar-circle">م</div>
-            <div><div class="avatar-name">د. محمد السعيد</div><div class="avatar-role">أكاديمي موثق</div></div>
-            <span style="color:var(--text-secondary);font-size:12px">▾</span>
-          </div>
-          <div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a><div class="dropdown-divider"></div><a href="#" class="dropdown-item" style="border-radius:8px;color:var(--danger)">🚪 خروج</a></div></div>
-        </div>
-      </div>
-    </nav>
+    <?php include 'components/academic-navbar.php'; ?>
 
     <div class="page-body">
       <!-- Header -->

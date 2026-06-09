@@ -1,4 +1,15 @@
-﻿<!-- ============================================
+<?php
+$curr_user = currentUser();
+$user_name = $curr_user ? htmlspecialchars($curr_user['name']) : 'المدير العام';
+$user_email = $curr_user ? htmlspecialchars($curr_user['email']) : 'admin@tawassul.com';
+$user_avatar = $curr_user ? htmlspecialchars($curr_user['avatar']) : 'أ';
+$user_role = ($curr_user && $curr_user['role'] === 'admin') ? 'Super Admin' : 'طالب';
+
+// Fetch unread notifications count dynamically for this admin
+$nb_db = db();
+$nb_unread_notifications = (int) $nb_db->query("SELECT COUNT(*) FROM notifications WHERE is_read = 0 AND user_type = 'admin'")->fetchColumn();
+?>
+<!-- ============================================
      Navbar Component - Tawassul Admin
      ============================================ -->
 <nav class="navbar" id="navbar">
@@ -31,7 +42,9 @@
     <div class="dropdown" id="notificationDropdown">
       <button class="nav-btn" id="notificationBtn" title="الإشعارات">
         🔔
-        <span class="badge" id="notificationBadge">2</span>
+        <?php if ($nb_unread_notifications > 0): ?>
+          <span class="badge" id="notificationBadge"><?= $nb_unread_notifications ?></span>
+        <?php endif; ?>
       </button>
 
       <!-- Notification Dropdown -->
@@ -52,24 +65,24 @@
 
     <!-- Admin Profile -->
     <div class="admin-profile dropdown" id="profileDropdown">
-      <div class="admin-avatar">أ</div>
+      <div class="admin-avatar"><?= $user_avatar ?></div>
       <div class="admin-info">
-        <div class="admin-name">المدير العام</div>
-        <div class="admin-role">Super Admin</div>
+        <div class="admin-name"><?= $user_name ?></div>
+        <div class="admin-role"><?= $user_role ?></div>
       </div>
       <span style="color:var(--text-secondary);font-size:12px;margin-right:4px;">▾</span>
 
       <!-- Profile Dropdown -->
       <div class="dropdown-menu" style="right:0;left:auto;min-width:200px;">
         <div style="padding:16px;border-bottom:1px solid var(--border-color);">
-          <p style="font-size:14px;font-weight:700;color:var(--text-primary);">المدير العام</p>
-          <p style="font-size:12px;color:var(--text-secondary);">admin@tawassul.com</p>
+          <p style="font-size:14px;font-weight:700;color:var(--text-primary);"><?= $user_name ?></p>
+          <p style="font-size:12px;color:var(--text-secondary);"><?= $user_email ?></p>
         </div>
         <div style="padding:8px;">
           <a href="../pages/settings.php" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--text-primary);text-decoration:none;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='var(--bg-main)'" onmouseout="this.style.background='transparent'">
             <span>⚙️</span> الإعدادات
           </a>
-          <a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.05)'" onmouseout="this.style.background='transparent'">
+          <a href="<?= rootUrl() ?>/logout.php" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.05)'" onmouseout="this.style.background='transparent'">
             <span>🚪</span> تسجيل الخروج
           </a>
         </div>
@@ -91,4 +104,3 @@ document.addEventListener('click', () => {
   document.getElementById('profileDropdown')?.classList.remove('open');
 });
 </script>
-

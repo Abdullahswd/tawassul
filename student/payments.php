@@ -1,4 +1,19 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+requireStudent();
+
+$user = currentUser();
+$db = db();
+
+// Fetch summary metrics
+$total_paid = (float) $db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = " . $user['id'] . " AND status = 'paid'")->fetchColumn();
+$total_pending = (float) $db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = " . $user['id'] . " AND status = 'pending'")->fetchColumn();
+
+// Fetch operations
+$payments = getPaymentsByStudent($user['id']);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -52,7 +67,7 @@
       </nav>
       
       <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="#" class="nav-item" style="color:var(--danger)">
+        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
           <span class="icon">🚪</span>
           <span>تسجيل الخروج</span>
         </a>
@@ -72,15 +87,15 @@
         <div class="navbar-actions">
           <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
           <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot">3</span>
+            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
           </button>
           <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
           <div class="user-profile">
             <div class="user-info" style="text-align:left">
-              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-name"><?= e($user['name']) ?></span>
               <span class="user-role">طالب</span>
             </div>
-            <div class="user-avatar user-initials-fill">؟</div>
+            <div class="user-avatar"><?= e($user['avatar']) ?></div>
           </div>
         </div>
       </header>
@@ -99,12 +114,11 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(250px, 1fr));gap:24px;margin-bottom:32px">
           <div class="card" style="display:flex;flex-direction:column;justify-content:center">
             <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px;font-weight:700">إجمالي المدفوعات السابقة</div>
-            <div style="font-size:32px;font-weight:900;color:var(--text-primary)">850 <span style="font-size:16px;color:var(--text-muted)">ر.س</span></div>
+            <div style="font-size:32px;font-weight:900;color:var(--text-primary)"><?= formatMoney($total_paid) ?></div>
           </div>
           <div class="card" style="display:flex;flex-direction:column;justify-content:center;border-color:var(--warning)">
             <div style="font-size:14px;color:var(--warning);margin-bottom:8px;font-weight:700">مبالغ بانتظار الدفع</div>
-            <div style="font-size:32px;font-weight:900;color:var(--text-primary)">150 <span style="font-size:16px;color:var(--text-muted)">ر.س</span></div>
-            <button class="btn btn-primary" style="margin-top:12px;padding:8px;font-size:13px">ادفع الآن</button>
+            <div style="font-size:32px;font-weight:900;color:var(--text-primary)"><?= formatMoney($total_pending) ?></div>
           </div>
         </div>
 
@@ -127,49 +141,38 @@
                 </tr>
               </thead>
               <tbody>
-                
-                <tr>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-family:monospace;font-weight:700">INV-260401</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--primary); font-weight:700">#ORD-1049</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-20</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-weight:700">150 ر.س</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">-</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-progress">بانتظار الدفع</span>
-                  </td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <button class="btn btn-primary" style="padding:6px 12px;font-size:12px">الدفع الآن</button>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-family:monospace;font-weight:700">INV-260402</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--primary); font-weight:700">#ORD-1045</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-18</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-weight:700">450 ر.س</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">Apple Pay</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-completed">مدفوع</span>
-                  </td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <button class="btn btn-outline" style="padding:6px 12px;font-size:12px">الفاتورة ⬇</button>
-                  </td>
-                </tr>
-
-                <tr>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-family:monospace;font-weight:700">INV-260403</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--primary); font-weight:700">#ORD-1042</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">2026-04-10</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-weight:700">200 ر.س</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)">مدى (Mada)</td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <span class="status-badge status-completed">مدفوع</span>
-                  </td>
-                  <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
-                    <button class="btn btn-outline" style="padding:6px 12px;font-size:12px">الفاتورة ⬇</button>
-                  </td>
-                </tr>
-
+                <?php if (empty($payments)): ?>
+                  <tr>
+                    <td colspan="7" style="text-align:center;padding:32px;color:var(--text-secondary)">
+                      لا توجد عمليات دفع مسجلة حالياً.
+                    </td>
+                  </tr>
+                <?php else: ?>
+                  <?php foreach ($payments as $p): 
+                    $badge = paymentStatusLabel($p['status']);
+                    $inv_no = 'INV-' . str_pad($p['id'], 6, '0', STR_PAD_LEFT);
+                  ?>
+                    <tr>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-family:monospace;font-weight:700"><?= $inv_no ?></td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--primary); font-weight:700">
+                        <a href="order-details.php?id=<?= $p['order_id'] ?>"><?= e($p['order_number']) ?></a>
+                      </td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)"><?= formatDate($p['created_at']) ?></td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); font-weight:700"><?= formatMoney($p['amount']) ?></td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color); color:var(--text-secondary)"><?= $p['method'] === 'credit_card' ? 'بطاقة ائتمانية' : e($p['method']) ?></td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
+                        <span class="badge <?= $badge['class'] ?>"><?= $badge['label'] ?></span>
+                      </td>
+                      <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
+                        <?php if ($p['status'] === 'pending'): ?>
+                          <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="alert('محاكاة بوابة الدفع: تم الدفع بنجاح!'); window.location.reload();">الدفع الآن</button>
+                        <?php else: ?>
+                          <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" onclick="window.print()">الفاتورة ⬇</button>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </tbody>
             </table>
           </div>
@@ -182,4 +185,3 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-

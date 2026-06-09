@@ -1,4 +1,12 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+requireStudent();
+
+$user = currentUser();
+$services = getAllServices();
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
@@ -52,7 +60,7 @@
       </nav>
       
       <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="#" class="nav-item" style="color:var(--danger)">
+        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
           <span class="icon">🚪</span>
           <span>تسجيل الخروج</span>
         </a>
@@ -72,15 +80,15 @@
         <div class="navbar-actions">
           <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
           <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot">3</span>
+            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
           </button>
           <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
           <div class="user-profile">
             <div class="user-info" style="text-align:left">
-              <span class="user-name user-name-fill">جار التحميل...</span>
+              <span class="user-name"><?= e($user['name']) ?></span>
               <span class="user-role">طالب</span>
             </div>
-            <div class="user-avatar user-initials-fill">؟</div>
+            <div class="user-avatar"><?= e($user['avatar']) ?></div>
           </div>
         </div>
       </header>
@@ -91,15 +99,28 @@
         <!-- Filter Tabs -->
         <div style="display:flex;gap:12px;margin-bottom:32px;overflow-x:auto;padding-bottom:8px">
           <button class="btn btn-primary" style="border-radius:40px;padding:8px 20px">الكل</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">التأسيس الأكاديمي</button>
+          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">البحوث الأكاديمية</button>
           <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">التحليل الإحصائي</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">التدقيق والتحرير</button>
-          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">الترجمة</button>
+          <button class="btn btn-outline" style="border-radius:40px;padding:8px 20px;color:var(--text-secondary);border-color:var(--border-color)">الترجمة والتدقيق</button>
         </div>
 
         <!-- Services Grid -->
         <div id="servicesGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:24px">
-          <!-- Populated by JS -->
+          <?php foreach ($services as $idx => $s): ?>
+            <div class="card anim-fade-up" style="animation-delay:<?= $idx * 0.05 ?>s; display:flex; flex-direction:column;">
+              <div style="font-size:40px;margin-bottom:16px"><?= e($s['icon']) ?></div>
+              <h3 class="h3" style="margin-bottom:8px"><?= e($s['name']) ?></h3>
+              <p class="text-body" style="flex-grow:1;margin-bottom:24px"><?= e($s['description'] ?: 'لا يوجد وصف حالياً لهذه الخدمة.') ?></p>
+              
+              <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:16px">
+                <div>
+                  <div style="font-size:12px;color:var(--text-secondary)">تبدأ من</div>
+                  <div style="font-weight:800;color:var(--primary);font-size:18px">150 ر.س</div>
+                </div>
+                <a href="create-order.php?sid=<?= $s['id'] ?>" class="btn btn-primary">اطلب الآن</a>
+              </div>
+            </div>
+          <?php endforeach; ?>
         </div>
 
       </div>
@@ -109,4 +130,3 @@
   <script src="assets/js/main.js"></script>
 </body>
 </html>
-

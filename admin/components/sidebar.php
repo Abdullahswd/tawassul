@@ -1,4 +1,25 @@
-﻿<!-- ============================================
+<?php
+/**
+ * Sidebar Component - Tawassul Admin
+ * 
+ * تعليق: تم إضافة require_once لملف functions.php لتجنب خطأ "undefined function db()"
+ */
+
+// تضمين دوال قاعدة البيانات والمساعدات
+require_once __DIR__ . '/../../config/functions.php';
+
+// بدء الجلسة إذا لم تكن قد بدأت (للتأكد من وجود بيانات المستخدم إن لزم)
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// استعلامات العد للشارات (badges)
+$sb_db = db();
+$sb_students_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn();
+$sb_academics_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM academics")->fetchColumn();
+$sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+?>
+<!-- ============================================
      Sidebar Component - Tawassul Admin
      ============================================ -->
 <aside class="sidebar" id="sidebar">
@@ -26,13 +47,13 @@
     <a href="../pages/users.php" class="nav-item" id="nav-users">
       <span class="nav-icon">👥</span>
       <span class="nav-label">الطلاب</span>
-      <span class="nav-badge">1,248</span>
+      <span class="nav-badge"><?= number_format($sb_students_cnt) ?></span>
     </a>
 
     <a href="../pages/academics.php" class="nav-item" id="nav-academics">
       <span class="nav-icon">🎓</span>
       <span class="nav-label">الأكاديميون</span>
-      <span class="nav-badge">86</span>
+      <span class="nav-badge"><?= number_format($sb_academics_cnt) ?></span>
     </a>
 
     <!-- Operations -->
@@ -51,7 +72,9 @@
     <a href="../pages/orders.php" class="nav-item" id="nav-orders">
       <span class="nav-icon">📋</span>
       <span class="nav-label">الطلبات</span>
-      <span class="nav-badge" style="background:#ef4444">5</span>
+      <?php if ($sb_orders_cnt > 0): ?>
+        <span class="nav-badge" style="background:#ef4444"><?= $sb_orders_cnt ?></span>
+      <?php endif; ?>
     </a>
 
     <!-- Finance -->
@@ -79,11 +102,10 @@
 
   <!-- Footer -->
   <div class="sidebar-footer">
-    <a href="#" class="nav-item" onclick="event.preventDefault(); Toast.show('تم تسجيل الخروج', 'info')">
+    <a href="<?= rootUrl() ?>/logout.php" class="nav-item">
       <span class="nav-icon">🚪</span>
       <span class="nav-label">تسجيل الخروج</span>
     </a>
   </div>
 
 </aside>
-

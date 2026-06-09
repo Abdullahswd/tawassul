@@ -1,57 +1,55 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+requireAdmin();
+
+$db = db();
+
+// جلب جميع الطلاب مع بيانات الطلبات والإنفاق
+$students_stmt = $db->query("
+    SELECT u.id, u.name, u.email, u.phone, u.status,
+           COALESCE(u.avatar_initials, SUBSTRING(u.name,1,1)) AS avatar,
+           DATE(u.created_at) AS joined,
+           (SELECT COUNT(*) FROM orders o WHERE o.student_id = u.id) AS orders,
+           (SELECT COALESCE(SUM(o.amount), 0) FROM orders o WHERE o.student_id = u.id AND o.status = 'completed') AS spending
+    FROM users u
+    WHERE u.role = 'student'
+    ORDER BY u.created_at DESC
+");
+$students = $students_stmt->fetchAll();
+
+$students = array_map(function($s) {
+    $s['id'] = (int)$s['id'];
+    $s['orders'] = (int)$s['orders'];
+    $s['spending'] = (float)$s['spending'];
+    return $s;
+}, $students);
+
+$total_students = count($students);
+$active_students = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'student' AND status = 'active'")->fetchColumn();
+$suspended_students = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'student' AND status = 'suspended'")->fetchColumn();
+$new_students_month = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 'student' AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)")->fetchColumn();
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>الطلاب - تواصل Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="../assets/css/style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body>
 <div class="mobile-overlay" id="mobileOverlay"></div>
 <div class="admin-layout">
 
-  <!-- Sidebar -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-logo"><div class="logo-icon">🎓</div><span class="logo-text">تواصل Admin</span></div>
-    <nav class="sidebar-nav">
-      <p class="nav-section-title">القائمة الرئيسية</p>
-      <a href="dashboard.php" class="nav-item"><span class="nav-icon">📊</span><span class="nav-label">الرئيسية</span></a>
-      <p class="nav-section-title">إدارة المستخدمين</p>
-      <a href="users.php" class="nav-item active"><span class="nav-icon">👥</span><span class="nav-label">الطلاب</span><span class="nav-badge">1,248</span></a>
-      <a href="academics.php" class="nav-item"><span class="nav-icon">🎓</span><span class="nav-label">الأكاديميون</span><span class="nav-badge">86</span></a>
-      <p class="nav-section-title">العمليات</p>
-      <a href="services.php" class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-label">الخدمات</span></a>
-      <a href="packages.php" class="nav-item"><span class="nav-icon">💎</span><span class="nav-label">الباقات</span></a>
-      <a href="orders.php" class="nav-item"><span class="nav-icon">📋</span><span class="nav-label">الطلبات</span><span class="nav-badge" style="background:#ef4444">5</span></a>
-      <p class="nav-section-title">المالية والتقارير</p>
-      <a href="payments.php" class="nav-item"><span class="nav-icon">💰</span><span class="nav-label">المدفوعات</span></a>
-      <a href="reports.php" class="nav-item"><span class="nav-icon">📈</span><span class="nav-label">التقارير</span></a>
-      <p class="nav-section-title">النظام</p>
-      <a href="settings.php" class="nav-item"><span class="nav-icon">🔧</span><span class="nav-label">الإعدادات</span></a>
-    </nav>
-    <div class="sidebar-footer"><a href="#" class="nav-item"><span class="nav-icon">🚪</span><span class="nav-label">تسجيل الخروج</span></a></div>
-  </aside>
+  <?php include '../components/sidebar.php'; ?>
 
   <div class="main-content" id="mainContent">
-
-    <!-- Navbar -->
-    <nav class="navbar" id="navbar">
-      <button class="navbar-toggle" id="sidebarToggle">☰</button>
-      <div class="navbar-search"><div style="position:relative"><span style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary)">🔍</span><input type="search" id="globalSearch" placeholder="بحث في الطلاب..." style="width:100%;padding:8px 36px 8px 12px;border-radius:10px;background:var(--bg-main);border:1px solid var(--border-color);color:var(--text-primary);font-family:Tajawal,sans-serif;font-size:14px;outline:none" /></div></div>
-      <div style="flex:1"></div>
-      <div class="navbar-actions">
-        <button class="nav-btn dark-toggle" title="تبديل المظهر">🌙</button>
-        <div class="dropdown" id="notificationDropdown"><button class="nav-btn" id="notificationBtn">🔔<span class="badge" id="notificationBadge">2</span></button><div class="dropdown-menu" style="right:0;left:auto;min-width:300px"><div style="padding:14px 20px;border-bottom:1px solid var(--border-color)"><span style="font-size:15px;font-weight:700;color:var(--text-primary)">الإشعارات</span></div><div id="notificationList" style="max-height:300px;overflow-y:auto"></div></div></div>
-        <div style="width:1px;height:28px;background:var(--border-color)"></div>
-        <div class="admin-profile dropdown" id="profileDropdown"><div class="admin-avatar">أ</div><div class="admin-info"><div class="admin-name">المدير العام</div><div class="admin-role">Super Admin</div></div><span style="color:var(--text-secondary);font-size:12px;margin-right:4px">▾</span><div class="dropdown-menu" style="right:0;left:auto;min-width:180px"><div style="padding:8px"><a href="settings.php" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--text-primary);text-decoration:none;font-size:14px">⚙️ الإعدادات</a><a href="#" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:#ef4444;text-decoration:none;font-size:14px">🚪 خروج</a></div></div></div>
-      </div>
-    </nav>
+    <?php include '../components/navbar.php'; ?>
 
     <div class="page-content">
-
-      <!-- Header -->
       <div class="page-header animate-fadeInUp">
         <div>
           <div class="breadcrumb"><a href="dashboard.php">الرئيسية</a><span>›</span><span>الطلاب</span></div>
@@ -61,235 +59,244 @@
         <button class="btn btn-primary" onclick="Modal.open('addUserModal')">+ إضافة طالب</button>
       </div>
 
-      <!-- Stats Mini -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
-        <div class="stat-card animate-fadeInUp delay-1" style="padding:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="1248">0</div><div class="card-label">إجمالي الطلاب</div></div>
-            <div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0">👥</div>
-          </div>
-        </div>
-        <div class="stat-card animate-fadeInUp delay-2" style="padding:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="1106">0</div><div class="card-label">حسابات نشطة</div></div>
-            <div class="card-icon" style="background:rgba(16,185,129,0.1);margin:0">✅</div>
-          </div>
-        </div>
-        <div class="stat-card animate-fadeInUp delay-3" style="padding:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="28">0</div><div class="card-label">حسابات معلقة</div></div>
-            <div class="card-icon" style="background:rgba(239,68,68,0.1);margin:0">⊘</div>
-          </div>
-        </div>
-        <div class="stat-card animate-fadeInUp delay-4" style="padding:18px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="47">0</div><div class="card-label">طلاب جدد هذا الشهر</div></div>
-            <div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0">⭐</div>
-          </div>
-        </div>
+      <!-- إحصائيات -->
+      <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px">
+        <div class="stat-card"><div class="card-value"><?= $total_students ?></div><div class="card-label">إجمالي الطلاب</div></div>
+        <div class="stat-card"><div class="card-value"><?= $active_students ?></div><div class="card-label">نشطون</div></div>
+        <div class="stat-card"><div class="card-value"><?= $suspended_students ?></div><div class="card-label">معلقون</div></div>
+        <div class="stat-card"><div class="card-value"><?= $new_students_month ?></div><div class="card-label">جدد هذا الشهر</div></div>
       </div>
 
-      <!-- Table -->
-      <div class="table-container animate-fadeInUp delay-2">
+      <!-- جدول الطلاب -->
+      <div class="table-container animate-fadeInUp">
         <div class="table-header">
           <h3 class="table-title">قائمة الطلاب</h3>
-          <div class="search-box">
-            <span class="search-icon">🔍</span>
-            <input type="text" id="userSearch" placeholder="بحث بالاسم أو البريد..." />
-          </div>
-          <select class="form-input form-select" id="statusFilter" style="width:auto;padding-left:32px;font-size:14px">
+          <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="userSearch" placeholder="بحث..."></div>
+          <select class="form-input form-select" id="statusFilter">
             <option value="all">جميع الحالات</option>
             <option value="active">نشط</option>
             <option value="suspended">معلق</option>
-            <option value="inactive">غير نشط</option>
           </select>
-          <button class="btn btn-outline btn-sm" onclick="exportTable()">📤 تصدير</button>
+          <button class="btn btn-outline btn-sm" onclick="exportTable()">📤 تصدير CSV</button>
         </div>
-
         <div style="overflow-x:auto">
-          <table class="data-table" id="usersTable">
-            <thead>
-              <tr>
-                <th><input type="checkbox" id="selectAll" style="cursor:pointer" /></th>
-                <th>الطالب</th>
-                <th>البريد الإلكتروني</th>
-                <th>الهاتف</th>
-                <th>عدد الطلبات</th>
-                <th>الحالة</th>
-                <th>تاريخ التسجيل</th>
-                <th>الإجراءات</th>
-              </tr>
-            </thead>
+          <table class="data-table">
+            <thead><tr><th><input type="checkbox" id="selectAll"></th><th>الطالب</th><th>البريد</th><th>الهاتف</th><th>الطلبات</th><th>الحالة</th><th>تاريخ التسجيل</th><th>الإجراءات</th></tr></thead>
             <tbody id="usersTableBody"></tbody>
           </table>
         </div>
-
-        <div class="pagination">
-          <span class="pagination-info">عرض 1-7 من <strong>1,248</strong> طالب</span>
-          <div class="pagination-pages">
-            <button class="page-btn">‹</button>
-            <button class="page-btn active">1</button>
-            <button class="page-btn">2</button>
-            <button class="page-btn">3</button>
-            <button class="page-btn">...</button>
-            <button class="page-btn">178</button>
-            <button class="page-btn">›</button>
-          </div>
-        </div>
+        <div class="pagination" id="tablePagination"></div>
       </div>
-
     </div>
   </div>
 </div>
 
-<!-- Modals -->
-<!-- View User Modal -->
+<!-- مودال عرض التفاصيل -->
 <div class="modal-overlay" id="viewUserModal">
   <div class="modal-box" style="max-width:600px">
-    <div class="modal-header">
-      <h3 class="modal-title">تفاصيل الطالب</h3>
-      <button class="modal-close" data-modal-close>✕</button>
-    </div>
+    <div class="modal-header"><h3 class="modal-title">تفاصيل الطالب</h3><button class="modal-close" data-modal-close>✕</button></div>
     <div class="modal-body" id="viewUserContent"></div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" data-modal-close>إغلاق</button>
-      <button class="btn btn-primary">تعديل البيانات</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-modal-close>إغلاق</button><button class="btn btn-primary" id="editFromViewBtn">تعديل</button></div>
   </div>
 </div>
 
-<!-- Add User Modal -->
+<!-- مودال إضافة / تعديل طالب -->
 <div class="modal-overlay" id="addUserModal">
-  <div class="modal-box">
-    <div class="modal-header"><h3 class="modal-title">إضافة طالب جديد</h3><button class="modal-close" data-modal-close>✕</button></div>
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header"><h3 class="modal-title" id="userModalTitle">إضافة طالب جديد</h3><button class="modal-close" data-modal-close>✕</button></div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="form-input" placeholder="أدخل الاسم الكامل" /></div>
-      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="form-input" type="email" placeholder="example@email.com" /></div>
-      <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="form-input" placeholder="05XXXXXXXX" /></div>
-      <div class="form-group"><label class="form-label">كلمة المرور</label><input class="form-input" type="password" placeholder="••••••••" /></div>
+      <input type="hidden" id="editUserId" value="0">
+      <div class="form-group"><label class="form-label">الاسم الكامل</label><input class="form-input" id="userName"></div>
+      <div class="form-group"><label class="form-label">البريد الإلكتروني</label><input class="form-input" type="email" id="userEmail"></div>
+      <div class="form-group"><label class="form-label">رقم الهاتف</label><input class="form-input" id="userPhone"></div>
+      <div class="form-group"><label class="form-label" id="passwordLabel">كلمة المرور</label><input class="form-input" type="password" id="userPassword" placeholder="••••••••"><small class="form-text" id="passwordHint" style="display:none;">اتركها فارغة إذا لم ترد تغييرها</small></div>
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" data-modal-close>إلغاء</button>
-      <button class="btn btn-primary" onclick="Toast.show('تم إضافة الطالب بنجاح','success');Modal.close('addUserModal')">حفظ</button>
-    </div>
+    <div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-primary" id="saveUserBtn">حفظ</button></div>
   </div>
 </div>
 
-<!-- Confirm Delete Modal -->
+<!-- مودال التأكيد -->
 <div class="modal-overlay" id="confirmModal">
   <div class="modal-box" style="max-width:420px">
-    <div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد الحذف</h3><button class="modal-close" data-modal-close>✕</button></div>
-    <div class="modal-body" style="text-align:center;padding:32px 24px">
-      <div style="font-size:64px;margin-bottom:16px">⚠️</div>
-      <p id="confirmMessage" style="color:var(--text-secondary);font-size:15px">هل أنت متأكد من تنفيذ هذا الإجراء؟</p>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" data-modal-close>إلغاء</button>
-      <button class="btn btn-danger" id="confirmBtn">تأكيد</button>
-    </div>
+    <div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:64px">⚠️</div><p id="confirmMessage"></p></div>
+    <div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmBtn">تأكيد</button></div>
   </div>
 </div>
 
 <script src="../assets/js/main.js"></script>
 <script>
-document.getElementById('profileDropdown')?.addEventListener('click',function(e){e.stopPropagation();this.classList.toggle('open');});
-document.addEventListener('click',()=>{document.getElementById('profileDropdown')?.classList.remove('open');});
+// بيانات الطلاب من الخادم
+let studentsData = <?= json_encode($students) ?>;
+let filteredData = [...studentsData];
+let currentPage = 1;
+const rowsPerPage = 10;
 
-function renderUsers(data) {
+function getAvatarColor(i) { const c=['#6366f1','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec489a']; return c[i%c.length]; }
+function getStatusBadge(s) { return s==='active'?'<span class="badge badge-success">نشط</span>':'<span class="badge badge-danger">معلق</span>'; }
+function escapeHtml(str) { if(!str) return ''; return str.replace(/[&<>]/g, function(m){if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m;}); }
+
+function renderTable() {
   const tbody = document.getElementById('usersTableBody');
-  if (!tbody) return;
-  if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">لا توجد نتائج</td></tr>';
-    return;
-  }
-  tbody.innerHTML = data.map((u, i) => `
-    <tr>
-      <td><input type="checkbox" style="cursor:pointer" /></td>
-      <td>
-        <div style="display:flex;align-items:center;gap:12px">
-          <div class="table-avatar" style="background:${getAvatarColor(i)}">${u.avatar}</div>
-          <div>
-            <div style="font-weight:600;color:var(--text-primary)">${u.name}</div>
-            <div style="font-size:12px;color:var(--text-secondary)">ID: #${u.id.toString().padStart(5,'0')}</div>
-          </div>
-        </div>
-      </td>
-      <td style="color:var(--text-secondary)">${u.email}</td>
-      <td dir="ltr" style="text-align:right">${u.phone}</td>
-      <td><span style="font-weight:700;color:var(--primary)">${u.orders}</span> طلب</td>
-      <td>${getStatusBadge(u.status)}</td>
-      <td style="color:var(--text-secondary)">${u.joined}</td>
-      <td>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm btn-outline btn-icon" title="عرض" onclick="viewUser(${u.id})">👁</button>
-          <button class="btn btn-sm btn-outline btn-icon" title="تعديل" onclick="Toast.show('تعديل: ${u.name}','info')">✏️</button>
-          <button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b;border:none" title="${u.status==='active'?'إيقاف':'تفعيل'}" onclick="toggleStatus(${u.id},'${u.name}','${u.status}')">${u.status==='active'?'⊘':'▶'}</button>
-          <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" title="حذف" onclick="deleteUser(${u.id},'${u.name}')">🗑</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  if(!tbody) return;
+  const start = (currentPage-1)*rowsPerPage;
+  const pageData = filteredData.slice(start, start+rowsPerPage);
+  if(pageData.length===0) { tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:40px">لا توجد نتائج</td></tr>'; document.getElementById('tablePagination').innerHTML=''; return; }
+  tbody.innerHTML = pageData.map((u,idx) => {
+    const gi = studentsData.findIndex(s=>s.id===u.id);
+    return `<tr>
+      <td><input type="checkbox" class="userCheckbox" data-id="${u.id}"></td>
+      <td><div style="display:flex;align-items:center;gap:12px"><div class="table-avatar" style="background:${getAvatarColor(gi)}">${escapeHtml(u.avatar||'ط')}</div><div><div style="font-weight:600">${escapeHtml(u.name)}</div><div style="font-size:12px">#${u.id}</div></div></div></td>
+      <td>${escapeHtml(u.email)}</td><td>${u.phone||'—'}</td><td><strong>${u.orders}</strong></td>
+      <td>${getStatusBadge(u.status)}</td><td>${u.joined}</td>
+      <td><div style="display:flex;gap:6px"><button class="btn btn-sm btn-outline btn-icon" onclick="viewUser(${u.id})">👁</button><button class="btn btn-sm btn-outline btn-icon" onclick="openEditUser(${u.id})">✏️</button><button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,0.1);color:#f59e0b;border:none" onclick="toggleUserStatus(${u.id},'${u.status}')">${u.status==='active'?'⊘':'▶'}</button><button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" onclick="deleteUser(${u.id})">🗑</button></div></td>
+    </tr>`;
+  }).join('');
+  const totalPages = Math.ceil(filteredData.length/rowsPerPage);
+  let pagHtml = `<span class="pagination-info">${start+1}-${Math.min(start+rowsPerPage, filteredData.length)} من ${filteredData.length}</span><div class="pagination-pages">`;
+  pagHtml += `<button class="page-btn" ${currentPage===1?'disabled':''} onclick="changePage(${currentPage-1})">‹</button>`;
+  for(let i=1;i<=totalPages;i++) if(i===1||i===totalPages||(i>=currentPage-2&&i<=currentPage+2)) pagHtml+=`<button class="page-btn ${i===currentPage?'active':''}" onclick="changePage(${i})">${i}</button>`; else if(i===currentPage-3||i===currentPage+3) pagHtml+=`<span>...</span>`;
+  pagHtml += `<button class="page-btn" ${currentPage===totalPages?'disabled':''} onclick="changePage(${currentPage+1})">›</button></div>`;
+  document.getElementById('tablePagination').innerHTML = pagHtml;
 }
+function changePage(p) { currentPage=p; renderTable(); }
+function filterData() {
+  const q = document.getElementById('userSearch').value.toLowerCase();
+  const s = document.getElementById('statusFilter').value;
+  filteredData = studentsData.filter(u => (u.name.toLowerCase().includes(q)||u.email.toLowerCase().includes(q)||(u.phone&&u.phone.includes(q))) && (s==='all'||u.status===s));
+  currentPage=1; renderTable();
+}
+document.getElementById('userSearch').addEventListener('input', filterData);
+document.getElementById('statusFilter').addEventListener('change', filterData);
+document.getElementById('selectAll').addEventListener('change', e => document.querySelectorAll('.userCheckbox').forEach(cb=>cb.checked=e.target.checked));
 
 function viewUser(id) {
-  const u = MOCK_DATA.students.find(s => s.id === id);
-  if (!u) return;
-  document.getElementById('viewUserContent').innerHTML = `
-    <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px">
-      <div class="table-avatar" style="width:64px;height:64px;border-radius:16px;font-size:24px;background:${getAvatarColor(id)}">${u.avatar}</div>
-      <div>
-        <h3 style="font-size:20px;font-weight:700;color:var(--text-primary)">${u.name}</h3>
-        <p style="color:var(--text-secondary)">${u.email}</p>
-        ${getStatusBadge(u.status)}
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <div><p class="form-label">رقم الهاتف</p><p style="font-weight:600;color:var(--text-primary)">${u.phone}</p></div>
-      <div><p class="form-label">تاريخ التسجيل</p><p style="font-weight:600;color:var(--text-primary)">${u.joined}</p></div>
-      <div><p class="form-label">عدد الطلبات</p><p style="font-weight:700;color:var(--primary);font-size:20px">${u.orders}</p></div>
-      <div><p class="form-label">إجمالي الإنفاق</p><p style="font-weight:700;color:var(--success);font-size:20px">${(u.orders * 349).toLocaleString('ar')} ر.س</p></div>
-    </div>
-  `;
+  const u = studentsData.find(s=>s.id===id);
+  if(!u) return;
+  const gi = studentsData.indexOf(u);
+  document.getElementById('viewUserContent').innerHTML = `<div style="display:flex;align-items:center;gap:20px;margin-bottom:24px"><div class="table-avatar" style="width:64px;height:64px;border-radius:16px;font-size:24px;background:${getAvatarColor(gi)}">${escapeHtml(u.avatar||'ط')}</div><div><h3 style="font-size:20px;font-weight:700">${escapeHtml(u.name)}</h3><p>${escapeHtml(u.email)}</p>${getStatusBadge(u.status)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><label class="form-label">الهاتف</label><p>${u.phone||'—'}</p></div><div><label class="form-label">تاريخ التسجيل</label><p>${u.joined}</p></div><div><label class="form-label">الطلبات</label><p style="font-size:20px;color:var(--primary)">${u.orders}</p></div><div><label class="form-label">الإنفاق</label><p style="font-size:20px;color:var(--success)">${u.spending.toLocaleString('ar')} ر.س</p></div></div>`;
+  document.getElementById('editFromViewBtn').onclick = () => { Modal.close('viewUserModal'); openEditUser(id); };
   Modal.open('viewUserModal');
 }
-
-function deleteUser(id, name) {
-  Modal.confirm('تأكيد حذف الطالب', `هل تريد حذف الطالب "${name}"؟ لا يمكن التراجع عن هذا الإجراء.`, () => {
-    Toast.show(`تم حذف الطالب ${name} بنجاح`, 'success');
-  });
+function openEditUser(id) {
+  const u = studentsData.find(s=>s.id===id);
+  if(!u) return;
+  document.getElementById('userModalTitle').innerText = 'تعديل بيانات الطالب';
+  document.getElementById('editUserId').value = u.id;
+  document.getElementById('userName').value = u.name;
+  document.getElementById('userEmail').value = u.email;
+  document.getElementById('userPhone').value = u.phone||'';
+  document.getElementById('userPassword').value = '';
+  document.getElementById('passwordLabel').innerText = 'كلمة المرور الجديدة (اختياري)';
+  document.getElementById('passwordHint').style.display = 'block';
+  Modal.open('addUserModal');
 }
 
-function toggleStatus(id, name, status) {
-  const action = status === 'active' ? 'إيقاف' : 'تفعيل';
-  Modal.confirm(`${action} الحساب`, `هل تريد ${action} حساب "${name}"؟`, () => {
-    Toast.show(`تم ${action} الحساب بنجاح`, 'success');
-    renderUsers(MOCK_DATA.students);
+// حفظ (إضافة أو تعديل) - تم إصلاح مشكلة "معرف غير صالح"
+document.getElementById('saveUserBtn').onclick = function() {
+    const id = document.getElementById('editUserId').value;
+    const name = document.getElementById('userName').value.trim();
+    const email = document.getElementById('userEmail').value.trim();
+    const phone = document.getElementById('userPhone').value.trim();
+    const password = document.getElementById('userPassword').value;
+
+    if (!name) { Toast.show('الاسم مطلوب', 'warning'); return; }
+    if (!email) { Toast.show('البريد الإلكتروني مطلوب', 'warning'); return; }
+    // إذا كانت إضافة جديدة (id == 0 أو id == "") وتحقق من كلمة المرور
+    const isAdd = (id === '0' || id === '');
+    if (isAdd && !password) { Toast.show('كلمة المرور مطلوبة للإضافة', 'warning'); return; }
+
+    const formData = new FormData();
+    formData.append('action', isAdd ? 'add' : 'edit');
+    if (!isAdd) formData.append('id', id);
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('phone', phone);
+    if (password) formData.append('password', password);
+
+    fetch('/tawassul/admin/ajax/manage_user.php', {
+        method: 'POST',
+        body: formData,
+        credentials: 'same-origin'
+    })
+    .then(async response => {
+        const text = await response.text();
+        try {
+            return JSON.parse(text);
+        } catch(e) {
+            throw new Error('استجابة غير صالحة: ' + text.substring(0, 100));
+        }
+    })
+    .then(res => {
+        if (res.success) {
+            Toast.show(res.message, 'success');
+            Modal.close('addUserModal');
+            setTimeout(() => location.reload(), 800);
+        } else {
+            Toast.show(res.message, 'error');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        Toast.show('خطأ في الاتصال: ' + err.message, 'error');
+    });
+};
+
+function deleteUser(id) {
+  const u = studentsData.find(s=>s.id===id);
+  if(!u) return;
+  Modal.confirm('حذف الطالب', `هل تريد حذف "${u.name}" نهائياً؟`, () => {
+    const fd = new FormData(); fd.append('action','delete'); fd.append('id',id);
+    fetch('/tawassul/admin/ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
+      .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
+      .catch(()=>Toast.show('خطأ في الاتصال','error'));
   });
 }
-
+function toggleUserStatus(id, curr) {
+  const newStatus = curr==='active'?'suspended':'active';
+  const actionText = newStatus==='active'?'تفعيل':'تعليق';
+  const u = studentsData.find(s=>s.id===id);
+  Modal.confirm(`${actionText} الحساب`, `هل تريد ${actionText} حساب "${u.name}"؟`, () => {
+    const fd = new FormData(); fd.append('action','update_status'); fd.append('id',id); fd.append('status',newStatus);
+    fetch('/tawassul/admin/ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
+      .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
+      .catch(()=>Toast.show('خطأ في الاتصال','error'));
+  });
+}
 function exportTable() {
-  Toast.show('جاري تصدير البيانات...', 'info');
+  let csv = "ID,الاسم,البريد,الهاتف,الطلبات,الإنفاق,الحالة,تاريخ التسجيل\n";
+  filteredData.forEach(u=>csv+=`${u.id},${u.name},${u.email},${u.phone||''},${u.orders},${u.spending},${u.status},${u.joined}\n`);
+  const blob = new Blob(["\uFEFF"+csv], {type:"text/csv"});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download="students.csv"; a.click(); URL.revokeObjectURL(a.href);
+  Toast.show('تم التصدير','success');
 }
 
-// Search filter
-document.getElementById('userSearch')?.addEventListener('input', function() {
-  const q = this.value.toLowerCase();
-  const filtered = MOCK_DATA.students.filter(u => u.name.includes(q) || u.email.includes(q) || u.phone.includes(q));
-  renderUsers(filtered);
+// منع إغلاق المودال عند النقر داخله (حل مشكلة الاختفاء)
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  const box = overlay.querySelector('.modal-box');
+  if(box) box.addEventListener('click', e => e.stopPropagation());
+  overlay.addEventListener('click', e => { if(e.target === overlay) Modal.close(overlay.id); });
 });
 
-document.getElementById('statusFilter')?.addEventListener('change', function() {
-  const v = this.value;
-  const filtered = v === 'all' ? MOCK_DATA.students : MOCK_DATA.students.filter(u => u.status === v);
-  renderUsers(filtered);
-});
+// إعادة تعيين مودال الإضافة عند الفتح
+const addModal = document.getElementById('addUserModal');
+if(addModal) {
+  const observer = new MutationObserver(() => {
+    if(addModal.classList.contains('open') && (document.getElementById('editUserId').value === '0' || document.getElementById('editUserId').value === '')) {
+      document.getElementById('userModalTitle').innerText = 'إضافة طالب جديد';
+      document.getElementById('editUserId').value = '0';
+      document.getElementById('userName').value = '';
+      document.getElementById('userEmail').value = '';
+      document.getElementById('userPhone').value = '';
+      document.getElementById('userPassword').value = '';
+      document.getElementById('passwordLabel').innerText = 'كلمة المرور';
+      document.getElementById('passwordHint').style.display = 'none';
+    }
+  });
+  observer.observe(addModal, { attributes: true, attributeFilter: ['class'] });
+}
 
-document.getElementById('selectAll')?.addEventListener('change', function() {
-  document.querySelectorAll('#usersTableBody input[type=checkbox]').forEach(cb => cb.checked = this.checked);
-});
-
-document.addEventListener('DOMContentLoaded', () => renderUsers(MOCK_DATA.students));
+renderTable();
 </script>
 </body>
 </html>
-
