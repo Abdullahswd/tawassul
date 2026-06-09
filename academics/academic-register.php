@@ -1,4 +1,19 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+
+$db = db();
+$services = getAllServices(true);
+$servicesJson = [];
+foreach ($services as $s) {
+    $servicesJson[] = [
+        'id' => (int)$s['id'],
+        'name' => $s['name'],
+        'icon' => $s['icon'] ?? '🔬'
+    ];
+}
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
@@ -85,22 +100,9 @@
             </div>
           </div>
 
-          <!-- Avatar Upload -->
-          <div style="display:flex;justify-content:center;margin-bottom:24px">
-            <div style="position:relative">
-              <div id="avatarPreview" style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer;border:3px solid var(--border-color);overflow:hidden" onclick="document.getElementById('avatarInput').click()">
-                🤵
-                <img id="avatarImg" style="display:none;object-fit:cover;width:100%;height:100%;position:absolute;inset:0" />
-              </div>
-              <div style="position:absolute;bottom:0;left:0;width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px" onclick="document.getElementById('avatarInput').click()">+</div>
-              <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="previewAvatar(this)"/>
-              <p style="font-size:11px;color:var(--text-secondary);text-align:center;margin-top:8px">صورة شخصية</p>
-            </div>
-          </div>
-
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div class="form-group" style="grid-column:span 2">
-              <label class="form-label">الاسم الرباعي <span style="color:var(--danger)">*</span></label>
+              <label class="form-label">الاسم الكامل <span style="color:var(--danger)">*</span></label>
               <input class="form-input" id="fullName" name="fullName" placeholder="محمد عبدالله أحمد الزهراني" required/>
             </div>
 
@@ -108,8 +110,8 @@
               <label class="form-label">الجنس <span style="color:var(--danger)">*</span></label>
               <select class="form-input form-select" style="padding-left:36px" name="gender" required>
                 <option value="">اختر...</option>
-                <option>ذكر</option>
-                <option>أنثى</option>
+                <option value="ذكر">ذكر</option>
+                <option value="أنثى">أنثى</option>
               </select>
             </div>
 
@@ -134,6 +136,11 @@
             </div>
 
             <div class="form-group">
+              <label class="form-label">كلمة المرور للدخول <span style="color:var(--danger)">*</span></label>
+              <input class="form-input" name="password" type="password" placeholder="••••••••" required/>
+            </div>
+
+            <div class="form-group">
               <label class="form-label">مكان الميلاد</label>
               <input class="form-input" name="birthPlace" placeholder="الرياض، السعودية"/>
             </div>
@@ -151,7 +158,7 @@
             <div class="form-group" style="grid-column:span 2">
               <label class="form-label">نبذة تعريفية <span style="color:var(--danger)">*</span></label>
               <textarea class="form-input" name="bio" rows="4" placeholder="اكتب نبذة عن نفسك وخبراتك العلمية والأكاديمية..." required></textarea>
-              <p class="form-hint">الحد الأدنى 100 حرف</p>
+              <p class="form-hint">الحد الأدنى 20 حرفاً</p>
             </div>
           </div>
         </div>
@@ -208,16 +215,6 @@
                   <label class="form-label">سنة التخرج</label>
                   <input class="form-input" name="bsYear" type="number" placeholder="2015" min="1980" max="2030"/>
                 </div>
-                <div class="form-group" style="grid-column:span 2">
-                  <label class="form-label">صورة الشهادة</label>
-                  <div class="file-upload-area" style="padding:20px">
-                    <input type="file" accept="image/*,.pdf" style="display:none"/>
-                    <span class="upload-icon">📄</span>
-                    <p><strong>اضغط للرفع</strong> أو اسحب الملف هنا</p>
-                    <p style="font-size:12px;margin-top:4px">PNG، JPG، PDF · بحد أقصى 5MB</p>
-                    <div class="upload-info" style="font-size:13px;color:var(--primary);margin-top:8px"></div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
@@ -261,15 +258,6 @@
                 <div class="form-group">
                   <label class="form-label">سنة التخرج</label>
                   <input class="form-input" name="msYear" type="number" placeholder="2018"/>
-                </div>
-                <div class="form-group" style="grid-column:span 2">
-                  <label class="form-label">صورة الشهادة</label>
-                  <div class="file-upload-area" style="padding:20px">
-                    <input type="file" accept="image/*,.pdf" style="display:none"/>
-                    <span class="upload-icon">📄</span>
-                    <p><strong>اضغط للرفع</strong> أو اسحب الملف هنا</p>
-                    <div class="upload-info" style="font-size:13px;color:var(--primary);margin-top:8px"></div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -315,20 +303,11 @@
                   <label class="form-label">سنة التخرج</label>
                   <input class="form-input" name="phdYear" type="number" placeholder="2022"/>
                 </div>
-                <div class="form-group" style="grid-column:span 2">
-                  <label class="form-label">صورة الشهادة</label>
-                  <div class="file-upload-area" style="padding:20px">
-                    <input type="file" accept="image/*,.pdf" style="display:none"/>
-                    <span class="upload-icon">📄</span>
-                    <p><strong>اضغط للرفع</strong> أو اسحب الملف هنا</p>
-                    <div class="upload-info" style="font-size:13px;color:var(--primary);margin-top:8px"></div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
 
-          <div class="alert alert-info"><span>ℹ️</span><span>يجب رفع شهادة واحدة على الأقل لاستكمال التسجيل</span></div>
+          <div class="alert alert-info"><span>ℹ️</span><span>يجب تفعيل شهادة واحدة على الأقل وتعبئتها لاستكمال التسجيل</span></div>
         </div>
       </div>
 
@@ -350,7 +329,7 @@
             <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">💰 تسعير الخدمة</h3>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
               <div class="form-group">
-                <label class="form-label">السعر المبدئي (ر.س)</label>
+                <label class="form-label">السعر المبدئي للطلبات (ر.س)</label>
                 <input class="form-input" name="basePrice" type="number" placeholder="149" min="50"/>
                 <p class="form-hint">أدنى سعر للطلب</p>
               </div>
@@ -395,11 +374,11 @@
     </form><!-- /registerForm -->
 
     <!-- Success Message -->
-    <div id="formSuccess" class="hidden" style="display:none">
+    <div id="formSuccess" style="display:none">
       <div class="card" style="padding:60px 40px;text-align:center">
         <div style="font-size:72px;margin-bottom:20px">🎉</div>
         <h2 style="font-size:26px;font-weight:900;color:var(--text-primary);margin-bottom:12px">تم إرسال طلبك بنجاح!</h2>
-        <p style="color:var(--text-secondary);font-size:15px;margin-bottom:28px">سيقوم فريق تواصل بمراجعة بياناتك والتواصل معك خلال 2-3 أيام عمل</p>
+        <p style="color:var(--text-secondary);font-size:15px;margin-bottom:28px">تم تسجيل حسابك وقبول المؤهلات بشكل أولي. سيقوم فريق المراجعة بمطابقة المستندات وتفعيل ظهورك العام في القائمة خلال 2-3 أيام عمل.</p>
         <div style="display:flex;gap:12px;justify-content:center">
           <a href="academics-list.php" class="btn btn-outline">← تصفح الأكاديميين</a>
           <a href="academic-dashboard.php" class="btn btn-primary">لوحة التحكم →</a>
@@ -420,6 +399,9 @@
 
 <script src="assets/js/main.js"></script>
 <script>
+// Load dynamic services list
+window.ACADEMICS_DATA.services = <?= json_encode($servicesJson, JSON_UNESCAPED_UNICODE) ?>;
+
 // ---- Degree toggles ----
 function toggleDegree(id) {
   const body = document.getElementById(id + 'Body');
@@ -435,28 +417,13 @@ function openDegree(id) {
   if (arrow) arrow.style.transform = 'rotate(180deg)';
 }
 
-// ---- Avatar preview ----
-function previewAvatar(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    const avatar = document.getElementById('avatarPreview');
-    const img = document.getElementById('avatarImg');
-    img.src = e.target.result;
-    img.style.display = 'block';
-    avatar.querySelector(':not(img)') && (avatar.firstChild.textContent = '');
-  };
-  reader.readAsDataURL(file);
-}
-
 // ---- Render services checkboxes ----
 function renderServicesCheckboxes() {
   const grid = document.getElementById('servicesGrid');
   if (!grid) return;
   grid.innerHTML = ACADEMICS_DATA.services.map(s => `
     <label class="service-checkbox">
-      <input type="checkbox" value="${s.id}" style="width:18px;height:18px;accent-color:var(--primary);flex-shrink:0"/>
+      <input type="checkbox" name="services[]" value="${s.id}" style="width:18px;height:18px;accent-color:var(--primary);flex-shrink:0"/>
       <span style="font-size:22px">${s.icon}</span>
       <span style="font-size:14px;color:var(--text-primary)">${s.name}</span>
     </label>
@@ -497,16 +464,52 @@ StepForm.next = function() {
   if (StepForm.currentStep === 4) renderReviewSummary();
 };
 
+// Override StepForm.submit to perform actual DB insert via AJAX fetch
+StepForm.submit = function() {
+  if (!this.validate()) return;
+  const agree = document.getElementById('agreeTerms').checked;
+  if (!agree) {
+    Toast.show('يجب الموافقة على الشروط والأحكام للاستمرار', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('submitBtn');
+  if (btn) { btn.innerHTML = '⏳ جاري الإرسال...'; btn.disabled = true; }
+
+  const form = document.getElementById('registerForm');
+  const formData = new FormData(form);
+
+  if (document.getElementById('hasBachelor').checked) formData.append('hasBachelor', '1');
+  if (document.getElementById('hasMasters').checked) formData.append('hasMasters', '1');
+  if (document.getElementById('hasPhd').checked) formData.append('hasPhd', '1');
+
+  fetch('ajax/handler.php?action=register', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      document.getElementById('formSuccess').style.display = 'block';
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('formNavButtons').style.display = 'none';
+      Toast.show(data.message, 'success');
+    } else {
+      if (btn) { btn.innerHTML = '✅ إرسال الطلب'; btn.disabled = false; }
+      Toast.show(data.message, 'error');
+    }
+  })
+  .catch(err => {
+    if (btn) { btn.innerHTML = '✅ إرسال الطلب'; btn.disabled = false; }
+    Toast.show('حدث خطأ في الاتصال بالخادم.', 'error');
+  });
+};
+
 document.addEventListener('DOMContentLoaded', () => {
-  rendersServicesCheckboxes_init();
+  renderServicesCheckboxes();
   StepForm.totalSteps = 4;
   StepForm.init();
 });
-
-function rendersServicesCheckboxes_init() {
-  renderServicesCheckboxes();
-}
 </script>
 </body>
 </html>
-

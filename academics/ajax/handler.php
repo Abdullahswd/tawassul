@@ -1,0 +1,461 @@
+<?php
+/**
+ * ============================================================
+ *  Tawassul - Academics AJAX Handler
+ *  File: academics/ajax/handler.php
+ * ============================================================
+ */
+
+header('Content-Type: application/json; charset=utf-8');
+
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 0); // Keep it clean for JSON response
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+
+function sendJSONResponse($success, $message, $extra = []) {
+    echo json_encode(array_merge([
+        'success' => $success,
+        'message' => $message
+    ], $extra), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+$action = $_GET['action'] ?? $_POST['action'] ?? '';
+
+if (!$action) {
+    sendJSONResponse(false, 'إجراء غير محدد.');
+}
+
+// ─────────────────────────────────────────────────────────────
+// 1. ACADEMIC REGISTRATION
+// ─────────────────────────────────────────────────────────────
+if ($action === 'register') {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        sendJSONResponse(false, 'طريقة طلب غير صالحة.');
+    }
+
+    $name = trim($_POST['fullName'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $whatsapp = trim($_POST['whatsapp'] ?? '');
+    $bio = trim($_POST['bio'] ?? '');
+    $gender = trim($_POST['gender'] ?? '');
+    $idNumber = trim($_POST['idNumber'] ?? '');
+    $birthPlace = trim($_POST['birthPlace'] ?? '');
+    $birthDate = trim($_POST['birthDate'] ?? '');
+    $address = trim($_POST['address'] ?? '');
+    
+    // Credentials
+    $password = $_POST['password'] ?? 'Academic@123'; // Default fallback if not provided
+
+    // Qualifications checkbox indicators
+    $hasBachelor = isset($_POST['hasBachelor']) || !empty($_POST['bsUniversity']);
+    $hasMasters = isset($_POST['hasMasters']) || !empty($_POST['msUniversity']);
+    $hasPhd = isset($_POST['hasPhd']) || !empty($_POST['phdUniversity']);
+
+    // Selected services
+    $services = $_POST['services'] ?? []; // Array of service IDs
+    $basePrice = floatval($_POST['basePrice'] ?? 0);
+
+    if (!$name || !$email || !$phone || !$bio) {
+        sendJSONResponse(false, 'يرجى ملء جميع الحقول الشخصية الأساسية المطلوبة.');
+    }
+
+    if (!$hasBachelor && !$hasMasters && !$hasPhd) {
+        sendJSONResponse(false, 'يرجى تقديم مؤهل أكاديمي واحد على الأقل.');
+    }
+
+    try {
+        $db = db();
+        
+        // Check email uniqueness
+        $check = $db->prepare("SELECT id FROM academics WHERE email = ?");
+        $check->execute([$email]);
+        if ($check->rowCount() > 0) {
+            sendJSONResponse(false, 'البريد الإلكتروني مسجل مسبقاً كأكاديمي.');
+        }
+
+        // Determine main specialty and degree
+        $mainSpecialty = '';
+        $mainDegree = 'بكالوريوس';
+        $mainUniversity = '';
+
+        if ($hasPhd) {
+            $mainDegree = 'دكتوراه';
+            $mainSpecialty = trim($_POST['phdMajor'] ?? '');
+            $mainUniversity = trim($_POST['phdUniversity'] ?? '');
+        } elseif ($hasMasters) {
+            $mainDegree = 'ماجستير';
+            $mainSpecialty = trim($_POST['msMajor'] ?? '');
+            $mainUniversity = trim($_POST['msUniversity'] ?? '');
+        } elseif ($hasBachelor) {
+            $mainDegree = 'بكالوريوس';
+            $mainSpecialty = trim($_POST['bsMajor'] ?? '');
+            $mainUniversity = trim($_POST['bsUniversity'] ?? '');
+        }
+
+        // Avatar Initials
+        $initials = mb_substr($name, 0, 1, 'UTF-8') . mb_substr(explode(' ', $name)[1] ?? '', 0, 1, 'UTF-8');
+
+        // Insert into academics
+        $stmt = $db->prepare(
+            "INSERT INTO academics (name, email, password, phone, specialty, degree, university, bio, avatar_initials, starting_price, status, availability, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'available', NOW())"
+        );
+        $stmt->execute([
+            $name,
+            $email,
+            password_hash($password, PASSWORD_DEFAULT),
+            $phone,
+            $mainSpecialty,
+            $mainDegree,
+            $mainUniversity,
+            $bio,
+            $initials,
+            $basePrice
+        ]);
+        
+        $academicId = (int)$db->lastInsertId();
+
+        // Save Qualifications
+        if ($hasBachelor) {
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'بكالوريوس', ?, ?, ?, ?, 1)")
+               ->execute([$academicId, trim($_POST['bsMajor'] ?? 'رياضيات'), trim($_POST['bsUniversity'] ?? 'جامعة الملك سعود'), trim($_POST['bsCountry'] ?? 'السعودية'), intval($_POST['bsYear'] ?? 2015)]);
+        }
+        if ($hasMasters) {
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'ماجستير', ?, ?, ?, ?, 1)")
+               ->execute([$academicId, trim($_POST['msMajor'] ?? 'إحصاء'), trim($_POST['msUniversity'] ?? 'جامعة الملك عبدالعزيز'), trim($_POST['msCountry'] ?? 'السعودية'), intval($_POST['msYear'] ?? 2018)]);
+        }
+        if ($hasPhd) {
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'دكتوراه', ?, ?, ?, ?, 1)")
+               ->execute([$academicId, trim($_POST['phdMajor'] ?? 'إحصاء حيوي'), trim($_POST['phdUniversity'] ?? 'جامعة أوكلاند'), trim($_POST['phdCountry'] ?? 'نيوزيلندا'), intval($_POST['phdYear'] ?? 2022)]);
+        }
+
+        // Save Services
+        if (!empty($services)) {
+            $srvStmt = $db->prepare("INSERT INTO academic_services (academic_id, service_id, custom_price) VALUES (?, ?, NULL)");
+            foreach ($services as $srvId) {
+                $srvStmt->execute([$academicId, intval($srvId)]);
+            }
+        }
+
+        // Auto log in as academic
+        $newAcademic = getAcademicById($academicId);
+        loginAcademic($newAcademic);
+
+        sendJSONResponse(true, 'تم تسجيل حسابك بنجاح وقيد المراجعة الآن من الإدارة!');
+
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'حدث خطأ أثناء التسجيل: ' . $e->getMessage());
+    }
+}
+
+// ── AUTH CHECK FOR REMAINING ACTIONS ────────────────────────
+if ($action === 'create_order') {
+    // Requires logged-in student user
+    if (!isset($_SESSION['user_id'])) {
+        sendJSONResponse(false, 'يرجى تسجيل الدخول كطالب لطلب الخدمة.');
+    }
+} else {
+    // Requires logged-in academic
+    if (!isset($_SESSION['academic_id'])) {
+        sendJSONResponse(false, 'غير مصرح: يرجى تسجيل الدخول كأكاديمي.');
+    }
+    $academicId = $_SESSION['academic_id'];
+}
+
+// ─────────────────────────────────────────────────────────────
+// 2. UPDATE ORDER STATUS
+// ─────────────────────────────────────────────────────────────
+if ($action === 'update_order_status') {
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $status = trim($_POST['status'] ?? '');
+
+    if ($orderId <= 0 || !$status) {
+        sendJSONResponse(false, 'بيانات غير مكتملة.');
+    }
+
+    // Check ownership
+    $db = db();
+    $stmt = $db->prepare("SELECT id, student_id FROM orders WHERE id = ? AND academic_id = ?");
+    $stmt->execute([$orderId, $academicId]);
+    $order = $stmt->fetch();
+
+    if (!$order) {
+        sendJSONResponse(false, 'الطلب غير موجود أو غير مرتبط بحسابك.');
+    }
+
+    try {
+        $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
+        $updateStmt->execute([$status, $orderId]);
+
+        // Send notification to student
+        $statusLabels = [
+            'accepted' => 'تم قبول طلبك وبدأ العمل عليه.',
+            'in_progress' => 'طلبك الآن قيد التنفيذ.',
+            'completed' => 'اكتمل تنفيذ طلبك بنجاح.',
+            'cancelled' => 'تم إلغاء الطلب.'
+        ];
+        $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
+        
+        createNotification(
+            $order['student_id'],
+            'student',
+            'تحديث للطلب #' . $orderId,
+            $msg,
+            '📋',
+            'student/order-details.php?id=' . $orderId
+        );
+
+        sendJSONResponse(true, 'تم تحديث حالة الطلب بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل تحديث الحالة: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 3. UPDATE PROFILE/SETTINGS
+// ─────────────────────────────────────────────────────────────
+if ($action === 'update_profile') {
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $bio = trim($_POST['bio'] ?? '');
+    $availability = trim($_POST['availability'] ?? 'available');
+    $startingPrice = floatval($_POST['starting_price'] ?? 0);
+    $services = $_POST['services'] ?? []; // Array of services
+
+    if (!$name || !$email || !$phone) {
+        sendJSONResponse(false, 'الاسم والبريد ورقم الجوال حقول مطلوبة.');
+    }
+
+    try {
+        $db = db();
+
+        // Check email uniqueness
+        $check = $db->prepare("SELECT id FROM academics WHERE email = ? AND id != ?");
+        $check->execute([$email, $academicId]);
+        if ($check->rowCount() > 0) {
+            sendJSONResponse(false, 'البريد الإلكتروني مستخدم بالفعل.');
+        }
+
+        // Update academic details
+        $stmt = $db->prepare(
+            "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?, starting_price = ? WHERE id = ?"
+        );
+        $stmt->execute([$name, $email, $phone, $bio, $availability, $startingPrice, $academicId]);
+
+        // Sync Services
+        $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
+        if (!empty($services)) {
+            $ins = $db->prepare("INSERT INTO academic_services (academic_id, service_id) VALUES (?, ?)");
+            foreach ($services as $srvId) {
+                $ins->execute([$academicId, intval($srvId)]);
+            }
+        }
+
+        // Update session name/email
+        $_SESSION['academic_name'] = $name;
+        $_SESSION['academic_email'] = $email;
+        $_SESSION['academic_avatar'] = mb_substr($name, 0, 2);
+
+        sendJSONResponse(true, 'تم حفظ التعديلات بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل الحفظ: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 4. CHANGE PASSWORD
+// ─────────────────────────────────────────────────────────────
+if ($action === 'change_password') {
+    $current = $_POST['current'] ?? '';
+    $new = $_POST['new'] ?? '';
+    $confirm = $_POST['confirm'] ?? '';
+
+    if (!$current || !$new || !$confirm) {
+        sendJSONResponse(false, 'يرجى تعبئة جميع الحقول.');
+    }
+
+    if ($new !== $confirm) {
+        sendJSONResponse(false, 'كلمتا المرور الجديدتان غير متطابقتين.');
+    }
+
+    if (strlen($new) < 6) {
+        sendJSONResponse(false, 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
+    }
+
+    try {
+        $db = db();
+        $stmt = $db->prepare("SELECT password FROM academics WHERE id = ?");
+        $stmt->execute([$academicId]);
+        $hash = $stmt->fetchColumn();
+
+        if (!password_verify($current, $hash)) {
+            sendJSONResponse(false, 'كلمة المرور الحالية غير صحيحة.');
+        }
+
+        $update = $db->prepare("UPDATE academics SET password = ? WHERE id = ?");
+        $update->execute([password_hash($new, PASSWORD_DEFAULT), $academicId]);
+
+        sendJSONResponse(true, 'تم تحديث كلمة المرور بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل تحديث كلمة المرور: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 5. SUBMIT WITHDRAW
+// ─────────────────────────────────────────────────────────────
+if ($action === 'submit_withdraw') {
+    $amount = floatval($_POST['amount'] ?? 0);
+    $method = trim($_POST['method'] ?? 'تحويل بنكي');
+    $iban = trim($_POST['iban'] ?? '');
+
+    if ($amount < 200) {
+        sendJSONResponse(false, 'الحد الأدنى للسحب هو 200 ر.س.');
+    }
+
+    try {
+        $db = db();
+        $stmt = $db->prepare("SELECT balance FROM academics WHERE id = ?");
+        $stmt->execute([$academicId]);
+        $balance = floatval($stmt->fetchColumn());
+
+        if ($amount > $balance) {
+            sendJSONResponse(false, 'الرصيد غير كافٍ لإجراء هذه العملية.');
+        }
+
+        // Deduct balance and update database
+        $newBalance = $balance - $amount;
+        $db->prepare("UPDATE academics SET balance = ? WHERE id = ?")->execute([$newBalance, $academicId]);
+
+        sendJSONResponse(true, 'تم إرسال طلب السحب بنجاح. سيتم تحويل المبلغ إلى حسابك البنكي قريباً.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل إرسال طلب السحب: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 6. CREATE SERVICE ORDER FROM STUDENT
+// ─────────────────────────────────────────────────────────────
+if ($action === 'create_order') {
+    $studentId = $_SESSION['user_id'];
+    $academicTargetId = intval($_POST['academic_id'] ?? 0);
+    $serviceId = intval($_POST['service_id'] ?? 0);
+    $description = trim($_POST['description'] ?? '');
+    $deadline = trim($_POST['deadline'] ?? '');
+    $packageType = trim($_POST['package_type'] ?? 'البداية'); // Default mock package
+
+    if ($academicTargetId <= 0 || $serviceId <= 0 || !$description || !$deadline) {
+        sendJSONResponse(false, 'يرجى تعبئة كافة حقول النموذج.');
+    }
+
+    try {
+        $db = db();
+
+        // Get package info or use academic starting price
+        $packageId = null;
+        $amount = 349.00; // default average
+
+        // Fetch package price from packages table
+        $pkgStmt = $db->prepare("SELECT id, price FROM packages WHERE name = ? LIMIT 1");
+        $pkgStmt->execute([$packageType]);
+        $pkg = $pkgStmt->fetch();
+        if ($pkg) {
+            $packageId = $pkg['id'];
+            $amount = floatval($pkg['price']);
+        } else {
+            // Get starting price of academic
+            $acPriceStmt = $db->prepare("SELECT starting_price FROM academics WHERE id = ?");
+            $acPriceStmt->execute([$academicTargetId]);
+            $acPrice = $acPriceStmt->fetchColumn();
+            if ($acPrice) {
+                $amount = floatval($acPrice);
+            }
+        }
+
+        // Generate Order Number
+        $number = generateOrderNumber();
+
+        // Insert order
+        $stmt = $db->prepare(
+            'INSERT INTO orders
+               (order_number, student_id, academic_id, service_id, package_id, specialty,
+                academic_level, language, description, deadline, amount, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "new", NOW())'
+        );
+        
+        $stmt->execute([
+            $number,
+            $studentId,
+            $academicTargetId,
+            $serviceId,
+            $packageId,
+            'عام',
+            $description,
+            $deadline,
+            $amount
+        ]);
+
+        $orderId = (int)$db->lastInsertId();
+
+        // Create Payment
+        $fee = round($amount * 0.15, 2);
+        $net = round($amount - $fee, 2);
+        $payNum = generatePaymentNumber();
+
+        $payStmt = $db->prepare(
+            'INSERT INTO payments
+               (payment_number, order_id, student_id, amount, platform_fee, academic_net, method, status, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, "credit_card", "paid", NOW())'
+        );
+        $payStmt->execute([
+            $payNum,
+            $orderId,
+            $studentId,
+            $amount,
+            $fee,
+            $net
+        ]);
+
+        // Add amount to academic's balance
+        $db->prepare("UPDATE academics SET balance = balance + ?, total_orders = total_orders + 1 WHERE id = ?")
+           ->execute([$net, $academicTargetId]);
+
+        // Send notification to academic
+        createNotification(
+            $academicTargetId,
+            'academic',
+            'طلب خدمة جديد #' . $number,
+            'وصلك طلب جديد للخدمة بقيمة ' . $amount . ' ر.س. يرجى مراجعته وقبوله لبدء العمل.',
+            '📋',
+            'academics/academic-orders.php'
+        );
+
+        sendJSONResponse(true, 'تم إرسال الطلب ودفع الرسوم بنجاح! تم تنبيه الأكاديمي للبدء بالعمل.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل إرسال الطلب: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 7. MARK NOTIFICATIONS AS READ
+// ─────────────────────────────────────────────────────────────
+if ($action === 'mark_notifications_read') {
+    try {
+        markNotificationsRead($academicId, 'academic');
+        sendJSONResponse(true, 'تم تعليم الإشعارات كمقروءة.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل تحديث الإشعارات.');
+    }
+}
+
+sendJSONResponse(false, 'إجراء غير معروف.');

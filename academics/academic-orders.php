@@ -1,4 +1,53 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+
+requireAcademic();
+
+$currentAcademicId = $_SESSION['academic_id'];
+$db = db();
+
+// Load orders for this academic
+$ordersStmt = $db->prepare("
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon, p.name AS package_name, u.name AS student_name
+    FROM orders o
+    LEFT JOIN services s ON o.service_id = s.id
+    LEFT JOIN packages p ON o.package_id = p.id
+    LEFT JOIN users u ON o.student_id = u.id
+    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'new')
+    ORDER BY o.created_at DESC
+");
+$ordersStmt->execute([$currentAcademicId]);
+$orders = $ordersStmt->fetchAll();
+
+// Map orders to JS array
+$ordersJson = [];
+foreach ($orders as $o) {
+    $ordersJson[] = [
+        'id' => $o['order_number'],
+        'db_id' => (int)$o['id'],
+        'student' => $o['student_name'] ?? 'طالب غير معروف',
+        'service' => $o['service_name'] ?? 'خدمة عامة',
+        'package' => $o['package_name'] ?? 'الباقة العادية',
+        'amount' => (float)$o['amount'],
+        'status' => $o['status'],
+        'date' => date('Y-m-d', strtotime($o['created_at'])),
+        'deadline' => $o['deadline'] ? date('Y-m-d', strtotime($o['deadline'])) : '-'
+    ];
+}
+
+// Count by status
+$allCount = count($ordersJson);
+$newCount = 0;
+$inProgressCount = 0;
+$completedCount = 0;
+foreach ($ordersJson as $o) {
+    if ($o['status'] === 'new') $newCount++;
+    elseif (in_array($o['status'], ['accepted', 'in_progress', 'revision'])) $inProgressCount++;
+    elseif ($o['status'] === 'completed') $completedCount++;
+}
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
@@ -31,19 +80,19 @@
       <!-- Status tabs & stats -->
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
         <div class="stat-card anim-up delay-1" style="padding:16px;cursor:pointer;border-bottom:3px solid #6366f1" onclick="filterOrders('')">
-          <div style="font-size:24px;font-weight:900;color:var(--primary)" data-counter="5">0</div>
+          <div style="font-size:24px;font-weight:900;color:var(--primary)" data-counter="<?= $allCount ?>">0</div>
           <div style="font-size:13px;color:var(--text-secondary)">جميع الطلبات</div>
         </div>
         <div class="stat-card anim-up delay-2" style="padding:16px;cursor:pointer;border-bottom:3px solid #3b82f6" onclick="filterOrders('new')">
-          <div style="font-size:24px;font-weight:900;color:#3b82f6" data-counter="2">0</div>
+          <div style="font-size:24px;font-weight:900;color:#3b82f6" data-counter="<?= $newCount ?>">0</div>
           <div style="font-size:13px;color:var(--text-secondary)">جديدة</div>
         </div>
         <div class="stat-card anim-up delay-3" style="padding:16px;cursor:pointer;border-bottom:3px solid #f59e0b" onclick="filterOrders('in_progress')">
-          <div style="font-size:24px;font-weight:900;color:#f59e0b" data-counter="3">0</div>
+          <div style="font-size:24px;font-weight:900;color:#f59e0b" data-counter="<?= $inProgressCount ?>">0</div>
           <div style="font-size:13px;color:var(--text-secondary)">قيد التنفيذ</div>
         </div>
         <div class="stat-card anim-up delay-4" style="padding:16px;cursor:pointer;border-bottom:3px solid #10b981" onclick="filterOrders('completed')">
-          <div style="font-size:24px;font-weight:900;color:#10b981" data-counter="231">0</div>
+          <div style="font-size:24px;font-weight:900;color:#10b981" data-counter="<?= $completedCount ?>">0</div>
           <div style="font-size:13px;color:var(--text-secondary)">مكتملة</div>
         </div>
       </div>
@@ -59,14 +108,11 @@
           <select class="form-input form-select" id="statusFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterOrders()">
             <option value="">جميع الحالات</option>
             <option value="new">جديد</option>
+            <option value="accepted">مقبول</option>
             <option value="in_progress">قيد التنفيذ</option>
+            <option value="revision">تحت المراجعة</option>
             <option value="completed">مكتمل</option>
-          </select>
-          <select class="form-input form-select" id="serviceFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterOrders()">
-            <option value="">جميع الخدمات</option>
-            <option>الأبحاث والدراسات</option>
-            <option>التحليل الإحصائي</option>
-            <option>الرسائل الجامعية</option>
+            <option value="cancelled">ملغي</option>
           </select>
         </div>
 
@@ -89,10 +135,7 @@
         </div>
 
         <div class="pagination">
-          <span class="pagination-info">عرض 1-5 من <strong>5</strong> طلب</span>
-          <div class="pagination-pages">
-            <button class="page-btn active">1</button>
-          </div>
+          <span class="pagination-info" id="paginationInfo">عرض 1-<?= count($ordersJson) ?> من <strong><?= count($ordersJson) ?></strong> طلب</span>
         </div>
       </div>
 
@@ -109,8 +152,8 @@
     </div>
     <div class="modal-body" id="orderDetailBody"></div>
     <div class="modal-footer">
-      <button class="btn btn-outline" data-modal-close>إغلاق</button>
-      <button class="btn btn-warning" id="orderUpdateBtn">🔄 تحديث الحالة</button>
+      <button class="btn btn-outline" data-modal-close>إلغاء</button>
+      <button class="btn btn-primary" id="orderUpdateBtn">🔄 تحديث الحالة</button>
     </div>
   </div>
 </div>
@@ -122,11 +165,15 @@
 
 <script src="assets/js/main.js"></script>
 <script>
+// Feed database orders into ACADEMICS_DATA
+window.ACADEMICS_DATA.orders = <?= json_encode($ordersJson, JSON_UNESCAPED_UNICODE) ?>;
+
 function renderOrders(data) {
   const tbody = document.getElementById('ordersTableBody');
   if (!tbody) return;
   if (!data.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-secondary)">📭 لا توجد طلبات</td></tr>';
+    document.getElementById('paginationInfo').textContent = 'عرض 0-0 من 0 طلب';
     return;
   }
   tbody.innerHTML = data.map((o, i) => `
@@ -147,12 +194,13 @@ function renderOrders(data) {
         <div style="display:flex;gap:5px">
           <button class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none" title="عرض التفاصيل" onclick="viewOrder('${o.id}')">👁</button>
           ${o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
-          ${o.status === 'in_progress' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
-          <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,.1);color:#ef4444;border:none" title="إلغاء" onclick="cancelOrder('${o.id}')">✕</button>
+          ${o.status === 'in_progress' || o.status === 'accepted' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
+          ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,.1);color:#ef4444;border:none" title="إلغاء" onclick="cancelOrder('${o.id}')">✕</button>` : ''}
         </div>
       </td>
     </tr>
   `).join('');
+  document.getElementById('paginationInfo').innerHTML = `عرض 1-${data.length} من <strong>${data.length}</strong> طلب`;
 }
 
 function filterOrders(statusOverride) {
@@ -161,11 +209,10 @@ function filterOrders(statusOverride) {
   }
   const q = document.getElementById('orderSearch').value.toLowerCase();
   const st = document.getElementById('statusFilter').value;
-  const sv = document.getElementById('serviceFilter').value;
   const filtered = ACADEMICS_DATA.orders.filter(o => {
-    return (!q || o.id.toLowerCase().includes(q) || o.student.includes(q))
-        && (!st || o.status === st)
-        && (!sv || o.service.includes(sv));
+    const matchQ = !q || o.id.toLowerCase().includes(q) || o.student.toLowerCase().includes(q);
+    const matchSt = !st || o.status === st || (st === 'in_progress' && o.status === 'accepted');
+    return matchQ && matchSt;
   });
   renderOrders(filtered);
 }
@@ -191,47 +238,112 @@ function viewOrder(id) {
       <label class="form-label">تحديث الحالة</label>
       <select class="form-input form-select" id="newStatusSelect" style="padding-left:36px">
         <option value="new" ${o.status==='new'?'selected':''}>جديد</option>
+        <option value="accepted" ${o.status==='accepted'?'selected':''}>مقبول</option>
         <option value="in_progress" ${o.status==='in_progress'?'selected':''}>قيد التنفيذ</option>
+        <option value="revision" ${o.status==='revision'?'selected':''}>تحت المراجعة</option>
         <option value="completed" ${o.status==='completed'?'selected':''}>مكتمل</option>
+        <option value="cancelled" ${o.status==='cancelled'?'selected':''}>ملغي</option>
       </select>
     </div>
-    <input type="hidden" id="currentOrderId" value="${o.id}"/>
   `;
+
   document.getElementById('orderUpdateBtn').onclick = () => {
     const newStatus = document.getElementById('newStatusSelect').value;
-    const ord = ACADEMICS_DATA.orders.find(x => x.id === id);
-    if (ord) ord.status = newStatus;
-    Modal.close('orderDetailModal');
-    Toast.show('تم تحديث حالة الطلب', 'success');
-    filterOrders();
+    const formData = new FormData();
+    formData.append('order_id', o.db_id);
+    formData.append('status', newStatus);
+
+    fetch('ajax/handler.php?action=update_order_status', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        o.status = newStatus;
+        Modal.close('orderDetailModal');
+        Toast.show(data.message, 'success');
+        filterOrders();
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    });
   };
   Modal.open('orderDetailModal');
 }
 
 function acceptOrder(id) {
+  const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+  if (!o) return;
   Modal.confirm('قبول الطلب', `هل تريد قبول الطلب ${id} والبدء في التنفيذ؟`, () => {
-    const o = ACADEMICS_DATA.orders.find(x => x.id === id);
-    if (o) o.status = 'in_progress';
-    Toast.show('تم قبول الطلب وبدء التنفيذ ✅', 'success');
-    filterOrders();
+    const formData = new FormData();
+    formData.append('order_id', o.db_id);
+    formData.append('status', 'accepted');
+
+    fetch('ajax/handler.php?action=update_order_status', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        o.status = 'accepted';
+        Toast.show(data.message, 'success');
+        filterOrders();
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    });
   });
 }
 
 function completeOrder(id) {
+  const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+  if (!o) return;
   Modal.confirm('إتمام الطلب', `هل تريد تعليم الطلب ${id} كمكتمل؟`, () => {
-    const o = ACADEMICS_DATA.orders.find(x => x.id === id);
-    if (o) o.status = 'completed';
-    Toast.show('تم إتمام الطلب بنجاح 🎉', 'success');
-    filterOrders();
+    const formData = new FormData();
+    formData.append('order_id', o.db_id);
+    formData.append('status', 'completed');
+
+    fetch('ajax/handler.php?action=update_order_status', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        o.status = 'completed';
+        Toast.show(data.message, 'success');
+        filterOrders();
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    });
   });
 }
 
 function cancelOrder(id) {
-  Modal.confirm('إلغاء الطلب', `هل تريد إلغاء الطلب ${id}؟ لا يمكن التراجع.`, () => {
-    const idx = ACADEMICS_DATA.orders.findIndex(x => x.id === id);
-    if (idx > -1) ACADEMICS_DATA.orders.splice(idx, 1);
-    Toast.show('تم إلغاء الطلب', 'error');
-    filterOrders();
+  const o = ACADEMICS_DATA.orders.find(x => x.id === id);
+  if (!o) return;
+  Modal.confirm('إلغاء الطلب', `هل تريد إلغاء الطلب ${id}؟ لا يمكن التراجع عن هذا الإجراء.`, () => {
+    const formData = new FormData();
+    formData.append('order_id', o.db_id);
+    formData.append('status', 'cancelled');
+
+    fetch('ajax/handler.php?action=update_order_status', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        o.status = 'cancelled';
+        Toast.show(data.message, 'error');
+        filterOrders();
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    });
   });
 }
 
@@ -239,4 +351,3 @@ document.addEventListener('DOMContentLoaded', () => renderOrders(ACADEMICS_DATA.
 </script>
 </body>
 </html>
-

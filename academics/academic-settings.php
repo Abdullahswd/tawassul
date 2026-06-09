@@ -1,4 +1,29 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+
+requireAcademic();
+
+$academicId = $_SESSION['academic_id'];
+$academicData = getAcademicById($academicId);
+
+$db = db();
+
+// Selected services IDs for this academic
+$selectedServices = $db->query("SELECT service_id FROM academic_services WHERE academic_id = $academicId")->fetchAll(PDO::FETCH_COLUMN);
+
+// All services
+$allServicesList = getAllServices(true);
+
+// Qualifications for list
+$qualsStmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ?");
+$qualsStmt->execute([$academicId]);
+$quals = $qualsStmt->fetchAll();
+
+$academicName = $academicData['name'];
+$academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0, 2);
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
@@ -7,6 +32,20 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="assets/css/style.css"/>
+  <style>
+    .s-menu-btn {
+      display: flex; align-items: center; gap: 8px;
+      width: 100%; padding: 11px 14px; border-radius: 10px;
+      border: none; background: transparent; font-family: Tajawal, sans-serif;
+      font-size: 14px; font-weight: 600; color: var(--text-secondary);
+      cursor: pointer; text-align: right; transition: all .18s;
+      margin-bottom: 2px;
+    }
+    .s-menu-btn:hover { background: var(--bg-main); color: var(--text-primary); }
+    .s-menu-btn.active { background: rgba(99,102,241,.1); color: var(--primary); }
+    .s-section { animation: fadeIn .25s ease; }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
+  </style>
 </head>
 <body>
 <div class="mobile-overlay" id="mobileOverlay"></div>
@@ -39,9 +78,6 @@
           <button class="s-menu-btn" onclick="showSection('notifications',this)">🔔 الإشعارات</button>
           <button class="s-menu-btn" onclick="showSection('security',this)">🔒 كلمة المرور</button>
           <button class="s-menu-btn" onclick="showSection('bank',this)">🏦 البيانات البنكية</button>
-          <div style="border-top:1px solid var(--border-color);margin:8px 0;padding-top:8px">
-            <button class="s-menu-btn" style="color:var(--danger)" onclick="Modal.confirm('تعطيل الحساب','هل تريد تعطيل حسابك مؤقتاً؟',()=>Toast.show('تم تعطيل الحساب مؤقتاً','warning'))">🚫 تعطيل الحساب</button>
-          </div>
         </div>
 
         <!-- Settings content -->
@@ -55,44 +91,40 @@
               <!-- Avatar -->
               <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;padding:20px;background:var(--bg-main);border-radius:14px">
                 <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;position:relative">
-                  م
-                  <div style="position:absolute;bottom:0;left:0;width:26px;height:26px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:12px;border:2px solid var(--bg-card)" onclick="document.getElementById('photoInput').click()">+</div>
-                  <input type="file" id="photoInput" accept="image/*" style="display:none"/>
+                  <?= e($academicAvatar) ?>
                 </div>
                 <div>
-                  <div style="font-size:16px;font-weight:700;color:var(--text-primary)">د. محمد علي السعيد</div>
+                  <div style="font-size:16px;font-weight:700;color:var(--text-primary)"><?= e($academicName) ?></div>
                   <div style="font-size:13px;color:var(--text-secondary)">أكاديمي موثق ✓</div>
-                  <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="document.getElementById('photoInput').click()">📷 تغيير الصورة</button>
                 </div>
               </div>
 
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
                 <div class="form-group" style="grid-column:span 2">
-                  <label class="form-label">الاسم الرباعي</label>
-                  <input class="form-input" value="محمد علي أحمد السعيد"/>
+                  <label class="form-label">الاسم الكامل</label>
+                  <input class="form-input" id="settingsName" value="<?= e($academicData['name']) ?>"/>
                 </div>
                 <div class="form-group">
                   <label class="form-label">البريد الإلكتروني</label>
-                  <input class="form-input" type="email" value="mohammed@email.com" dir="ltr"/>
+                  <input class="form-input" id="settingsEmail" type="email" value="<?= e($academicData['email']) ?>" dir="ltr"/>
                 </div>
                 <div class="form-group">
                   <label class="form-label">رقم الجوال</label>
-                  <input class="form-input" type="tel" value="0501234567" dir="ltr"/>
+                  <input class="form-input" id="settingsPhone" type="tel" value="<?= e($academicData['phone']) ?>" dir="ltr"/>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">رقم واتساب</label>
-                  <input class="form-input" type="tel" value="0501234567" dir="ltr"/>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">الحالة</label>
+                  <label class="form-label">التوفر</label>
                   <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg-main);border-radius:var(--radius-sm);border:1.5px solid var(--border-color)">
-                    <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
+                    <label class="toggle-switch">
+                      <input type="checkbox" id="settingsAvailability" <?= $academicData['availability'] === 'available' ? 'checked' : '' ?>/>
+                      <span class="toggle-slider"></span>
+                    </label>
                     <span style="font-size:14px;color:var(--text-primary)">متاح لاستقبال الطلبات</span>
                   </div>
                 </div>
                 <div class="form-group" style="grid-column:span 2">
                   <label class="form-label">نبذة تعريفية</label>
-                  <textarea class="form-input" rows="4">أستاذ متميز في الرياضيات والإحصاء مع خبرة أكثر من 15 عاماً في التدريس والبحث العلمي. متخصص في التحليل الإحصائي والأساليب الكمية ومساعدة الطلاب في إنجاز أبحاثهم.</textarea>
+                  <textarea class="form-input" id="settingsBio" rows="4"><?= e($academicData['bio']) ?></textarea>
                 </div>
               </div>
             </div>
@@ -103,14 +135,24 @@
             <div class="card" style="padding:26px;margin-bottom:18px">
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">⚙️ إدارة الخدمات</h3>
               <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">اختر الخدمات التي تقدمها لطلابك</p>
-              <div id="servicesEditGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px"></div>
+              
+              <div id="servicesEditGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+                <?php foreach ($allServicesList as $srv): ?>
+                  <?php $checked = in_array($srv['id'], $selectedServices) ? 'checked' : ''; ?>
+                  <label class="service-checkbox" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:1.5px solid <?= $checked ? 'var(--primary)' : 'var(--border-color)' ?>;cursor:pointer;background:<?= $checked ? 'rgba(99,102,241,.06)' : 'transparent' ?>">
+                    <input type="checkbox" <?= $checked ?> value="<?= $srv['id'] ?>" style="width:16px;height:16px;accent-color:var(--primary);flex-shrink:0" onchange="this.closest('label').style.borderColor=this.checked?'var(--primary)':'var(--border-color)';this.closest('label').style.background=this.checked?'rgba(99,102,241,.06)':'transparent'"/>
+                    <span style="font-size:20px"><?= e($srv['icon'] ?? '🔬') ?></span>
+                    <span style="font-size:13px;color:var(--text-primary)"><?= e($srv['name']) ?></span>
+                  </label>
+                <?php endforeach; ?>
+              </div>
 
               <div style="border-top:1px solid var(--border-color);padding-top:20px;margin-top:4px">
                 <h4 style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:14px">💰 إعدادات التسعير</h4>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
                   <div class="form-group">
                     <label class="form-label">السعر المبدئي (ر.س)</label>
-                    <input class="form-input" type="number" value="349" min="50"/>
+                    <input class="form-input" id="settingsPrice" type="number" value="<?= intval($academicData['starting_price']) ?>" min="50"/>
                   </div>
                   <div class="form-group">
                     <label class="form-label">متوسط وقت التسليم</label>
@@ -131,49 +173,40 @@
             <div class="card" style="padding:26px;margin-bottom:18px">
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">🎓 المؤهلات الأكاديمية</h3>
               <div style="display:flex;flex-direction:column;gap:14px">
-                <div style="padding:18px;border:1.5px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                  <div style="display:flex;align-items:center;gap:14px">
-                    <span style="font-size:28px">🏫</span>
-                    <div>
-                      <div style="font-size:12px;font-weight:600;color:var(--primary)">بكالوريوس</div>
-                      <div style="font-weight:700;color:var(--text-primary)">رياضيات وإحصاء</div>
-                      <div style="font-size:12px;color:var(--text-secondary)">جامعة الملك سعود · 2005</div>
+                <?php if (empty($quals)): ?>
+                  <p style="color:var(--text-secondary);text-align:center;padding:20px;">لا توجد مؤهلات مسجلة.</p>
+                <?php else: ?>
+                  <?php foreach ($quals as $q): ?>
+                    <?php
+                    $icon = '🏫';
+                    $color = 'var(--primary)';
+                    if ($q['level'] === 'ماجستير') {
+                        $icon = '📜';
+                        $color = 'var(--success)';
+                    } elseif ($q['level'] === 'دكتوراه') {
+                        $icon = '🎓';
+                        $color = 'var(--warning)';
+                    }
+                    ?>
+                    <div style="padding:18px;border:1.5px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
+                      <div style="display:flex;align-items:center;gap:14px">
+                        <span style="font-size:28px"><?= $icon ?></span>
+                        <div>
+                          <div style="font-size:12px;font-weight:600;color:<?= $color ?>"><?= e($q['level']) ?></div>
+                          <div style="font-weight:700;color:var(--text-primary)"><?= e($q['field']) ?></div>
+                          <div style="font-size:12px;color:var(--text-secondary)"><?= e($q['university']) ?> · <?= e($q['graduation_year']) ?></div>
+                        </div>
+                      </div>
+                      <div style="display:flex;gap:6px">
+                        <?php if ($q['verified']): ?>
+                          <span class="badge badge-success">موثّق ✓</span>
+                        <?php else: ?>
+                          <span class="badge badge-secondary">قيد المراجعة</span>
+                        <?php endif; ?>
+                      </div>
                     </div>
-                  </div>
-                  <div style="display:flex;gap:6px">
-                    <span class="badge badge-success">موثّق ✓</span>
-                    <button class="btn btn-sm btn-icon btn-outline" title="تعديل" onclick="Toast.show('قسم تعديل المؤهلات','info')">✏️</button>
-                  </div>
-                </div>
-                <div style="padding:18px;border:1.5px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                  <div style="display:flex;align-items:center;gap:14px">
-                    <span style="font-size:28px">📜</span>
-                    <div>
-                      <div style="font-size:12px;font-weight:600;color:var(--success)">ماجستير</div>
-                      <div style="font-weight:700;color:var(--text-primary)">إحصاء تطبيقي</div>
-                      <div style="font-size:12px;color:var(--text-secondary)">جامعة الملك عبدالعزيز · 2008</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;gap:6px">
-                    <span class="badge badge-success">موثّق ✓</span>
-                    <button class="btn btn-sm btn-icon btn-outline" onclick="Toast.show('قسم تعديل المؤهلات','info')">✏️</button>
-                  </div>
-                </div>
-                <div style="padding:18px;border:1.5px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                  <div style="display:flex;align-items:center;gap:14px">
-                    <span style="font-size:28px">🎓</span>
-                    <div>
-                      <div style="font-size:12px;font-weight:600;color:var(--warning)">دكتوراه</div>
-                      <div style="font-weight:700;color:var(--text-primary)">الإحصاء الحيوي والتحليل الكمي</div>
-                      <div style="font-size:12px;color:var(--text-secondary)">جامعة أوكلاند · 2013</div>
-                    </div>
-                  </div>
-                  <div style="display:flex;gap:6px">
-                    <span class="badge badge-success">موثّق ✓</span>
-                    <button class="btn btn-sm btn-icon btn-outline" onclick="Toast.show('قسم تعديل المؤهلات','info')">✏️</button>
-                  </div>
-                </div>
-                <button class="btn btn-outline btn-sm" onclick="Toast.show('يمكنك إضافة مؤهل جديد','info')" style="align-self:flex-start">+ إضافة مؤهل</button>
+                  <?php endforeach; ?>
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -191,13 +224,9 @@
                   <div><div style="font-weight:600;color:var(--text-primary)">إشعارات الأرباح</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند استلام دفعة</div></div>
                   <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
                   <div><div style="font-weight:600;color:var(--text-primary)">إشعارات التقييمات</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند وصول تقييم جديد</div></div>
                   <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
-                </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
-                  <div><div style="font-weight:600;color:var(--text-primary)">التقارير الأسبوعية</div><div style="font-size:12px;color:var(--text-secondary)">ملخص أسبوعي بأدائك</div></div>
-                  <label class="toggle-switch"><input type="checkbox"/><span class="toggle-slider"></span></label>
                 </div>
               </div>
             </div>
@@ -209,14 +238,14 @@
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">🔒 تغيير كلمة المرور</h3>
               <div class="form-group">
                 <label class="form-label">كلمة المرور الحالية</label>
-                <input class="form-input" type="password" placeholder="••••••••"/>
+                <input class="form-input" type="password" id="currentPass" placeholder="••••••••"/>
               </div>
               <div class="form-group">
                 <label class="form-label">كلمة المرور الجديدة</label>
                 <input class="form-input" type="password" id="newPass" placeholder="••••••••"/>
               </div>
               <div class="form-group">
-                <label class="form-label">تأكيد كلمة المرور</label>
+                <label class="form-label">تأكيد كلمة المرور الجديدة</label>
                 <input class="form-input" type="password" id="confirmPass" placeholder="••••••••"/>
               </div>
               <button class="btn btn-primary" onclick="changePassword()">🔒 تحديث كلمة المرور</button>
@@ -236,16 +265,14 @@
                 <label class="form-label">اسم البنك</label>
                 <select class="form-input form-select" style="padding-left:36px">
                   <option>بنك الراجحي</option>
-                  <option>البنك الأهلي</option>
+                  <option selected>البنك الأهلي</option>
                   <option>بنك الرياض</option>
                   <option>بنك البلاد</option>
-                  <option>بنك الإنماء</option>
-                  <option>بنك الفرنسي</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">اسم صاحب الحساب (كما في البنك)</label>
-                <input class="form-input" value="Mohammed Ali Al-Saeed" dir="ltr"/>
+                <input class="form-input" value="<?= e($academicName) ?>" dir="ltr"/>
               </div>
             </div>
           </div>
@@ -261,12 +288,6 @@
   <div class="modal-box" style="max-width:420px"><div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد</h3><button class="modal-close" data-modal-close>✕</button></div><div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:56px;margin-bottom:12px">⚠️</div><p id="confirmMsg" style="color:var(--text-secondary)"></p></div><div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmOkBtn">تأكيد</button></div></div>
 </div>
 
-<style>
-.s-menu-btn{display:block;width:100%;padding:11px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;text-align:right;cursor:pointer;transition:all .2s;margin-bottom:2px}
-.s-menu-btn:hover{background:var(--bg-main);color:var(--primary)}
-.s-menu-btn.active{background:linear-gradient(135deg,rgba(99,102,241,.1),rgba(99,102,241,.05));color:var(--primary);font-weight:700;border-right:3px solid var(--primary)}
-</style>
-
 <script src="assets/js/main.js"></script>
 <script>
 function showSection(id, btn) {
@@ -276,47 +297,74 @@ function showSection(id, btn) {
   btn.classList.add('active');
 }
 
-function renderServicesEdit() {
-  const grid = document.getElementById('servicesEditGrid');
-  if (!grid) return;
-  grid.innerHTML = ACADEMICS_DATA.services.map((s, i) => {
-    const checked = [1,2,5,8].includes(s.id);
-    return `
-      <label class="service-checkbox" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:1.5px solid ${checked?'var(--primary)':'var(--border-color)'};cursor:pointer;background:${checked?'rgba(99,102,241,.06)':'transparent'}">
-        <input type="checkbox" ${checked?'checked':''} value="${s.id}" style="width:16px;height:16px;accent-color:var(--primary);flex-shrink:0" onchange="this.closest('label').style.borderColor=this.checked?'var(--primary)':'var(--border-color)';this.closest('label').style.background=this.checked?'rgba(99,102,241,.06)':'transparent'"/>
-        <span style="font-size:20px">${s.icon}</span>
-        <span style="font-size:13px;color:var(--text-primary)">${s.name}</span>
-      </label>
-    `;
-  }).join('');
-}
-
 function changePassword() {
+  const current = document.getElementById('currentPass').value;
   const p1 = document.getElementById('newPass').value;
   const p2 = document.getElementById('confirmPass').value;
-  if (!p1 || !p2) { Toast.show('يرجى ملء حقول كلمة المرور', 'error'); return; }
-  if (p1 !== p2) { Toast.show('كلمتا المرور غير متطابقتين', 'error'); return; }
+
+  if (!current || !p1 || !p2) { Toast.show('يرجى ملء كافة الحقول', 'error'); return; }
+  if (p1 !== p2) { Toast.show('كلمتا المرور الجديدتان غير متطابقتين', 'error'); return; }
   if (p1.length < 6) { Toast.show('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
-  Toast.show('تم تحديث كلمة المرور بنجاح ✅', 'success');
-  document.getElementById('newPass').value = '';
-  document.getElementById('confirmPass').value = '';
+
+  const formData = new FormData();
+  formData.append('current', current);
+  formData.append('new', p1);
+  formData.append('confirm', p2);
+
+  fetch('ajax/handler.php?action=change_password', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      Toast.show(data.message, 'success');
+      document.getElementById('currentPass').value = '';
+      document.getElementById('newPass').value = '';
+      document.getElementById('confirmPass').value = '';
+    } else {
+      Toast.show(data.message, 'error');
+    }
+  });
 }
 
 function saveSettings() {
   const btn = event.target;
   btn.innerHTML = '⏳ جاري الحفظ...';
   btn.disabled = true;
-  setTimeout(() => {
+
+  const formData = new FormData();
+  formData.append('name', document.getElementById('settingsName').value);
+  formData.append('email', document.getElementById('settingsEmail').value);
+  formData.append('phone', document.getElementById('settingsPhone').value);
+  formData.append('bio', document.getElementById('settingsBio').value);
+  formData.append('availability', document.getElementById('settingsAvailability').checked ? 'available' : 'busy');
+  formData.append('starting_price', document.getElementById('settingsPrice').value);
+
+  // Selected services checkboxes
+  const checkboxes = document.querySelectorAll('#servicesEditGrid input[type=checkbox]');
+  checkboxes.forEach(chk => {
+    if (chk.checked) {
+      formData.append('services[]', chk.value);
+    }
+  });
+
+  fetch('ajax/handler.php?action=update_profile', {
+    method: 'POST',
+    body: formData
+  })
+  .then(res => res.json())
+  .then(data => {
     btn.innerHTML = '💾 حفظ التغييرات';
     btn.disabled = false;
-    Toast.show('تم حفظ الإعدادات بنجاح ✅', 'success');
-  }, 1400);
+    if (data.success) {
+      Toast.show(data.message, 'success');
+      setTimeout(() => location.reload(), 1500);
+    } else {
+      Toast.show(data.message, 'error');
+    }
+  });
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-  renderServicesEdit();
-});
 </script>
 </body>
 </html>
-

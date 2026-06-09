@@ -6,75 +6,30 @@
  */
 
 /* ============================================
-   MOCK DATA
+   DATA STORE
    ============================================ */
+// Capture anything pre-injected by PHP inline scripts (e.g. navbar.php) BEFORE this file runs
+const _preInjected = window.ACADEMICS_DATA || {};
+
 const ACADEMICS_DATA = {
-
-  academics: [
-    { id: 1, name: 'د. محمد علي السعيد', avatar: 'مع', specialty: 'الرياضيات والإحصاء', degree: 'دكتوراه', university: 'جامعة الملك سعود', country: 'السعودية', rating: 4.9, reviews: 128, orders: 245, completedOrders: 231, bio: 'أستاذ متميز في الرياضيات والإحصاء مع خبرة أكثر من 15 عاماً في التدريس والبحث العلمي. متخصص في التحليل الإحصائي والأساليب الكمية.', services: [1,2,5,8], price: 349, status: 'approved', color: '#6366f1', joined: '2023-01-15', phone: '0501234567', whatsapp: '0501234567' },
-    { id: 2, name: 'أ. فاطمة يوسف القحطاني', avatar: 'في', specialty: 'اللغة العربية وآدابها', degree: 'ماجستير', university: 'جامعة أم القرى', country: 'السعودية', rating: 4.7, reviews: 86, orders: 178, completedOrders: 168, bio: 'متخصصة في اللغة العربية وآدابها مع شغف بالتدريس والكتابة الأكاديمية.', services: [1,3,4], price: 249, status: 'approved', color: '#10b981', joined: '2023-03-20', phone: '0507654321', whatsapp: '0507654321' },
-    { id: 3, name: 'د. عبدالرحمن خالد الشهري', avatar: 'عخ', specialty: 'علوم الحاسب والذكاء الاصطناعي', degree: 'دكتوراه', university: 'جامعة الملك عبدالله', country: 'السعودية', rating: 4.8, reviews: 204, orders: 312, completedOrders: 298, bio: 'دكتور في علوم الحاسب مع تخصص دقيق في الذكاء الاصطناعي وتعلم الآلة.', services: [1,8,9,10], price: 499, status: 'approved', color: '#0ea5e9', joined: '2023-02-10', phone: '0509876543', whatsapp: '0509876543' },
-    { id: 4, name: 'أ. منيرة صالح العتيبي', avatar: 'مص', specialty: 'الفيزياء والهندسة', degree: 'ماجستير', university: 'جامعة الملك فهد', country: 'السعودية', rating: 4.5, reviews: 63, orders: 94, completedOrders: 88, bio: 'متخصصة في الفيزياء التطبيقية والهندسة الميكانيكية.', services: [1,2,5], price: 299, status: 'approved', color: '#f59e0b', joined: '2023-05-01', phone: '0512345678', whatsapp: '0512345678' },
-    { id: 5, name: 'د. حسن طارق الدوسري', avatar: 'حط', specialty: 'المحاسبة والمالية', degree: 'دكتوراه', university: 'جامعة الإمام محمد بن سعود', country: 'السعودية', rating: 4.6, reviews: 91, orders: 156, completedOrders: 149, bio: 'خبير في المحاسبة المالية وإدارة الأعمال مع سجل حافل في مساعدة الطلاب.', services: [1,2,11], price: 399, status: 'approved', color: '#8b5cf6', joined: '2023-04-15', phone: '0508765432', whatsapp: '0508765432' },
-    { id: 6, name: 'د. نورة فهد المطيري', avatar: 'نف', specialty: 'علم النفس والتربية', degree: 'دكتوراه', university: 'جامعة الملك سعود', country: 'السعودية', rating: 4.9, reviews: 147, orders: 198, completedOrders: 192, bio: 'دكتورة في علم النفس التربوي متخصصة في البحث والتحليل النفسي.', services: [1,3,4,12], price: 449, status: 'approved', color: '#ec4899', joined: '2023-06-10', phone: '0503456789', whatsapp: '0503456789' },
-  ],
-
-  services: [
-    { id: 1, name: 'التأسيس الأكاديمي', icon: '🏗️' },
-    { id: 2, name: 'كتابة وتطوير البحث', icon: '📝' },
-    { id: 3, name: 'التدقيق والتحرير', icon: '✏️' },
-    { id: 4, name: 'التوثيق والمراجع', icon: '📚' },
-    { id: 5, name: 'التحليل الإحصائي', icon: '📊' },
-    { id: 6, name: 'الاستبيانات والأدوات', icon: '📋' },
-    { id: 7, name: 'الفحص والمراجعة', icon: '🔍' },
-    { id: 8, name: 'التحكيم الأكاديمي', icon: '⚖️' },
-    { id: 9, name: 'العرض والتقديم', icon: '📽️' },
-    { id: 10, name: 'النشر العلمي', icon: '📰' },
-    { id: 11, name: 'الترجمة الأكاديمية', icon: '🌐' },
-    { id: 12, name: 'الخدمات المساندة', icon: '🛠️' },
-  ],
-
-  specialties: [
+  // Defaults — each PHP page overrides these via window.ACADEMICS_DATA.X = realData
+  academics:     _preInjected.academics     || [],
+  services:      _preInjected.services      || [],
+  specialties:   _preInjected.specialties   || [
     'الرياضيات والإحصاء', 'اللغة العربية وآدابها', 'علوم الحاسب والذكاء الاصطناعي',
     'الفيزياء والهندسة', 'المحاسبة والمالية', 'علم النفس والتربية',
     'الكيمياء والأحياء', 'القانون والأنظمة', 'الطب والعلوم الصحية',
     'الاقتصاد وإدارة الأعمال',
   ],
-
-  orders: [
-    { id: '#ORD-201', student: 'أحمد محمد الزهراني', service: 'الأبحاث والدراسات', package: 'التحليل', amount: 649, status: 'in_progress', date: '2024-05-01', deadline: '2024-05-10' },
-    { id: '#ORD-202', student: 'سارة عبدالله الغامدي', service: 'التحليل الإحصائي', package: 'التطوير', amount: 349, status: 'new', date: '2024-05-03', deadline: '2024-05-12' },
-    { id: '#ORD-203', student: 'خالد ناصر العتيبي', service: 'الرسائل الجامعية', package: 'النخبة', amount: 1999, status: 'completed', date: '2024-04-20', deadline: '2024-04-30' },
-    { id: '#ORD-204', student: 'نورة فهد القحطاني', service: 'الترجمة الأكاديمية', package: 'البداية', amount: 149, status: 'completed', date: '2024-04-25', deadline: '2024-05-02' },
-    { id: '#ORD-205', student: 'عمر سعد الدوسري', service: 'الأبحاث والدراسات', package: 'التسليم', amount: 999, status: 'in_progress', date: '2024-05-05', deadline: '2024-05-15' },
-  ],
-
-  earnings: {
-    total: 84600,
-    pending: 12400,
-    withdrawn: 72200,
-    thisMonth: 14800,
-    lastMonth: 11200,
-    monthly: [4200, 6750, 5700, 7800, 9150, 11100, 8700, 12300, 14250, 11700, 13200, 14800],
+  orders:        _preInjected.orders        || [],
+  earnings:      Object.assign({
+    total: 0, pending: 0, withdrawn: 0, thisMonth: 0, lastMonth: 0,
+    monthly: [0,0,0,0,0,0,0,0,0,0,0,0],
     months: ['يناير','فبراير','مارس','إبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'],
-    transactions: [
-      { id: '#TXN-001', order: '#ORD-203', student: 'خالد ناصر', amount: 1699, commission: 300, net: 1399, date: '2024-04-30', status: 'paid' },
-      { id: '#TXN-002', order: '#ORD-204', student: 'نورة فهد', amount: 149, commission: 22, net: 127, date: '2024-05-02', status: 'paid' },
-      { id: '#TXN-003', order: '#ORD-201', student: 'أحمد محمد', amount: 649, commission: 97, net: 552, date: '2024-05-10', status: 'pending' },
-    ]
-  },
-
-  reviews: [
-    { id: 1, student: 'أحمد محمد', avatar: 'أم', rating: 5, text: 'تعامل ممتاز وعمل احترافي جداً، سأتعامل معه مرة أخرى بلا شك.', date: '2024-04-15' },
-    { id: 2, student: 'سارة عبدالله', avatar: 'سع', rating: 5, text: 'أفضل أكاديمي تعاملت معه، دقيق في الوقت ومتميز في الأداء.', date: '2024-03-20' },
-    { id: 3, student: 'خالد ناصر', avatar: 'خن', rating: 4, text: 'عمل جيد جداً، التسليم كان في الوقت المحدد والجودة ممتازة.', date: '2024-02-10' },
-  ],
-
-  notifications: [
-    { id: 1, title: 'طلب جديد', message: 'وصلك طلب جديد من أحمد محمد - برمجة المشاريع', time: 'منذ 10 دقائق', read: false, icon: '📋' },
-    { id: 2, title: 'دفعة مكتملة', message: 'تم إيداع 1,399 ر.س في حسابك', time: 'منذ ساعتين', read: false, icon: '💰' },
-    { id: 3, title: 'تقييم جديد', message: 'قيّمك الطالب سارة عبدالله بـ 5 نجوم', time: 'منذ 3 ساعات', read: true, icon: '⭐' },
-  ],
+    transactions: []
+  }, _preInjected.earnings || {}),
+  reviews:       _preInjected.reviews       || [],
+  notifications: _preInjected.notifications || [],
 };
 
 /* ============================================
@@ -608,14 +563,16 @@ document.addEventListener('DOMContentLoaded', () => {
   initFileUploads();
 });
 
-// Export globals
-window.ACADEMICS_DATA = ACADEMICS_DATA;
-window.AcademicSidebar = AcademicSidebar;
-window.DarkMode = DarkMode;
-window.Modal = Modal;
-window.Toast = Toast;
-window.Charts = Charts;
-window.StepForm = StepForm;
-window.getAvatarColor = getAvatarColor;
-window.getStatusBadge = getStatusBadge;
-window.renderStars = renderStars;
+// Export globals — window.ACADEMICS_DATA is now the single source of truth;
+// PHP pages inject real data via window.ACADEMICS_DATA.X = [...] AFTER this line
+window.ACADEMICS_DATA        = ACADEMICS_DATA;
+window.AcademicSidebar       = AcademicSidebar;
+window.DarkMode              = DarkMode;
+window.Modal                 = Modal;
+window.Toast                 = Toast;
+window.Charts                = Charts;
+window.StepForm              = StepForm;
+window.getAvatarColor        = getAvatarColor;
+window.getStatusBadge        = getStatusBadge;
+window.renderStars           = renderStars;
+window.renderNotifications   = renderNotifications;

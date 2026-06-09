@@ -1,3 +1,32 @@
+<?php
+require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/functions.php';
+
+$currentAcademicId = $_SESSION['academic_id'] ?? null;
+$academicData = null;
+if ($currentAcademicId) {
+    $academicData = getAcademicById($currentAcademicId);
+}
+
+$academicName = $academicData['name'] ?? 'أكاديمي';
+$academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0, 2);
+$academicAvailability = $academicData['availability'] ?? 'available';
+
+$statusText = 'متاح';
+$statusColor = '#22c55e';
+if ($academicAvailability === 'busy') {
+    $statusText = 'مشغول';
+    $statusColor = '#f59e0b';
+} elseif ($academicAvailability === 'vacation') {
+    $statusText = 'في إجازة';
+    $statusColor = '#ef4444';
+}
+
+$newOrdersCount = 0;
+if ($currentAcademicId) {
+    $newOrdersCount = (int)db()->query("SELECT COUNT(*) FROM orders WHERE academic_id = $currentAcademicId AND status = 'new'")->fetchColumn();
+}
+?>
 <!--
   ============================================
   Academic Sidebar Component
@@ -15,10 +44,10 @@
   <!-- Profile mini card -->
   <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07)">
     <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.06)">
-      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">م</div>
+      <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0"><?= e($academicAvatar) ?></div>
       <div class="logo-text" style="min-width:0">
-        <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">د. محمد السعيد</div>
-        <div style="font-size:11px;color:#22c55e">● متاح</div>
+        <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= e($academicName) ?></div>
+        <div style="font-size:11px;color:<?= $statusColor ?>">● <?= $statusText ?></div>
       </div>
     </div>
   </div>
@@ -36,7 +65,9 @@
     <a href="academic-orders.php" class="nav-item" id="nav-orders">
       <span class="nav-icon">📋</span>
       <span class="nav-text">الطلبات</span>
-      <span class="nav-text" style="margin-right:auto;background:#ef4444;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700">2</span>
+      <?php if ($newOrdersCount > 0): ?>
+      <span class="nav-text" style="margin-right:auto;background:#ef4444;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700"><?= $newOrdersCount ?></span>
+      <?php endif; ?>
     </a>
 
     <a href="academic-earnings.php" class="nav-item" id="nav-earnings">

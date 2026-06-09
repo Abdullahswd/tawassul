@@ -1,4 +1,85 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+
+requireAcademic();
+
+$academicId = $_SESSION['academic_id'];
+$academicData = getAcademicById($academicId);
+
+// Calculate real stats
+$db = db();
+
+// 1. Active orders count (new, accepted, in_progress, revision)
+$activeOrdersCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status IN ('new', 'accepted', 'in_progress', 'revision')")->fetchColumn();
+
+// 2. Completed orders count
+$completedOrdersCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'completed'")->fetchColumn();
+
+// 3. Earnings this month (payments net)
+$thisMonthEarnings = (float)$db->query("
+    SELECT COALESCE(SUM(p.academic_net), 0)
+    FROM payments p
+    JOIN orders o ON p.order_id = o.id
+    WHERE o.academic_id = $academicId AND p.status = 'paid' AND MONTH(p.paid_at) = MONTH(NOW()) AND YEAR(p.paid_at) = YEAR(NOW())
+")->fetchColumn();
+
+// 4. Rating and reviews
+$rating = (float)$academicData['rating'];
+$reviewsCount = (int)$academicData['total_reviews'];
+
+// Get last 5 orders for latest orders table
+$ordersStmt = $db->prepare("
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon, u.name AS student_name
+    FROM orders o
+    LEFT JOIN services s ON o.service_id = s.id
+    LEFT JOIN users u ON o.student_id = u.id
+    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'new')
+    ORDER BY o.created_at DESC
+    LIMIT 5
+");
+$ordersStmt->execute([$academicId]);
+$latestOrders = $ordersStmt->fetchAll();
+
+$latestOrdersJson = [];
+foreach ($latestOrders as $o) {
+    $latestOrdersJson[] = [
+        'id' => $o['order_number'],
+        'student' => $o['student_name'] ?? 'طالب غير معروف',
+        'service' => $o['service_name'] ?? 'خدمة عامة',
+        'package' => 'الباقة',
+        'amount' => (float)$o['amount'],
+        'status' => $o['status'],
+        'deadline' => $o['deadline'] ? date('Y/m/d', strtotime($o['deadline'])) : '-'
+    ];
+}
+
+// Monthly earnings for the line chart (12 months of current year)
+$monthlyEarnings = array_fill(0, 12, 0.0);
+$earningsStmt = $db->prepare("
+    SELECT MONTH(p.paid_at) as m, SUM(p.academic_net) as total
+    FROM payments p
+    JOIN orders o ON p.order_id = o.id
+    WHERE o.academic_id = ? AND p.status = 'paid' AND YEAR(p.paid_at) = YEAR(NOW())
+    GROUP BY MONTH(p.paid_at)
+");
+$earningsStmt->execute([$academicId]);
+while ($row = $earningsStmt->fetch()) {
+    $mIndex = (int)$row['m'] - 1;
+    if ($mIndex >= 0 && $mIndex < 12) {
+        $monthlyEarnings[$mIndex] = (float)$row['total'];
+    }
+}
+
+// Donut chart distribution (Completed, In Progress, New)
+$newCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'new'")->fetchColumn();
+$inProgressCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
+$completedCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'completed'")->fetchColumn();
+
+// Format date to Arabic readable
+$todayDateArabic = date('Y/m/d');
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
@@ -25,8 +106,8 @@
       <!-- Header -->
       <div class="page-header anim-up">
         <div>
-          <h1 class="page-title">مرحباً، د. محمد 👋</h1>
-          <p class="page-subtitle">إليك ملخص نشاطك اليوم — الاثنين 20 أبريل 2026</p>
+          <h1 class="page-title">مرحباً، <?= e($academicData['name']) ?> 👋</h1>
+          <p class="page-subtitle">إليك ملخص نشاطك اليوم — <?= $todayDateArabic ?></p>
         </div>
         <div style="display:flex;gap:10px">
           <a href="academic-orders.php" class="btn btn-primary">📋 الطلبات الجديدة</a>
@@ -37,27 +118,27 @@
       <div class="stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px">
         <div class="stat-card anim-up delay-1" style="border-top:3px solid #6366f1">
           <div class="stat-icon" style="background:rgba(99,102,241,.1)">📋</div>
-          <div class="stat-value" data-counter="5">0</div>
+          <div class="stat-value" data-counter="<?= $activeOrdersCount ?>">0</div>
           <div class="stat-label">طلبات جارية</div>
-          <div class="stat-trend trend-up">▲ 2 طلب جديد اليوم</div>
+          <div class="stat-trend trend-up">▲ نشط ومتابع</div>
         </div>
         <div class="stat-card anim-up delay-2" style="border-top:3px solid #10b981">
           <div class="stat-icon" style="background:rgba(16,185,129,.1)">✅</div>
-          <div class="stat-value" data-counter="231">0</div>
+          <div class="stat-value" data-counter="<?= $completedOrdersCount ?>">0</div>
           <div class="stat-label">طلبات مكتملة</div>
-          <div class="stat-trend trend-up">▲ 12% هذا الشهر</div>
+          <div class="stat-trend trend-up">▲ في المنصة</div>
         </div>
         <div class="stat-card anim-up delay-3" style="border-top:3px solid #f59e0b">
           <div class="stat-icon" style="background:rgba(245,158,11,.1)">💰</div>
-          <div class="stat-value" data-counter="14800" data-suffix=" ر.س">0</div>
+          <div class="stat-value" data-counter="<?= round($thisMonthEarnings) ?>" data-suffix=" ر.س">0</div>
           <div class="stat-label">أرباح هذا الشهر</div>
-          <div class="stat-trend trend-up">▲ 32% عن الشهر الماضي</div>
+          <div class="stat-trend trend-up">▲ صافي أرباحك</div>
         </div>
         <div class="stat-card anim-up delay-4" style="border-top:3px solid #f59e0b">
           <div class="stat-icon" style="background:rgba(245,158,11,.1)">⭐</div>
-          <div class="stat-value">4.9</div>
+          <div class="stat-value"><?= number_format($rating, 1) ?></div>
           <div class="stat-label">التقييم</div>
-          <div class="stat-trend trend-up">▲ من 128 تقييم</div>
+          <div class="stat-trend trend-up">▲ من <?= $reviewsCount ?> تقييم</div>
         </div>
       </div>
 
@@ -69,7 +150,6 @@
               <h3 class="chart-title">📈 الأرباح الشهرية</h3>
               <p style="font-size:13px;color:var(--text-secondary)">أرباح السنة الحالية</p>
             </div>
-            <div class="badge badge-success">+32% ↑</div>
           </div>
           <canvas id="earningsChart" style="width:100%;height:220px"></canvas>
         </div>
@@ -81,15 +161,15 @@
           <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">مكتملة</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">231</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $completedCount ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">جارية</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">5</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $inProgressCount ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center">
               <div style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block"></span><span style="font-size:13px;color:var(--text-secondary)">جديدة</span></div>
-              <span style="font-weight:700;color:var(--text-primary)">9</span>
+              <span style="font-weight:700;color:var(--text-primary)"><?= $newCount ?></span>
             </div>
           </div>
         </div>
@@ -149,8 +229,7 @@
             <div style="display:flex;flex-direction:column;gap:8px">
               <a href="academic-orders.php" class="btn btn-outline btn-sm" style="justify-content:flex-start;gap:10px">📋 عرض الطلبات الجديدة</a>
               <a href="academic-earnings.php" class="btn btn-outline btn-sm" style="justify-content:flex-start;gap:10px">💰 طلب سحب أرباح</a>
-              <a href="academic-profile.php" class="btn btn-outline btn-sm" style="justify-content:flex-start;gap:10px">👤 تعديل الملف</a>
-              <button onclick="Toast.show('تم تفعيل وضع الإجازة','warning')" class="btn btn-outline btn-sm" style="justify-content:flex-start;gap:10px">🏖 وضع الإجازة</button>
+              <a href="academic-settings.php" class="btn btn-outline btn-sm" style="justify-content:flex-start;gap:10px">👤 تعديل الملف</a>
             </div>
           </div>
         </div>
@@ -172,9 +251,17 @@
 
 <script src="assets/js/main.js"></script>
 <script>
+// Load dynamic dashboard values
+window.ACADEMICS_DATA.orders = <?= json_encode($latestOrdersJson, JSON_UNESCAPED_UNICODE) ?>;
+window.ACADEMICS_DATA.earnings.monthly = <?= json_encode($monthlyEarnings) ?>;
+
 function renderLatestOrders() {
   const tbody = document.getElementById('latestOrdersBody');
   if (!tbody) return;
+  if (ACADEMICS_DATA.orders.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-secondary)">📭 لا توجد طلبات حديثة</td></tr>';
+    return;
+  }
   tbody.innerHTML = ACADEMICS_DATA.orders.map((o, i) => `
     <tr>
       <td><a href="academic-orders.php" style="color:var(--primary);font-weight:700">${o.id}</a></td>
@@ -196,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLatestOrders();
   setTimeout(() => {
     Charts.drawLine('earningsChart', ACADEMICS_DATA.earnings.monthly, ACADEMICS_DATA.earnings.months, '#6366f1');
-    Charts.drawDonut('ordersDonut', [231, 5, 9], ['مكتملة','جارية','جديدة'], ['#10b981','#f59e0b','#3b82f6']);
+    Charts.drawDonut('ordersDonut', [<?= $completedCount ?>, <?= $inProgressCount ?>, <?= $newCount ?>], ['مكتملة','جارية','جديدة'], ['#10b981','#f59e0b','#3b82f6']);
   }, 200);
 });
 window.addEventListener('resize', () => {
@@ -205,4 +292,3 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 </html>
-

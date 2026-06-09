@@ -1,4 +1,60 @@
-﻿<!DOCTYPE html>
+<?php
+require_once __DIR__ . '/../config/auth.php';
+require_once __DIR__ . '/../config/functions.php';
+
+$db = db();
+
+// Fetch services
+$services = getAllServices(true);
+$servicesJson = [];
+foreach ($services as $s) {
+    $servicesJson[] = [
+        'id' => (int)$s['id'],
+        'name' => $s['name'],
+        'icon' => $s['icon'] ?? '🔬'
+    ];
+}
+
+// Fetch approved academics
+$acStmt = $db->query("SELECT * FROM academics WHERE status = 'approved' ORDER BY rating DESC");
+$acList = $acStmt->fetchAll();
+
+$acJson = [];
+$totalStudents = (int)$db->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn();
+$totalOrdersCompleted = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
+$totalAcademicsCount = count($acList);
+
+foreach ($acList as $ac) {
+    // Get services
+    $srvs = $db->query("SELECT service_id FROM academic_services WHERE academic_id = " . $ac['id'])->fetchAll(PDO::FETCH_COLUMN);
+
+    // Get completed orders
+    $completedCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = " . $ac['id'] . " AND status = 'completed'")->fetchColumn();
+
+    $acJson[] = [
+        'id' => (int)$ac['id'],
+        'name' => $ac['name'],
+        'avatar' => $ac['avatar_initials'] ?? mb_substr($ac['name'], 0, 2),
+        'specialty' => $ac['specialty'] ?? 'عام',
+        'degree' => $ac['degree'] ?? 'بكالوريوس',
+        'university' => $ac['university'] ?? 'جامعة تواصل',
+        'country' => 'السعودية',
+        'rating' => (float)$ac['rating'],
+        'reviews' => (int)$ac['total_reviews'],
+        'orders' => (int)$ac['total_orders'],
+        'completedOrders' => $completedCount,
+        'bio' => $ac['bio'] ?? '',
+        'services' => array_map('intval', $srvs),
+        'price' => (float)$ac['starting_price'],
+        'status' => $ac['status'],
+        'color' => '#6366f1',
+        'joined' => date('Y-m-d', strtotime($ac['created_at'])),
+        'phone' => $ac['phone'] ?? '',
+        'whatsapp' => $ac['phone'] ?? ''
+    ];
+}
+?>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
@@ -18,10 +74,16 @@
     <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
   </div>
   <nav style="display:flex;gap:6px;align-items:center">
-    <a href="#" class="btn btn-ghost btn-sm">الرئيسية</a>
     <a href="academics-list.php" class="btn btn-ghost btn-sm" style="color:var(--primary)">الأكاديميون</a>
-    <a href="#" class="btn btn-ghost btn-sm">الخدمات</a>
-    <a href="academic-register.php" class="btn btn-primary btn-sm">سجّل كأكاديمي</a>
+    <?php if (isLoggedIn()): ?>
+      <?php if (isset($_SESSION['academic_id'])): ?>
+        <a href="academic-dashboard.php" class="btn btn-primary btn-sm">لوحة التحكم الأكاديمي</a>
+      <?php else: ?>
+        <a href="../student/student-dashboard.php" class="btn btn-primary btn-sm">لوحة التحكم الطالب</a>
+      <?php endif; ?>
+    <?php else: ?>
+      <a href="../login.php" class="btn btn-primary btn-sm">تسجيل الدخول</a>
+    <?php endif; ?>
     <button class="nav-btn dark-toggle" title="الوضع الداكن" style="margin-right:8px">🌙</button>
   </nav>
 </header>
@@ -29,7 +91,7 @@
 <!-- ===== HERO SEARCH ===== -->
 <div class="search-hero">
   <h1>🎓 اكتشف خبراءك الأكاديميين</h1>
-  <p>أكثر من 86 أكاديمي متخصص في شتى المجالات العلمية</p>
+  <p>أكثر من <?= $totalAcademicsCount ?> أكاديمي متخصص في شتى المجالات العلمية</p>
   <div class="hero-search">
     <input type="search" id="heroSearch" placeholder="ابحث عن تخصص أو اسم أكاديمي..."/>
     <button onclick="filterAcademics()">🔍 بحث</button>
@@ -50,19 +112,19 @@
   <!-- Stats Strip -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
     <div class="card" style="padding:20px;text-align:center">
-      <div style="font-size:28px;font-weight:900;color:var(--primary)" data-counter="86">0</div>
+      <div style="font-size:28px;font-weight:900;color:var(--primary)" data-counter="<?= $totalAcademicsCount ?>">0</div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">أكاديمي متخصص</div>
     </div>
     <div class="card" style="padding:20px;text-align:center">
-      <div style="font-size:28px;font-weight:900;color:var(--success)" data-counter="1248">0</div>
+      <div style="font-size:28px;font-weight:900;color:var(--success)" data-counter="<?= $totalStudents ?>">0</div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">طالب مستفيد</div>
     </div>
     <div class="card" style="padding:20px;text-align:center">
-      <div style="font-size:28px;font-weight:900;color:var(--warning)" data-counter="342">0</div>
+      <div style="font-size:28px;font-weight:900;color:var(--warning)" data-counter="<?= $totalOrdersCompleted ?>">0</div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">طلب مكتمل</div>
     </div>
     <div class="card" style="padding:20px;text-align:center">
-      <div style="font-size:28px;font-weight:900;color:#f59e0b">4.8</div>
+      <div style="font-size:28px;font-weight:900;color:#f59e0b">4.9</div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">متوسط التقييم ⭐</div>
     </div>
   </div>
@@ -109,7 +171,7 @@
 
   <!-- Results count -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-    <p id="resultsCount" style="font-size:14px;color:var(--text-secondary)">عرض <strong>6</strong> أكاديمي</p>
+    <p id="resultsCount" style="font-size:14px;color:var(--text-secondary)">عرض <strong><?= count($acList) ?></strong> أكاديمي</p>
   </div>
 
   <!-- Academics Grid -->
@@ -141,6 +203,10 @@
 
 <script src="assets/js/main.js"></script>
 <script>
+// Feed database items into ACADEMICS_DATA
+window.ACADEMICS_DATA.services = <?= json_encode($servicesJson, JSON_UNESCAPED_UNICODE) ?>;
+window.ACADEMICS_DATA.academics = <?= json_encode($acJson, JSON_UNESCAPED_UNICODE) ?>;
+
 let currentView = 'grid';
 
 function renderAcademics(data) {
@@ -167,7 +233,7 @@ function renderAcademics(data) {
           <div style="font-size:17px;font-weight:800;color:var(--text-primary)">${a.name}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin:4px 0">📚 ${a.specialty} · 🎓 ${a.degree}</div>
           <div style="display:flex;align-items:center;gap:12px">
-            <span style="color:#f59e0b;font-weight:700">⭐ ${a.rating}</span>
+            <span style="color:#f59e0b;font-weight:700">⭐ ${a.rating.toFixed(1)}</span>
             <span style="color:var(--text-secondary);font-size:12px">(${a.reviews} تقييم)</span>
             <span class="badge badge-success">مقبول</span>
           </div>
@@ -201,7 +267,7 @@ function renderAcademics(data) {
         </div>
         <div class="academic-card-footer">
           <div>
-            <div class="star-rating">⭐ ${a.rating} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">(${a.reviews})</span></div>
+            <div class="star-rating">⭐ ${a.rating.toFixed(1)} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">(${a.reviews})</span></div>
             <div style="font-size:18px;font-weight:800;color:var(--primary);margin-top:2px">${a.price} <span style="font-size:12px;color:var(--text-secondary);font-weight:400">ر.س</span></div>
           </div>
           <a href="academic-profile.php?id=${a.id}" class="btn btn-primary btn-sm">عرض الملف ←</a>
@@ -262,4 +328,3 @@ document.addEventListener('DOMContentLoaded', () => filterAcademics());
 </script>
 </body>
 </html>
-
