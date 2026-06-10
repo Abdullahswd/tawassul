@@ -115,7 +115,7 @@ $services = getAllServices();
               <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:16px">
                 <div>
                   <div style="font-size:12px;color:var(--text-secondary)">تبدأ من</div>
-                  <div style="font-weight:800;color:var(--primary);font-size:18px">150 ر.س</div>
+              <div style="font-weight:800;color:var(--primary);font-size:18px">150 ر.س</div>
                 </div>
                 <a href="create-order.php?sid=<?= $s['id'] ?>" class="btn btn-primary">اطلب الآن</a>
               </div>

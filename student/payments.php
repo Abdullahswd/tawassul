@@ -6,6 +6,26 @@ requireStudent();
 $user = currentUser();
 $db = db();
 
+// Handle payment processing
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_now'])) {
+    $payment_id = (int)($_POST['payment_id'] ?? 0);
+    if ($payment_id) {
+        // Verify this payment belongs to student
+        $check = $db->prepare('SELECT id FROM payments WHERE id = ? AND student_id = ? AND status = ? LIMIT 1');
+        $check->execute([$payment_id, $user['id'], 'pending']);
+        if ($check->fetch()) {
+            $upd = $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = ?");
+            $upd->execute([$payment_id]);
+            // Notify admin
+            createNotification(1, 'admin', 'دفع جديد ✅', 'قام الطالب ' . $user['name'] . ' بإتمام عملية الدفع.', '💳', '');
+        }
+    }
+    header('Location: payments.php?paid=1');
+    exit;
+}
+
+$paid_success = isset($_GET['paid']);
+
 // Fetch summary metrics
 $total_paid = (float) $db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = " . $user['id'] . " AND status = 'paid'")->fetchColumn();
 $total_pending = (float) $db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = " . $user['id'] . " AND status = 'pending'")->fetchColumn();
@@ -103,6 +123,12 @@ $payments = getPaymentsByStudent($user['id']);
       <!-- Page Content -->
       <div class="content-wrap" style="max-width:1100px;margin:0 auto">
         
+        <?php if ($paid_success): ?>
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;color:#16a34a;padding:16px 20px;border-radius:12px;margin-bottom:24px;font-weight:700;display:flex;align-items:center;gap:12px">
+            ✅ تم إتمام عملية الدفع بنجاح! شكراً لك.
+          </div>
+        <?php endif; ?>
+
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px">
           <div>
             <h1 class="h1" style="margin-bottom:8px">الفواتير والمدفوعات</h1>
@@ -165,7 +191,12 @@ $payments = getPaymentsByStudent($user['id']);
                       </td>
                       <td style="padding:16px 24px; border-bottom:1px solid var(--border-color)">
                         <?php if ($p['status'] === 'pending'): ?>
-                          <button class="btn btn-primary" style="padding:6px 12px;font-size:12px" onclick="alert('محاكاة بوابة الدفع: تم الدفع بنجاح!'); window.location.reload();">الدفع الآن</button>
+                          <form method="POST" action="payments.php" style="display:inline">
+                            <input type="hidden" name="pay_now" value="1">
+                            <input type="hidden" name="payment_id" value="<?= $p['id'] ?>">
+                            <button type="submit" class="btn btn-primary" style="padding:6px 12px;font-size:12px"
+                              onclick="return confirm('هل تريد تأكيد عملية الدفع بمبلغ <?= formatMoney($p['amount']) ?>؟')">💳 الدفع الآن</button>
+                          </form>
                         <?php else: ?>
                           <button class="btn btn-outline" style="padding:6px 12px;font-size:12px" onclick="window.print()">الفاتورة ⬇</button>
                         <?php endif; ?>
