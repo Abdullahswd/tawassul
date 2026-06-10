@@ -46,6 +46,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (path.includes('create-order.html')) initCreateOrder();
 });
 
+// Force reload if page is served from Back-Forward Cache (BFCache)
+window.onpageshow = function(event) {
+  if (event.persisted) {
+    window.location.reload();
+  }
+};
+
 /* =======================================
    Layout & Components
    ======================================= */

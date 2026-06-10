@@ -230,6 +230,9 @@ if ($action === 'update_profile') {
     $bio = trim($_POST['bio'] ?? '');
     $availability = trim($_POST['availability'] ?? 'available');
     $startingPrice = floatval($_POST['starting_price'] ?? 0);
+    $iban = trim($_POST['iban'] ?? '');
+    $bankName = trim($_POST['bank_name'] ?? '');
+    $accountName = trim($_POST['account_name'] ?? '');
     $services = $_POST['services'] ?? []; // Array of services
 
     if (!$name || !$email || !$phone) {
@@ -248,9 +251,9 @@ if ($action === 'update_profile') {
 
         // Update academic details
         $stmt = $db->prepare(
-            "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?, starting_price = ? WHERE id = ?"
+            "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?, starting_price = ?, iban = ?, bank_name = ?, account_name = ? WHERE id = ?"
         );
-        $stmt->execute([$name, $email, $phone, $bio, $availability, $startingPrice, $academicId]);
+        $stmt->execute([$name, $email, $phone, $bio, $availability, $startingPrice, $iban, $bankName, $accountName, $academicId]);
 
         // Sync Services
         $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
@@ -455,6 +458,103 @@ if ($action === 'mark_notifications_read') {
         sendJSONResponse(true, 'تم تعليم الإشعارات كمقروءة.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل تحديث الإشعارات.');
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 8. SEND MESSAGE (CHAT)
+// ─────────────────────────────────────────────────────────────
+if ($action === 'send_message') {
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $content = trim($_POST['content'] ?? '');
+
+    if ($orderId <= 0 || !$content) {
+        sendJSONResponse(false, 'معلومات غير مكتملة.');
+    }
+
+    try {
+        $db = db();
+        
+        // Ensure academic owns the order
+        $orderStmt = $db->prepare("SELECT id, student_id FROM orders WHERE id = ? AND academic_id = ?");
+        $orderStmt->execute([$orderId, $academicId]);
+        $order = $orderStmt->fetch();
+
+        if (!$order) {
+            sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
+        }
+
+        // Get or Create Conversation
+        $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ?");
+        $convStmt->execute([$orderId]);
+        $conversationId = $convStmt->fetchColumn();
+
+        if (!$conversationId) {
+            $db->prepare("INSERT INTO conversations (order_id, student_id, academic_id) VALUES (?, ?, ?)")
+               ->execute([$orderId, $order['student_id'], $academicId]);
+            $conversationId = (int)$db->lastInsertId();
+        }
+
+        // Insert Message
+        $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content) VALUES (?, ?, 'academic', ?)")
+           ->execute([$conversationId, $academicId, $content]);
+
+        // Send notification to student
+        createNotification(
+            $order['student_id'],
+            'student',
+            'رسالة جديدة من الأكاديمي',
+            'أرسل الأكاديمي رسالة جديدة بخصوص طلبك',
+            '💬',
+            'student/order-details.php?id=' . $orderId
+        );
+
+        sendJSONResponse(true, 'تم الإرسال بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'حدث خطأ: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 9. UPLOAD ATTACHMENT
+// ─────────────────────────────────────────────────────────────
+if ($action === 'upload_attachment') {
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $file = $_FILES['file'] ?? null;
+
+    if ($orderId <= 0 || !$file || $file['error'] !== UPLOAD_ERR_OK) {
+        sendJSONResponse(false, 'يرجى اختيار ملف صحيح.');
+    }
+
+    try {
+        $db = db();
+        
+        // Ensure academic owns the order
+        $orderStmt = $db->prepare("SELECT id FROM orders WHERE id = ? AND academic_id = ?");
+        $orderStmt->execute([$orderId, $academicId]);
+        if (!$orderStmt->fetch()) {
+            sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
+        }
+
+        $uploadDir = __DIR__ . '/../../uploads/orders/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+
+        $fileName = basename($file['name']);
+        $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . '_' . preg_replace('/[^a-zA-Z0-9.\-_]/', '', $fileName);
+        $filePath = $uploadDir . $uniqueName;
+
+        if (move_uploaded_file($file['tmp_name'], $filePath)) {
+            $db->prepare("INSERT INTO order_attachments (order_id, file_name, file_path, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, 'academic')")
+               ->execute([$orderId, $fileName, 'uploads/orders/' . $uniqueName, $file['type'], $file['size']]);
+            
+            sendJSONResponse(true, 'تم الرفع بنجاح.');
+        } else {
+            sendJSONResponse(false, 'فشل في حفظ الملف.');
+        }
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'حدث خطأ: ' . $e->getMessage());
     }
 }
 

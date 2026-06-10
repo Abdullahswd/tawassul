@@ -192,7 +192,7 @@ function renderOrders(data) {
       <td style="color:${o.status !== 'completed' ? '#ef4444' : 'var(--text-secondary)'};font-size:13px">📅 ${o.deadline}</td>
       <td>
         <div style="display:flex;gap:5px">
-          <button class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none" title="عرض التفاصيل" onclick="viewOrder('${o.id}')">👁</button>
+          <a href="academic-order-details.php?id=${o.id}" class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none;text-decoration:none;display:flex;align-items:center;justify-content:center" title="عرض التفاصيل">👁</a>
           ${o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
           ${o.status === 'in_progress' || o.status === 'accepted' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
           ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,.1);color:#ef4444;border:none" title="إلغاء" onclick="cancelOrder('${o.id}')">✕</button>` : ''}

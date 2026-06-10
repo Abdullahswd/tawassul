@@ -563,6 +563,13 @@ document.addEventListener('DOMContentLoaded', () => {
   initFileUploads();
 });
 
+// Force reload if page is served from Back-Forward Cache (BFCache)
+window.onpageshow = function(event) {
+  if (event.persisted) {
+    window.location.reload();
+  }
+};
+
 // Export globals — window.ACADEMICS_DATA is now the single source of truth;
 // PHP pages inject real data via window.ACADEMICS_DATA.X = [...] AFTER this line
 window.ACADEMICS_DATA        = ACADEMICS_DATA;

@@ -87,8 +87,8 @@ if ($currentAcademicId) {
       </div>
       <div class="dropdown-menu" style="right:0;left:auto;min-width:200px">
         <div style="padding:8px">
-          <a href="academic-profile.php?id=<?= $currentAcademicId ?>" class="dropdown-item" style="border-radius:8px">👤 ملفي الشخصي</a>
-          <a href="academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات</a>
+          <a href="academic-profile.php?id=<?= $currentAcademicId ?>" target="_blank" class="dropdown-item" style="border-radius:8px">👤 عرض ملفي للطلاب</a>
+          <a href="academic-settings.php" class="dropdown-item" style="border-radius:8px">⚙️ الإعدادات وملفي الشخصي</a>
           <a href="academic-earnings.php" class="dropdown-item" style="border-radius:8px">💰 الأرباح</a>
           <div class="dropdown-divider"></div>
           <a href="academics-list.php" class="dropdown-item" style="border-radius:8px">🌐 المنصة</a>

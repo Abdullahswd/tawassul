@@ -82,9 +82,9 @@ if ($currentAcademicId) {
       <span class="nav-text">الإعدادات</span>
     </a>
 
-    <a href="academic-profile.php" class="nav-item" id="nav-profile">
+    <a href="academic-profile.php?id=<?= $currentAcademicId ?>" target="_blank" class="nav-item" id="nav-profile">
       <span class="nav-icon">👤</span>
-      <span class="nav-text">ملفي الشخصي</span>
+      <span class="nav-text">عرض ملفي للطلاب</span>
     </a>
 
   </nav>
@@ -95,8 +95,8 @@ if ($currentAcademicId) {
       <span class="nav-icon">🌐</span>
       <span class="nav-text">العودة للمنصة</span>
     </a>
-    <a href="#" class="nav-item" onclick="Toast?.show('تم تسجيل الخروج','info')">
-      <span class="nav-icon">🚪</span>
+    <a href="../logout.php" class="nav-item" style="color:var(--danger)">
+      <div class="nav-icon" style="background:rgba(239,68,68,0.1);color:#ef4444">🚪</div>
       <span class="nav-text">تسجيل الخروج</span>
     </a>
   </div>

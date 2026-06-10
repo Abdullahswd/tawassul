@@ -84,7 +84,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
         <div>
 
           <!-- Profile section -->
-          <div id="sec-profile" class="s-section anim-up delay-2">
+          <div id="sec-profile" class="s-section">
             <div class="card" style="padding:26px;margin-bottom:18px">
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">👤 البيانات الشخصية</h3>
 
@@ -259,20 +259,27 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
               <div class="alert alert-info" style="margin-bottom:18px"><span>ℹ️</span><span>يُستخدم IBAN لاستقبال الأرباح عبر التحويل البنكي</span></div>
               <div class="form-group">
                 <label class="form-label">رقم الحساب البنكي (IBAN)</label>
-                <input class="form-input" value="SA00 0000 0000 0000 0000 0000" dir="ltr" style="letter-spacing:1px"/>
+                <input class="form-input" id="settingsIban" value="<?= e($academicData['iban'] ?? '') ?>" dir="ltr" style="letter-spacing:1px" placeholder="SA00 0000 0000 0000 0000 0000"/>
               </div>
               <div class="form-group">
                 <label class="form-label">اسم البنك</label>
-                <select class="form-input form-select" style="padding-left:36px">
-                  <option>بنك الراجحي</option>
-                  <option selected>البنك الأهلي</option>
-                  <option>بنك الرياض</option>
-                  <option>بنك البلاد</option>
+                <select class="form-input form-select" id="settingsBankName" style="padding-left:36px">
+                  <option value="">اختر البنك</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك الراجحي' ? 'selected' : '' ?>>بنك الراجحي</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'البنك الأهلي' ? 'selected' : '' ?>>البنك الأهلي</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك الرياض' ? 'selected' : '' ?>>بنك الرياض</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك البلاد' ? 'selected' : '' ?>>بنك البلاد</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك الإنماء' ? 'selected' : '' ?>>بنك الإنماء</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'البنك الأول' ? 'selected' : '' ?>>البنك الأول</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك الجزيرة' ? 'selected' : '' ?>>بنك الجزيرة</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك ساب' ? 'selected' : '' ?>>بنك ساب</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'بنك الاستثمار' ? 'selected' : '' ?>>بنك الاستثمار</option>
+                  <option <?= ($academicData['bank_name'] ?? '') === 'البنك الفرنسي' ? 'selected' : '' ?>>البنك الفرنسي</option>
                 </select>
               </div>
               <div class="form-group">
                 <label class="form-label">اسم صاحب الحساب (كما في البنك)</label>
-                <input class="form-input" value="<?= e($academicName) ?>" dir="ltr"/>
+                <input class="form-input" id="settingsAccountName" value="<?= e($academicData['account_name'] ?? '') ?>" dir="ltr"/>
               </div>
             </div>
           </div>
@@ -340,6 +347,9 @@ function saveSettings() {
   formData.append('bio', document.getElementById('settingsBio').value);
   formData.append('availability', document.getElementById('settingsAvailability').checked ? 'available' : 'busy');
   formData.append('starting_price', document.getElementById('settingsPrice').value);
+  formData.append('iban', document.getElementById('settingsIban').value);
+  formData.append('bank_name', document.getElementById('settingsBankName').value);
+  formData.append('account_name', document.getElementById('settingsAccountName').value);
 
   // Selected services checkboxes
   const checkboxes = document.querySelectorAll('#servicesEditGrid input[type=checkbox]');
