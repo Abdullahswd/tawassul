@@ -28,17 +28,16 @@ $thisMonthEarnings = (float)$db->query("
 $rating = (float)$academicData['rating'];
 $reviewsCount = (int)$academicData['total_reviews'];
 
-// Get last 5 orders for latest orders table
 $ordersStmt = $db->prepare("
     SELECT o.*, s.name AS service_name, s.icon AS service_icon, u.name AS student_name
     FROM orders o
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN users u ON o.student_id = u.id
-    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'new')
+    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'assigned' AND o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?))
     ORDER BY o.created_at DESC
     LIMIT 5
 ");
-$ordersStmt->execute([$academicId]);
+$ordersStmt->execute([$academicId, $academicId]);
 $latestOrders = $ordersStmt->fetchAll();
 
 $latestOrdersJson = [];
@@ -72,7 +71,7 @@ while ($row = $earningsStmt->fetch()) {
 }
 
 // Donut chart distribution (Completed, In Progress, New)
-$newCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'new'")->fetchColumn();
+$newCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'assigned' AND id IN (SELECT order_id FROM order_assignments WHERE academic_id = $academicId)")->fetchColumn();
 $inProgressCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
 $completedCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'completed'")->fetchColumn();
 

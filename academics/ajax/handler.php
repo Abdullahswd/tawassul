@@ -182,19 +182,49 @@ if ($action === 'update_order_status') {
         sendJSONResponse(false, 'بيانات غير مكتملة.');
     }
 
-    // Check ownership
+    // Check ownership or assignment
     $db = db();
-    $stmt = $db->prepare("SELECT id, student_id FROM orders WHERE id = ? AND academic_id = ?");
-    $stmt->execute([$orderId, $academicId]);
+    $stmt = $db->prepare("SELECT id, student_id, academic_id, status FROM orders WHERE id = ?");
+    $stmt->execute([$orderId]);
     $order = $stmt->fetch();
 
     if (!$order) {
-        sendJSONResponse(false, 'الطلب غير موجود أو غير مرتبط بحسابك.');
+        sendJSONResponse(false, 'الطلب غير موجود.');
+    }
+
+    $is_authorized = false;
+    if ($order['academic_id'] == $academicId) {
+        $is_authorized = true;
+    } elseif ($order['academic_id'] === null && $order['status'] === 'assigned') {
+        // Check if academic is assigned in order_assignments table
+        $assignStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND academic_id = ?");
+        $assignStmt->execute([$orderId, $academicId]);
+        if ($assignStmt->fetchColumn() > 0) {
+            $is_authorized = true;
+        }
+    }
+
+    if (!$is_authorized) {
+        sendJSONResponse(false, 'غير مصرح: الطلب غير موجود أو غير مرتبط بحسابك.');
     }
 
     try {
-        $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
-        $updateStmt->execute([$status, $orderId]);
+        if ($status === 'accepted') {
+            $updateStmt = $db->prepare("UPDATE orders SET status = ?, academic_id = ? WHERE id = ?");
+            $updateStmt->execute([$status, $academicId, $orderId]);
+            
+            // Add net amount to academic's balance if payment is paid
+            $payStmt = $db->prepare("SELECT academic_net, status FROM payments WHERE order_id = ? LIMIT 1");
+            $payStmt->execute([$orderId]);
+            $payment = $payStmt->fetch();
+            if ($payment && $payment['status'] === 'paid') {
+                $db->prepare("UPDATE academics SET balance = balance + ?, total_orders = total_orders + 1 WHERE id = ?")
+                   ->execute([$payment['academic_net'], $academicId]);
+            }
+        } else {
+            $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
+            $updateStmt->execute([$status, $orderId]);
+        }
 
         // Send notification to student
         $statusLabels = [
@@ -393,13 +423,12 @@ if ($action === 'create_order') {
             'INSERT INTO orders
                (order_number, student_id, academic_id, service_id, package_id, specialty,
                 academic_level, language, description, deadline, amount, status, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "new", NOW())'
+             VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
         );
         
         $stmt->execute([
             $number,
             $studentId,
-            $academicTargetId,
             $serviceId,
             $packageId,
             'عام',
@@ -429,21 +458,17 @@ if ($action === 'create_order') {
             $net
         ]);
 
-        // Add amount to academic's balance
-        $db->prepare("UPDATE academics SET balance = balance + ?, total_orders = total_orders + 1 WHERE id = ?")
-           ->execute([$net, $academicTargetId]);
-
-        // Send notification to academic
+        // Send notification to admin (user ID 1)
         createNotification(
-            $academicTargetId,
-            'academic',
-            'طلب خدمة جديد #' . $number,
-            'وصلك طلب جديد للخدمة بقيمة ' . $amount . ' ر.س. يرجى مراجعته وقبوله لبدء العمل.',
+            1,
+            'admin',
+            'طلب جديد بانتظار التعيين 📋',
+            'تم إنشاء طلب جديد برقم ' . $number . ' وهو بانتظار التعيين للأكاديميين.',
             '📋',
-            'academics/academic-orders.php'
+            'admin/pages/order-details.php?id=' . $number
         );
 
-        sendJSONResponse(true, 'تم إرسال الطلب ودفع الرسوم بنجاح! تم تنبيه الأكاديمي للبدء بالعمل.');
+        sendJSONResponse(true, 'تم تقديم الطلب ودفع الرسوم بنجاح! تم تحويل الطلب للإدارة لتعيين الأكاديمي المناسب.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل إرسال الطلب: ' . $e->getMessage());
     }

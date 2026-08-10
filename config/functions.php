@@ -118,7 +118,7 @@ function createOrder(array $data): int {
         'INSERT INTO orders
            (order_number, student_id, service_id, package_id, specialty,
             academic_level, language, description, deadline, amount, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,"new")'
+         VALUES (?,?,?,?,?,?,?,?,?,?,"pending_assignment")'
     );
     $stmt->execute([
         $number,
@@ -342,7 +342,7 @@ function getAdminDashboardStats(): array {
         'total_orders'    => (int) $pdo->query("SELECT COUNT(*) FROM orders")->fetchColumn(),
         'total_revenue'   => (float) $pdo->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status='paid'")->fetchColumn(),
         'pending_academics' => (int) $pdo->query("SELECT COUNT(*) FROM academics WHERE status='pending'")->fetchColumn(),
-        'new_orders'      => (int) $pdo->query("SELECT COUNT(*) FROM orders WHERE status='new'")->fetchColumn(),
+        'new_orders'      => (int) $pdo->query("SELECT COUNT(*) FROM orders WHERE status IN ('new', 'pending_assignment')")->fetchColumn(),
     ];
 }
 
@@ -377,6 +377,8 @@ function formatMoney(float $amount): string {
  */
 function orderStatusLabel(string $status): array {
     return match($status) {
+        'pending_assignment' => ['label' => 'بانتظار تعيين الإدارة', 'class' => 'badge-info'],
+        'assigned'           => ['label' => 'أُرسل إلى الأكاديمي', 'class' => 'badge-primary'],
         'new'         => ['label' => 'جديد',         'class' => 'badge-info'],
         'accepted'    => ['label' => 'مقبول',         'class' => 'badge-primary'],
         'in_progress' => ['label' => 'قيد التنفيذ',   'class' => 'badge-warning'],

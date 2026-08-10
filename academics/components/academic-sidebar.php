@@ -24,7 +24,7 @@ if ($academicAvailability === 'busy') {
 
 $newOrdersCount = 0;
 if ($currentAcademicId) {
-    $newOrdersCount = (int)db()->query("SELECT COUNT(*) FROM orders WHERE academic_id = $currentAcademicId AND status = 'new'")->fetchColumn();
+    $newOrdersCount = (int)db()->query("SELECT COUNT(*) FROM orders WHERE status = 'assigned' AND id IN (SELECT order_id FROM order_assignments WHERE academic_id = $currentAcademicId)")->fetchColumn();
 }
 ?>
 <!--

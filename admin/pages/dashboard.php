@@ -32,7 +32,7 @@ $top_academics = $top_academics_stmt->fetchAll();
 // Fetch donut distribution
 $donut_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
 $donut_inprogress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
-$donut_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+$donut_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('new', 'pending_assignment', 'assigned')")->fetchColumn();
 
 // Fetch monthly chart stats (default orders count & revenue by month)
 $current_year = date('Y');

@@ -20,9 +20,9 @@ $stmt = $db->prepare("
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN packages p ON o.package_id = p.id
     LEFT JOIN users u ON o.student_id = u.id
-    WHERE o.order_number = ? AND (o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'new'))
+    WHERE o.order_number = ? AND (o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'assigned' AND o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?)))
 ");
-$stmt->execute([$orderNumber, $academicId]);
+$stmt->execute([$orderNumber, $academicId, $academicId]);
 $order = $stmt->fetch();
 
 if (!$order) {

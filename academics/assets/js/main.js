@@ -43,7 +43,11 @@ function getAvatarColor(i) {
 function getStatusBadge(status) {
   const map = {
     new: '<span class="badge badge-info">★ جديد</span>',
+    pending_assignment: '<span class="badge badge-warning" style="background:rgba(245,158,11,.15);color:#d97706;border-color:rgba(245,158,11,.3)">⏳ بانتظار تعيين الإدارة</span>',
+    assigned: '<span class="badge badge-primary" style="background:rgba(99,102,241,.15);color:#6366f1;border-color:rgba(99,102,241,.3)">→ مسند إليك</span>',
+    accepted: '<span class="badge badge-success" style="background:rgba(16,185,129,.15);color:#059669;border-color:rgba(16,185,129,.3)">✓ مقبول</span>',
     in_progress: '<span class="badge badge-warning">⟳ قيد التنفيذ</span>',
+    revision: '<span class="badge badge-secondary">✍ تحت المراجعة</span>',
     completed: '<span class="badge badge-success">✓ مكتمل</span>',
     cancelled: '<span class="badge badge-danger">✗ ملغي</span>',
     approved: '<span class="badge badge-success">✓ مقبول</span>',

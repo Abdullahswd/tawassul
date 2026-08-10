@@ -35,7 +35,7 @@ if (!$order) {
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
     $new_status = $_POST['status'] ?? '';
-    if (in_array($new_status, ['new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled'])) {
+    if (in_array($new_status, ['pending_assignment', 'assigned', 'new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled'])) {
         updateOrderStatus($order['id'], $new_status);
         
         // Add a notification for the student
@@ -52,6 +52,79 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 }
+
+// Handle assignment updates
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'assign_academics') {
+    $academic_ids = $_POST['academic_ids'] ?? [];
+    
+    $db->beginTransaction();
+    try {
+        // Clear previous assignments
+        $del = $db->prepare("DELETE FROM order_assignments WHERE order_id = ?");
+        $del->execute([$order['id']]);
+        
+        if (!empty($academic_ids)) {
+            $ins = $db->prepare("INSERT INTO order_assignments (order_id, academic_id) VALUES (?, ?)");
+            foreach ($academic_ids as $ac_id) {
+                $ins->execute([$order['id'], $ac_id]);
+                
+                // Notify academic
+                createNotification(
+                    $ac_id,
+                    'academic',
+                    'تم إسناد طلب جديد إليك 📋',
+                    'قامت الإدارة بإسناد الطلب #' . $order['order_number'] . ' إليك. يرجى مراجعته وقبوله لبدء العمل.',
+                    '📋',
+                    'academics/academic-orders.php'
+                );
+            }
+            
+            // Set status to assigned
+            $upd = $db->prepare("UPDATE orders SET status = 'assigned' WHERE id = ?");
+            $upd->execute([$order['id']]);
+            
+            // Notify student
+            createNotification(
+                $order['student_id'],
+                'student',
+                'تحديث حالة الطلب 🔔',
+                'تم تحويل طلبك #' . $order['order_number'] . ' إلى الأكاديميين المتخصصين للمراجعة والقبول.',
+                '🔔',
+                'student/order-details.php?id=' . $order['id']
+            );
+        } else {
+            // Revert status to pending_assignment
+            $upd = $db->prepare("UPDATE orders SET status = 'pending_assignment' WHERE id = ?");
+            $upd->execute([$order['id']]);
+        }
+        
+        $db->commit();
+        header('Location: order-details.php?id=' . $order['order_number'] . '&updated=1');
+        exit;
+    } catch (Exception $e) {
+        $db->rollBack();
+        $error = "حدث خطأ أثناء حفظ الإسناد: " . $e->getMessage();
+    }
+}
+
+// Fetch approved academics belonging to the same specialty
+$orderSpecialty = $order['specialty'];
+$academics_stmt = $db->prepare("
+    SELECT * FROM academics 
+    WHERE status = 'approved' AND (specialty LIKE ? OR ? LIKE CONCAT('%', specialty, '%'))
+");
+$academics_stmt->execute(['%' . $orderSpecialty . '%', $orderSpecialty]);
+$matching_academics = $academics_stmt->fetchAll();
+
+// Fallback if no matching academics found
+if (empty($matching_academics)) {
+    $matching_academics = $db->query("SELECT * FROM academics WHERE status = 'approved'")->fetchAll();
+}
+
+// Fetch currently assigned academics for this order
+$assigned_stmt = $db->prepare("SELECT academic_id FROM order_assignments WHERE order_id = ?");
+$assigned_stmt->execute([$order['id']]);
+$assigned_academic_ids = $assigned_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 $badge = orderStatusLabel($order['status']);
 
@@ -190,7 +263,7 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                 <div>
                   <div style="font-size:15px;font-weight:700;color:var(--text-primary)"><?= e($order['academic_name']) ?></div>
                   <div style="font-size:12px;color:var(--text-secondary)"><?= e($order['academic_email']) ?></div>
-                  <div style="font-size:12px;color:#f59e0b;font-weight:600">⭐ <?= parseFloat($order['academic_rating'])->toFixed(1) ?> تقييم</div>
+                  <div style="font-size:12px;color:#f59e0b;font-weight:600">⭐ <?= number_format((float)$order['academic_rating'], 1) ?> تقييم</div>
                 </div>
               </div>
               <div style="background:var(--bg-main);padding:10px;border-radius:10px;margin-bottom:8px">
@@ -198,7 +271,33 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                 <div style="font-size:13px;font-weight:600;color:var(--text-primary)"><?= e($order['academic_specialty']) ?></div>
               </div>
             <?php else: ?>
-              <p style="font-size:13px;color:var(--text-secondary)">لم يتم تعيين أكاديمي لهذا الطلب بعد.</p>
+              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">لم يتم قبول الطلب من أكاديمي بعد.</p>
+              
+              <!-- إسناد الطلب للأكاديميين المرشحين -->
+              <div style="border-top:1px dashed var(--border-color);padding-top:16px">
+                <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px">📋 إسناد الطلب لأكاديمي أو أكثر</h4>
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">تخصص الطلب: <strong style="color:var(--primary)"><?= e($order['specialty']) ?></strong></p>
+                <form method="POST" action="order-details.php?id=<?= e($order['order_number']) ?>">
+                  <input type="hidden" name="action" value="assign_academics">
+                  <div style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;padding-left:4px">
+                    <?php if (empty($matching_academics)): ?>
+                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون نشطون حالياً.</p>
+                    <?php else: ?>
+                      <?php foreach ($matching_academics as $ac): ?>
+                        <?php $checked = in_array($ac['id'], $assigned_academic_ids) ? 'checked' : ''; ?>
+                        <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-main);border-radius:8px;cursor:pointer;font-size:13px">
+                          <input type="checkbox" name="academic_ids[]" value="<?= $ac['id'] ?>" <?= $checked ?> style="width:16px;height:16px;accent-color:var(--primary)" />
+                          <div style="flex:1">
+                            <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
+                            <span style="font-size:10px;color:var(--text-secondary);display:block"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?></span>
+                          </div>
+                        </label>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </div>
+                  <button type="submit" class="btn btn-primary btn-block btn-sm" style="justify-content:center;width:100%">💾 حفظ وإرسال الإسناد</button>
+                </form>
+              </div>
             <?php endif; ?>
           </div>
 
@@ -208,6 +307,7 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
             <form method="POST" action="order-details.php?id=<?= e($order['order_number']) ?>">
               <input type="hidden" name="action" value="update_status">
               <div style="display:flex;flex-direction:column;gap:8px">
+                <button type="submit" name="status" value="pending_assignment" class="btn btn-info" style="justify-content:center;background:#6366f1">⏳ بانتظار التعيين</button>
                 <button type="submit" name="status" value="new" class="btn btn-info" style="justify-content:center">⭐ طلب جديد</button>
                 <button type="submit" name="status" value="in_progress" class="btn btn-warning" style="justify-content:center">⟳ قيد التنفيذ</button>
                 <button type="submit" name="status" value="completed" class="btn btn-success" style="justify-content:center">✓ مكتمل</button>

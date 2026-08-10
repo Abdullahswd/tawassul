@@ -19,7 +19,7 @@ $orders = $orders_stmt->fetchAll();
 
 // Count stats
 $cnt_all = count($orders);
-$cnt_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+$cnt_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('new', 'pending_assignment', 'assigned')")->fetchColumn();
 $cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
 $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
 ?>
@@ -75,7 +75,9 @@ $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'c
           <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="orderSearch" placeholder="بحث برقم أو اسم..." /></div>
           <select class="form-input form-select" id="orderStatusFilter" style="width:auto;padding-left:32px;font-size:14px">
             <option value="">جميع الحالات</option>
-            <option value="new">جديد</option>
+            <option value="pending_assignment">بانتظار تعيين الإدارة</option>
+            <option value="assigned">أُرسل إلى الأكاديمي</option>
+            <option value="new">جديد (قيد المراجعة)</option>
             <option value="in_progress">قيد التنفيذ</option>
             <option value="completed">مكتمل</option>
           </select>
@@ -183,7 +185,9 @@ function applyFilters() {
   const filtered = MOCK_DATA.orders.filter(o => {
     const matchQ = !q || o.id.toLowerCase().includes(q) || o.student.toLowerCase().includes(q) || o.academic.toLowerCase().includes(q);
     let matchSt = !st || o.status === st;
-    if (st === 'in_progress') {
+    if (st === 'new') {
+       matchSt = ['new', 'pending_assignment', 'assigned'].includes(o.status);
+    } else if (st === 'in_progress') {
        matchSt = ['accepted', 'in_progress', 'revision'].includes(o.status);
     }
     const matchSv = !sv || o.service.includes(sv);

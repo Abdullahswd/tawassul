@@ -14,10 +14,10 @@ $ordersStmt = $db->prepare("
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN packages p ON o.package_id = p.id
     LEFT JOIN users u ON o.student_id = u.id
-    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'new')
+    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'assigned' AND o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?))
     ORDER BY o.created_at DESC
 ");
-$ordersStmt->execute([$currentAcademicId]);
+$ordersStmt->execute([$currentAcademicId, $currentAcademicId]);
 $orders = $ordersStmt->fetchAll();
 
 // Map orders to JS array
@@ -42,7 +42,7 @@ $newCount = 0;
 $inProgressCount = 0;
 $completedCount = 0;
 foreach ($ordersJson as $o) {
-    if ($o['status'] === 'new') $newCount++;
+    if (in_array($o['status'], ['new', 'assigned'])) $newCount++;
     elseif (in_array($o['status'], ['accepted', 'in_progress', 'revision'])) $inProgressCount++;
     elseif ($o['status'] === 'completed') $completedCount++;
 }
@@ -193,7 +193,7 @@ function renderOrders(data) {
       <td>
         <div style="display:flex;gap:5px">
           <a href="academic-order-details.php?id=${o.id}" class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none;text-decoration:none;display:flex;align-items:center;justify-content:center" title="عرض التفاصيل">👁</a>
-          ${o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
+          ${o.status === 'assigned' || o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
           ${o.status === 'in_progress' || o.status === 'accepted' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
           ${o.status !== 'completed' && o.status !== 'cancelled' ? `<button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,.1);color:#ef4444;border:none" title="إلغاء" onclick="cancelOrder('${o.id}')">✕</button>` : ''}
         </div>
@@ -211,7 +211,7 @@ function filterOrders(statusOverride) {
   const st = document.getElementById('statusFilter').value;
   const filtered = ACADEMICS_DATA.orders.filter(o => {
     const matchQ = !q || o.id.toLowerCase().includes(q) || o.student.toLowerCase().includes(q);
-    const matchSt = !st || o.status === st || (st === 'in_progress' && o.status === 'accepted');
+    const matchSt = !st || o.status === st || (st === 'in_progress' && o.status === 'accepted') || (st === 'new' && o.status === 'assigned');
     return matchQ && matchSt;
   });
   renderOrders(filtered);

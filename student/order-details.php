@@ -247,13 +247,19 @@ $badge = orderStatusLabel($order['status']);
                   <div class="ti-desc">تم تسجيل طلبك بنجاح على المنصة.</div>
                   <div class="ti-date"><?= formatDate($order['created_at']) ?></div>
                 </div>
-                <div class="timeline-item <?= ($order['status'] !== 'new') ? 'done' : 'active' ?>">
-                  <div class="ti-title">الربط والتعيين</div>
+                <div class="timeline-item <?= in_array($order['status'], ['assigned', 'accepted', 'in_progress', 'revision', 'completed']) ? 'done' : (($order['status'] === 'pending_assignment') ? 'active' : '') ?>">
+                  <div class="ti-title">مراجعة الإدارة</div>
                   <div class="ti-desc">
-                    <?= $order['academic_id'] ? 'تم تعيين الأكاديمي وقبول العمل.' : 'جاري البحث عن أكاديمي متخصص للطلب.' ?>
+                    <?= ($order['status'] === 'pending_assignment') ? 'جاري مراجعة الطلب وتعيين الأكاديمي المناسب.' : 'تمت مراجعة الطلب من قِبل الإدارة.' ?>
                   </div>
                 </div>
-                <div class="timeline-item <?= in_array($order['status'], ['in_progress', 'revision', 'completed']) ? 'active' : '' ?>">
+                <div class="timeline-item <?= in_array($order['status'], ['accepted', 'in_progress', 'revision', 'completed']) ? 'done' : (($order['status'] === 'assigned') ? 'active' : '') ?>">
+                  <div class="ti-title">الربط والتعيين</div>
+                  <div class="ti-desc">
+                    <?= $order['academic_id'] ? 'تم تعيين الأكاديمي وقبول العمل.' : (($order['status'] === 'assigned') ? 'تم إرسال الطلب للأكاديمي، بانتظار القبول.' : 'جاري البحث عن أكاديمي متخصص.') ?>
+                  </div>
+                </div>
+                <div class="timeline-item <?= ($order['status'] === 'completed') ? 'done' : (in_array($order['status'], ['in_progress', 'revision']) ? 'active' : '') ?>">
                   <div class="ti-title">قيد التنفيذ</div>
                   <div class="ti-desc">يقوم الأكاديمي حالياً بالعمل على الملفات.</div>
                 </div>

@@ -55,7 +55,7 @@ function requireAdmin(): void {
  */
 function requireAcademic(): void {
     if (!isset($_SESSION['academic_id'])) {
-        header('Location: ' . rootUrl() . '/academics/academic-register.php');
+        header('Location: ' . rootUrl() . '/login.php');
         exit;
     }
 }

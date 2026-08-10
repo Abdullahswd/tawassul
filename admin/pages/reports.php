@@ -31,7 +31,7 @@ foreach ($orders_stmt->fetchAll() as $row) {
 // 2. Orders breakdown
 $cnt_completed = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
 $cnt_progress  = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
-$cnt_new       = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+$cnt_new       = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status IN ('new', 'pending_assignment', 'assigned')")->fetchColumn();
 $cnt_all       = max(1, $cnt_completed + $cnt_progress + $cnt_new);
 
 $pct_completed = round(($cnt_completed / $cnt_all) * 100);
