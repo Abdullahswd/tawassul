@@ -5,33 +5,87 @@ requireAdmin();
 
 $db = db();
 
-// Financial stats
-$total_revenue  = (float) $db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'paid'")->fetchColumn();
-$total_cnt      = (int)   $db->query("SELECT COUNT(*) FROM payments")->fetchColumn();
-$pending_amount = (float) $db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'pending'")->fetchColumn();
-$failed_amount  = (float) $db->query("SELECT COALESCE(SUM(amount),0) FROM payments WHERE status = 'failed'")->fetchColumn();
-$success_cnt    = (int)   $db->query("SELECT COUNT(*) FROM payments WHERE status = 'paid'")->fetchColumn();
-$failed_cnt     = (int)   $db->query("SELECT COUNT(*) FROM payments WHERE status = 'failed'")->fetchColumn();
+/* ─────────────────────────────
+   Financial stats (safe)
+───────────────────────────── */
 
-// Monthly revenue for chart
+$total_revenue = (float) $db->query("
+    SELECT COALESCE(SUM(amount),0)
+    FROM payments
+    WHERE status = 'paid'
+")->fetchColumn();
+
+$total_cnt = (int) $db->query("
+    SELECT COUNT(*) FROM payments
+")->fetchColumn();
+
+$pending_amount = (float) $db->query("
+    SELECT COALESCE(SUM(amount),0)
+    FROM payments
+    WHERE status = 'pending'
+")->fetchColumn();
+
+$failed_amount = (float) $db->query("
+    SELECT COALESCE(SUM(amount),0)
+    FROM payments
+    WHERE status = 'failed'
+")->fetchColumn();
+
+$success_cnt = (int) $db->query("
+    SELECT COUNT(*) FROM payments WHERE status = 'paid'
+")->fetchColumn();
+
+$failed_cnt = (int) $db->query("
+    SELECT COUNT(*) FROM payments WHERE status = 'failed'
+")->fetchColumn();
+
+
+/* ─────────────────────────────
+   Monthly revenue (FIXED for MySQL 8)
+───────────────────────────── */
+
 $months_ar = ['ينا', 'فبر', 'مار', 'أبر', 'ماي', 'يون', 'يول', 'أغس', 'سبت', 'أكت', 'نوف', 'ديس'];
+
 $rev_by_month = array_fill(0, 12, 0);
-$rev_stmt = $db->prepare("SELECT MONTH(paid_at)-1 AS m, SUM(amount) AS rev FROM payments WHERE YEAR(paid_at) = ? AND status = 'paid' GROUP BY MONTH(paid_at)");
+
+$rev_stmt = $db->prepare("
+    SELECT 
+        MONTH(paid_at) AS m,
+        SUM(amount) AS rev
+    FROM payments
+    WHERE YEAR(paid_at) = ?
+      AND status = 'paid'
+    GROUP BY MONTH(paid_at)
+    ORDER BY m
+");
+
 $rev_stmt->execute([date('Y')]);
+
 foreach ($rev_stmt->fetchAll() as $r) {
-    $rev_by_month[$r['m']] = (float)$r['rev'];
+    $rev_by_month[((int)$r['m']) - 1] = (float)$r['rev'];
 }
 
-// Payments table data
+
+/* ─────────────────────────────
+   Payments table (FIXED safer JOINs)
+───────────────────────────── */
+
 $payments_stmt = $db->query("
-    SELECT CONCAT('PAY-', LPAD(p.id,6,'0')) AS id, o.order_number AS `order`,
-           u.name AS student, p.amount, p.method, p.status, DATE(p.created_at) AS date
+    SELECT 
+        CONCAT('PAY-', LPAD(p.id,6,'0')) AS payment_id,
+        o.order_number AS order_number,
+        u.name AS student,
+        p.amount,
+        p.method,
+        p.status,
+        DATE(p.created_at) AS date
     FROM payments p
-    JOIN orders o ON p.order_id = o.id
-    JOIN users u ON p.student_id = u.id
+    INNER JOIN orders o ON p.order_id = o.id
+    INNER JOIN users u ON p.student_id = u.id
     ORDER BY p.created_at DESC
     LIMIT 50
 ");
+
 $payments = $payments_stmt->fetchAll();
 ?>
 <!DOCTYPE html>

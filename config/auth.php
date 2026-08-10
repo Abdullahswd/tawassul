@@ -55,7 +55,7 @@ function requireAdmin(): void {
  */
 function requireAcademic(): void {
     if (!isset($_SESSION['academic_id'])) {
-        header('Location: ' . rootUrl() . '/login.php');
+        header('Location: ' . rootUrl() . '/academics/academic-register.php');
         exit;
     }
 }
@@ -123,10 +123,11 @@ function currentAcademic(): ?array {
 }
 
 /**
- * Get root URL for redirects.
+ * Get root URL for redirects (production safe)
  */
 function rootUrl(): string {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host     = $_SERVER['HTTP_HOST'];
-    return $protocol . '://' . $host . '/tawassul';
+
+    return rtrim($protocol . '://' . $host, '/');
 }

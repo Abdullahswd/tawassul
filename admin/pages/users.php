@@ -214,7 +214,7 @@ document.getElementById('saveUserBtn').onclick = function() {
     formData.append('phone', phone);
     if (password) formData.append('password', password);
 
-    fetch('/tawassul/admin/ajax/manage_user.php', {
+    fetch('/admin/ajax/manage_user.php', {
         method: 'POST',
         body: formData,
         credentials: 'same-origin'

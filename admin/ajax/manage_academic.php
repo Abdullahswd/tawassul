@@ -57,10 +57,26 @@ if ($action === 'add') {
             sendError('البريد الإلكتروني موجود بالفعل');
         }
 
-        $stmt = $db->prepare("INSERT INTO academics (name, email, specialty, degree, bio, status, created_at) VALUES (?, ?, ?, ?, ?, 'pending', NOW())");
-        $stmt->execute([$name, $email, $specialty, $degree, $bio]);
+        // 🔴 إضافة كلمة المرور الافتراضية
+        $password = password_hash('123456', PASSWORD_DEFAULT);
+
+        $stmt = $db->prepare("
+            INSERT INTO academics 
+            (name, email, password, specialty, degree, bio, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
+        ");
+
+        $stmt->execute([
+            $name,
+            $email,
+            $password,
+            $specialty,
+            $degree,
+            $bio
+        ]);
 
         echo json_encode(['success' => true, 'message' => 'تم إضافة الأكاديمي بنجاح']);
+
     } catch (PDOException $e) {
         sendError('خطأ في قاعدة البيانات: ' . $e->getMessage(), 500);
     }
