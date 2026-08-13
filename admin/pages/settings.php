@@ -88,7 +88,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
           <button class="btn btn-primary" id="saveAllBtn" onclick="saveAllSettings()">💾 حفظ التغييرات</button>
         </div>
 
-        <div style="display:grid;grid-template-columns:240px 1fr;gap:24px">
+        <div class="settings-grid">
 
           <!-- Sidebar Menu -->
           <div class="stat-card animate-fadeInUp delay-1" style="padding:12px;height:fit-content">

@@ -100,7 +100,7 @@ $chart_revenue = array_values($revenue_by_month);
           <h1 class="page-header-title">لوحة التحكم</h1>
           <p class="page-header-subtitle">مرحباً بك! إليك نظرة عامة على المنصة</p>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
+        <div class="page-header-actions">
           <select class="form-input form-select" style="width:auto;padding-left:36px" id="periodFilter">
             <option>هذا الشهر</option>
             <option>الشهر الماضي</option>
@@ -114,7 +114,7 @@ $chart_revenue = array_values($revenue_by_month);
       </div>
 
       <!-- Stats Cards -->
-      <div class="grid grid-cols-1 gap-6 mb-8" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:28px">
+      <div class="grid-responsive-4">
 
         <div class="stat-card animate-fadeInUp delay-1">
           <div class="card-icon" style="background:rgba(99,102,241,0.1)">👥</div>
@@ -151,7 +151,7 @@ $chart_revenue = array_values($revenue_by_month);
       </div>
 
       <!-- Charts Row -->
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:28px" class="animate-fadeInUp delay-2">
+      <div class="grid-2-1 animate-fadeInUp delay-2" style="margin-bottom:28px">
 
         <!-- Line Chart -->
         <div class="chart-card">
@@ -193,7 +193,7 @@ $chart_revenue = array_values($revenue_by_month);
       </div>
 
       <!-- Bottom Row -->
-      <div style="display:grid;grid-template-columns:3fr 2fr;gap:20px" class="animate-fadeInUp delay-3">
+      <div class="grid-2-1 animate-fadeInUp delay-3">
 
         <!-- Recent Orders Table -->
         <div class="table-container">

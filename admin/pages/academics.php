@@ -48,11 +48,13 @@ $cnt_rejected = (int) $db->query("SELECT COUNT(*) FROM academics WHERE status = 
           <h1 class="page-header-title">إدارة الأكاديميين</h1>
           <p class="page-header-subtitle">قبول ورفض وإدارة حسابات الأكاديميين</p>
         </div>
-        <button class="btn btn-primary" onclick="Modal.open('addAcademicModal')">+ إضافة أكاديمي</button>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="Modal.open('addAcademicModal')">+ إضافة أكاديمي</button>
+        </div>
       </div>
 
       <!-- Stats -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+      <div class="grid-responsive-4">
         <div class="stat-card animate-fadeInUp delay-1" style="padding:18px">
           <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:26px" data-counter="<?= $cnt_all ?>"><?= $cnt_all ?></div><div class="card-label">إجمالي الأكاديميين</div></div><div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0">🎓</div></div>
         </div>

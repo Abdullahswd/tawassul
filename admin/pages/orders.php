@@ -49,11 +49,13 @@ $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'c
           <h1 class="page-header-title">إدارة الطلبات</h1>
           <p class="page-header-subtitle">عرض ومتابعة جميع طلبات المنصة</p>
         </div>
-        <button class="btn btn-outline" onclick="Toast.show('جاري تصدير الطلبات...','info')">📤 تصدير</button>
+        <div class="page-header-actions">
+          <button class="btn btn-outline" onclick="Toast.show('جاري تصدير الطلبات...','info')">📤 تصدير</button>
+        </div>
       </div>
 
       <!-- Status Cards -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">
+      <div class="grid-responsive-4">
         <div class="stat-card animate-fadeInUp delay-1" style="padding:18px;cursor:pointer" onclick="filterByStatus('')">
           <div style="display:flex;align-items:center;justify-content:space-between"><div><div class="card-value" style="font-size:28px" data-counter="<?= $cnt_all ?>"><?= $cnt_all ?></div><div class="card-label">جميع الطلبات</div></div><div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0;font-size:22px">📋</div></div>
         </div>

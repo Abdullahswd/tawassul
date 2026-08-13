@@ -28,6 +28,7 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
   <div class="sidebar-logo">
     <div class="logo-icon">🎓</div>
     <span class="logo-text">تواصل Admin</span>
+    <button class="sidebar-mobile-close" id="sidebarMobileClose" title="إغلاق القائمة">✕</button>
   </div>
 
   <!-- Navigation -->

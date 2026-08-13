@@ -158,13 +158,13 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
           <h1 class="page-header-title">تفاصيل الطلب <?= e($order['order_number']) ?></h1>
           <p class="page-header-subtitle">تاريخ الطلب: <?= formatDate($order['created_at']) ?></p>
         </div>
-        <div style="display:flex;gap:10px">
+        <div class="page-header-actions">
           <a href="orders.php" class="btn btn-outline">← العودة للطلبات</a>
           <button class="btn btn-primary" onclick="window.print()">🖨 طباعة</button>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px">
+      <div class="grid-2-1">
 
         <!-- Left Column -->
         <div style="display:flex;flex-direction:column;gap:20px">

@@ -52,11 +52,13 @@ $packages = array_map(function($p) {
           <h1 class="page-header-title">إدارة الباقات</h1>
           <p class="page-header-subtitle">تسعير وتخصيص باقات الخدمات الأكاديمية</p>
         </div>
-        <button class="btn btn-primary" onclick="openEditPackage(null)">+ إضافة باقة</button>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openEditPackage(null)">+ إضافة باقة</button>
+        </div>
       </div>
 
       <!-- Packages Grid -->
-      <div id="packagesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;margin-bottom:28px"></div>
+      <div id="packagesGrid" class="grid-responsive-2" style="margin-bottom:28px"></div>
 
       <!-- Orders Per Package Chart -->
       <div class="chart-card animate-fadeInUp delay-3">
@@ -75,7 +77,7 @@ $packages = array_map(function($p) {
     <div class="modal-header"><h3 class="modal-title" id="packageModalTitle">تعديل الباقة</h3><button class="modal-close" data-modal-close>✕</button></div>
     <div class="modal-body">
       <input type="hidden" id="editPackageId" />
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div class="grid-responsive-2" style="margin-bottom:0">
         <div class="form-group"><label class="form-label">اسم الباقة</label><input class="form-input" id="pkgName" /></div>
         <div class="form-group"><label class="form-label">السعر (ريال سعودي)</label><input class="form-input" id="pkgPrice" type="number" /></div>
         <div class="form-group"><label class="form-label">لون الباقة</label><input class="form-input" id="pkgColor" type="color" /></div>

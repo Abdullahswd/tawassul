@@ -56,11 +56,13 @@ $new_students_month = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 
           <h1 class="page-header-title">إدارة الطلاب</h1>
           <p class="page-header-subtitle">عرض وإدارة حسابات الطلاب المسجلين على المنصة</p>
         </div>
-        <button class="btn btn-primary" onclick="Modal.open('addUserModal')">+ إضافة طالب</button>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="Modal.open('addUserModal')">+ إضافة طالب</button>
+        </div>
       </div>
 
       <!-- إحصائيات -->
-      <div class="stats-grid" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px">
+      <div class="grid-responsive-4">
         <div class="stat-card"><div class="card-value"><?= $total_students ?></div><div class="card-label">إجمالي الطلاب</div></div>
         <div class="stat-card"><div class="card-value"><?= $active_students ?></div><div class="card-label">نشطون</div></div>
         <div class="stat-card"><div class="card-value"><?= $suspended_students ?></div><div class="card-label">معلقون</div></div>

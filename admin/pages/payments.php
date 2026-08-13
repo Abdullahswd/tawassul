@@ -114,7 +114,7 @@ $payments = $payments_stmt->fetchAll();
           <h1 class="page-header-title">إدارة المدفوعات</h1>
           <p class="page-header-subtitle">عرض ومتابعة جميع العمليات المالية</p>
         </div>
-        <div style="display:flex;gap:10px">
+        <div class="page-header-actions">
           <button class="btn btn-outline" onclick="Toast.show('جاري تصدير التقرير المالي...','info')">📤 تصدير</button>
           <select class="form-input form-select" style="width:auto;padding-left:36px">
             <option>هذا الشهر</option>
@@ -125,7 +125,7 @@ $payments = $payments_stmt->fetchAll();
       </div>
 
       <!-- Financial Stats -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:24px">
+      <div class="grid-responsive-4">
         <div class="stat-card animate-fadeInUp delay-1" style="background:linear-gradient(135deg,#10b981,#059669);color:white;border:none">
           <div class="card-icon" style="background:rgba(255,255,255,0.2);margin-bottom:12px">💰</div>
           <div class="card-value" style="font-size:30px;color:white" data-counter="<?= $total_revenue ?>" data-suffix=" ر.س">0</div>

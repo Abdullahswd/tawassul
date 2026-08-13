@@ -47,11 +47,13 @@ $services = array_map(function($s) {
           <h1 class="page-header-title">إدارة الخدمات</h1>
           <p class="page-header-subtitle">إدارة أقسام الخدمات الأكاديمية</p>
         </div>
-        <button class="btn btn-primary" onclick="openAddService()">+ إضافة خدمة</button>
+        <div class="page-header-actions">
+          <button class="btn btn-primary" onclick="openAddService()">+ إضافة خدمة</button>
+        </div>
       </div>
 
       <!-- Services Grid -->
-      <div id="servicesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-bottom:24px"></div>
+      <div id="servicesGrid" class="grid-responsive-2" style="margin-bottom:24px"></div>
 
     </div>
   </div>

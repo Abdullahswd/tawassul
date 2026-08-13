@@ -101,8 +101,9 @@ const AdminSidebar = {
     this.sidebar = document.getElementById('sidebar');
     this.mainContent = document.getElementById('mainContent');
     this.navbar = document.getElementById('navbar');
-    this.mobileOverlay = document.getElementById('mobileOverlay');
+    this.mobileCloseBtn = document.getElementById('sidebarMobileClose');
     this.toggleBtn = document.getElementById('sidebarToggle');
+    this.mobileOverlay = document.querySelector('.mobile-overlay');
 
     if (!this.sidebar) return;
 
@@ -115,13 +116,26 @@ const AdminSidebar = {
     if (this.toggleBtn) {
       this.toggleBtn.addEventListener('click', () => this.toggle());
     }
+    if (this.mobileCloseBtn) {
+      this.mobileCloseBtn.addEventListener('click', () => this.closeMobile());
+    }
     if (this.mobileOverlay) {
       this.mobileOverlay.addEventListener('click', () => this.closeMobile());
     }
 
+    // Auto close sidebar on mobile link click
+    this.sidebar.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', () => {
+        if (window.innerWidth <= 1024) {
+          this.closeMobile();
+        }
+      });
+    });
+
     // Mark active link
     this.markActiveLink();
   },
+
 
   toggle() {
     if (window.innerWidth > 1024) {
@@ -153,14 +167,15 @@ const AdminSidebar = {
     this.mobileOpen = true;
     this.sidebar?.classList.add('mobile-open');
     this.mobileOverlay?.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    // منع التمرير العمودي فقط أثناء فتح القائمة
+    document.body.style.overflowY = 'hidden';
   },
 
   closeMobile() {
     this.mobileOpen = false;
     this.sidebar?.classList.remove('mobile-open');
     this.mobileOverlay?.classList.remove('active');
-    document.body.style.overflow = '';
+    document.body.style.overflowY = '';
   },
 
   markActiveLink() {

@@ -40,10 +40,10 @@ $pct_new       = round(($cnt_new / $cnt_all) * 100);
 
 // 3. Top Services
 $top_services = $db->query("
-    SELECT s.name, s.icon, COUNT(o.id) AS order_cnt, COALESCE(SUM(o.amount), 0) AS total_amount
+    SELECT s.id, s.name, s.icon, COUNT(o.id) AS order_cnt, COALESCE(SUM(o.amount), 0) AS total_amount
     FROM services s
     LEFT JOIN orders o ON o.service_id = s.id
-    GROUP BY s.id
+    GROUP BY s.id, s.name, s.icon
     ORDER BY order_cnt DESC
     LIMIT 5
 ")->fetchAll();
@@ -139,7 +139,7 @@ $services_report = array_map(function($s) {
           <h1 class="page-header-title">التقارير والإحصائيات</h1>
           <p class="page-header-subtitle">تحليل شامل لأداء المنصة</p>
         </div>
-        <div style="display:flex;gap:10px">
+        <div class="page-header-actions">
           <select class="form-input form-select" style="width:auto;padding-left:36px" id="reportPeriod">
             <option>هذا الشهر</option>
             <option>الربع الأول</option>
@@ -151,7 +151,7 @@ $services_report = array_map(function($s) {
       </div>
 
       <!-- KPIs Row -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">
+      <div class="grid-responsive-4">
         <div class="stat-card animate-fadeInUp delay-1" style="padding:20px;border-top:3px solid #6366f1">
           <div style="font-size:30px;margin-bottom:8px">📊</div>
           <div class="card-value" style="font-size:28px" data-counter="<?= $total_orders ?>">0</div>
@@ -195,7 +195,7 @@ $services_report = array_map(function($s) {
 
         <!-- Orders Report -->
         <div id="tab-orders-report" class="tab-panel active">
-          <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px">
+          <div class="grid-2-1" style="margin-bottom:20px">
             <div class="chart-card">
               <div class="chart-header"><h3 class="chart-title">نمو الطلبات الشهري</h3></div>
               <canvas id="ordersChart" style="width:100%;height:260px;display:block"></canvas>
@@ -222,21 +222,23 @@ $services_report = array_map(function($s) {
           <!-- Top services table -->
           <div class="table-container">
             <div class="table-header"><h3 class="table-title">أعلى الخدمات طلباً</h3></div>
-            <table class="data-table">
-              <thead><tr><th>الخدمة</th><th>عدد الطلبات</th><th>الإيراد</th><th>النسبة</th></tr></thead>
-              <tbody>
-                <?php foreach ($top_services as $s): 
-                  $pct = round(($s['order_cnt'] / $max_service_orders) * 100);
-                ?>
-                  <tr>
-                    <td><?= $s['name'] ?> <?= $s['icon'] ?></td>
-                    <td><strong><?= $s['order_cnt'] ?></strong></td>
-                    <td><?= number_format($s['total_amount'], 0) ?> ر.س</td>
-                    <td><div class="progress-bar" style="min-width:120px"><div class="progress-fill" style="width:<?= $pct ?>%;background:#6366f1"></div></div></td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
+            <div style="overflow-x:auto">
+              <table class="data-table">
+                <thead><tr><th>الخدمة</th><th>عدد الطلبات</th><th>الإيراد</th><th>النسبة</th></tr></thead>
+                <tbody>
+                  <?php foreach ($top_services as $s): 
+                    $pct = round(($s['order_cnt'] / $max_service_orders) * 100);
+                  ?>
+                    <tr>
+                      <td><?= $s['name'] ?> <?= $s['icon'] ?></td>
+                      <td><strong><?= $s['order_cnt'] ?></strong></td>
+                      <td><?= number_format($s['total_amount'], 0) ?> ر.س</td>
+                      <td><div class="progress-bar" style="min-width:120px"><div class="progress-fill" style="width:<?= $pct ?>%;background:#6366f1"></div></div></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -246,7 +248,7 @@ $services_report = array_map(function($s) {
             <div class="chart-header"><h3 class="chart-title">الإيرادات الشهرية</h3></div>
             <canvas id="revenueLineChart" style="width:100%;height:280px;display:block"></canvas>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div class="grid-responsive-4">
             <div class="stat-card" style="padding:20px;text-align:center">
               <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">أعلى شهر</div>
               <div style="font-size:26px;font-weight:900;color:var(--success)"><?= number_format($highest_revenue_month, 0) ?> ر.س</div>

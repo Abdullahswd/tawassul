@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
@@ -51,6 +51,20 @@
       z-index: 1;
       box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05);
       animation: fadeInUp 0.5s ease forwards;
+    }
+    @media (max-width: 480px) {
+      .login-card {
+        padding: 28px 20px !important;
+        border-radius: 20px !important;
+      }
+      .login-logo {
+        margin-bottom: 24px;
+      }
+      .login-logo .logo-icon-lg {
+        width: 60px;
+        height: 60px;
+        font-size: 30px;
+      }
     }
     .login-logo {
       text-align: center;
