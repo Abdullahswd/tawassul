@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin AJAX: Manage services (toggle / save / delete)
+ * Admin AJAX: Manage services (toggle / save / delete) with hierarchical support
  */
 ob_start();
 
@@ -43,16 +43,17 @@ if ($action === 'toggle') {
     $ok = $update->execute([$new_status, $id]);
 
     ob_end_clean();
-    echo json_encode(['success' => (bool)$ok, 'active' => $new_status]);
+    echo json_encode(['success' => (bool)$ok, 'active' => (bool)$new_status]);
     exit;
 }
 
 /* ── SAVE (add / edit) ── */
 if ($action === 'save') {
-    $id     = (int)($_POST['id'] ?? 0);
-    $name   = trim($_POST['name'] ?? '');
-    $icon   = trim($_POST['icon'] ?? '🔬');
-    $active = isset($_POST['active']) ? (int)$_POST['active'] : 1;
+    $id       = (int)($_POST['id'] ?? 0);
+    $name     = trim($_POST['name'] ?? '');
+    $icon     = trim($_POST['icon'] ?? '📚');
+    $active   = isset($_POST['active']) ? (int)$_POST['active'] : 1;
+    $parentId = isset($_POST['parent_id']) && $_POST['parent_id'] !== '' ? (int)$_POST['parent_id'] : null;
 
     if (!$name) {
         ob_end_clean();
@@ -61,16 +62,56 @@ if ($action === 'save') {
     }
 
     try {
-        if ($id > 0) {
-            $stmt = $db->prepare("UPDATE services SET name = ?, icon = ?, is_active = ? WHERE id = ?");
-            $ok   = $stmt->execute([$name, $icon, $active, $id]);
-            ob_end_clean();
-            echo json_encode(['success' => (bool)$ok, 'id' => $id]);
+        // حساب المستوى (level)
+        if ($parentId) {
+            $stmt = $db->prepare("SELECT level FROM services WHERE id = ?");
+            $stmt->execute([$parentId]);
+            $parentLevel = $stmt->fetchColumn();
+            if ($parentLevel === false) {
+                ob_end_clean();
+                echo json_encode(['success' => false, 'message' => 'الخدمة الأب غير موجودة']);
+                exit;
+            }
+            $level = $parentLevel + 1;
+            if ($level > 3) {
+                ob_end_clean();
+                echo json_encode(['success' => false, 'message' => 'لا يمكن إضافة خدمة في مستوى رابع (الحد الأقصى 3 مستويات)']);
+                exit;
+            }
         } else {
-            $stmt = $db->prepare("INSERT INTO services (name, icon, is_active) VALUES (?, ?, ?)");
-            $ok   = $stmt->execute([$name, $icon, $active]);
+            $level = 1;
+        }
+
+        // تعيين sort_order: نأخذ أكبر قيمة حالية لنفس الأب +1
+        if ($parentId) {
+            $stmt = $db->prepare("SELECT MAX(sort_order) FROM services WHERE parent_id = ?");
+            $stmt->execute([$parentId]);
+        } else {
+            $stmt = $db->prepare("SELECT MAX(sort_order) FROM services WHERE parent_id IS NULL");
+            $stmt->execute();
+        }
+        $maxOrder = (int)$stmt->fetchColumn();
+        $sortOrder = $maxOrder + 1;
+
+        if ($id > 0) {
+            // تحديث: نمنع جعل الخدمة أباً لنفسها
+            if ($parentId && $parentId == $id) {
+                ob_end_clean();
+                echo json_encode(['success' => false, 'message' => 'لا يمكن جعل الخدمة أباً لنفسها']);
+                exit;
+            }
+            // يمكن إضافة تحقق إضافي لعدم حدوث cycle (اختياري)
+            $stmt = $db->prepare("UPDATE services SET name = ?, icon = ?, is_active = ?, parent_id = ?, level = ?, sort_order = ? WHERE id = ?");
+            $ok = $stmt->execute([$name, $icon, $active, $parentId, $level, $sortOrder, $id]);
             ob_end_clean();
-            echo json_encode(['success' => (bool)$ok, 'id' => $db->lastInsertId()]);
+            echo json_encode(['success' => (bool)$ok, 'id' => $id, 'level' => $level]);
+        } else {
+            // إضافة جديدة
+            $stmt = $db->prepare("INSERT INTO services (parent_id, name, icon, is_active, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)");
+            $ok = $stmt->execute([$parentId, $name, $icon, $active, $level, $sortOrder]);
+            $newId = $db->lastInsertId();
+            ob_end_clean();
+            echo json_encode(['success' => (bool)$ok, 'id' => $newId, 'level' => $level]);
         }
     } catch (Exception $e) {
         ob_end_clean();
@@ -89,8 +130,9 @@ if ($action === 'delete') {
     }
 
     try {
+        // الحذف التتالي مفعّل عبر ON DELETE CASCADE في قاعدة البيانات
         $stmt = $db->prepare("DELETE FROM services WHERE id = ?");
-        $ok   = $stmt->execute([$id]);
+        $ok = $stmt->execute([$id]);
         ob_end_clean();
         echo json_encode(['success' => (bool)$ok]);
     } catch (Exception $e) {
