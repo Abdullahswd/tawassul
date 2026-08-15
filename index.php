@@ -12,6 +12,16 @@ if (!is_array($all_services)) {
 
 // تحويل إلى JSON مباشرة (بدون htmlspecialchars)
 $all_services_json = json_encode($all_services, JSON_UNESCAPED_UNICODE);
+// جلب الأكاديميين المتميزين من قاعدة البيانات
+$all_featured = [];
+if (function_exists('getAllFeaturedAcademics')) {
+    try {
+        $all_featured = getAllFeaturedAcademics(true);
+        if (!is_array($all_featured)) $all_featured = [];
+    } catch (Exception $e) {
+        $all_featured = [];
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -470,128 +480,47 @@ $all_services_json = json_encode($all_services, JSON_UNESCAPED_UNICODE);
 
         <div class="swiper-wrapper">
 
-          <!-- Academic 1 -->
-          <div class="swiper-slide">
-            <div class="academic-card">
-
-              <img
-                src="/image/IMG-20260620-WA0014.jpg"
-                alt="البروفيسور خليل سعيد الوجيه"
-                class="academic-img">
-
-              <h3 class="text-xl md:text-2xl font-extrabold">
-                البروفيسور خليل سعيد الوجيه
-              </h3>
-
-              <p class="text-[var(--primary)] font-bold text-sm">
-                دكتوراه في النمذجه والمحاكاة
-              </p>
-
-              <div class="stars">★★★★★</div>
-
-              <p class="text-sm text-[var(--text-secondary)] mb-4">
-                الأستاذ الدكتور خليل سعيد الوجيه، رئيس جامعة الرازي، هو أكاديمي يمني بارز حاصل على الدكتوراه في النمذجة والمحاكاة من جامعة الموصل، وشغل سابقاً مناصب قيادية رفيعة منها رئيس جامعة ذمار وعميد كلية الحاسوب بها.
-              </p>
-
-              <a href="#" class="contact-btn">
-                تواصل معي ←
-              </a>
-
+          <?php if (empty($all_featured)): ?>
+            <!-- بطاقة افتراضية إن لم توجد بيانات -->
+            <div class="swiper-slide">
+              <div class="academic-card">
+                <img src="/image/IMG-20260620-WA0014.jpg" alt="البروفيسور خليل سعيد الوجيه" class="academic-img">
+                <h3 class="text-xl md:text-2xl font-extrabold">البروفيسور خليل سعيد الوجيه</h3>
+                <p class="text-[var(--primary)] font-bold text-sm">دكتوراه في النمذجه والمحاكاة</p>
+                <div class="stars">★★★★★</div>
+                <p class="text-sm text-[var(--text-secondary)] mb-4">
+                  الأستاذ الدكتور خليل سعيد الوجيه، رئيس جامعة الرازي، هو أكاديمي يمني بارز حاصل على الدكتوراه في النمذجة والمحاكاة من جامعة الموصل.
+                </p>
+              </div>
             </div>
-          </div>
+          <?php else: ?>
+            <?php foreach ($all_featured as $f): ?>
+              <?php
+                $f_name = e($f['name'] ?? '');
+                $f_specialty = e($f['specialty'] ?? '');
+                $f_bio = e($f['bio'] ?? '');
+                $f_image = ($f['image'] ?? '') ? 'uploads/featured/' . ltrim(basename($f['image']), '/') : '';
+              ?>
+              <div class="swiper-slide">
+                <div class="academic-card">
+                  <?php if ($f_image): ?>
+                    <img src="<?= $f_image ?>" alt="<?= $f_name ?>" class="academic-img" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+                    <div class="academic-img" style="display:none;align-items:center;justify-content:center;font-size:40px;">🎓</div>
+                  <?php else: ?>
+                    <div class="academic-img" style="display:flex;align-items:center;justify-content:center;font-size:40px;">🎓</div>
+                  <?php endif; ?>
 
+                  <h3 class="text-xl md:text-2xl font-extrabold"><?= $f_name ?></h3>
 
-          <!-- Academic 2 -->
-          <div class="swiper-slide">
-            <div class="academic-card">
+                  <p class="text-[var(--primary)] font-bold text-sm"><?= $f_specialty ?></p>
 
-              <img
-                src="/image/IMG-20260620-WA0020.jpg"
-                alt="د. محمد محمد النفيش"
-                class="academic-img">
+                  <div class="stars">★★★★★</div>
 
-              <h3 class="text-xl md:text-2xl font-extrabold">
-                د. محمد محمد النفيش
-              </h3>
-
-              <p class="text-[var(--primary)] font-bold text-sm">
-                استاذ اداره الاعمال المساعد
-              </p>
-
-              <div class="stars">★★★★★</div>
-
-              <p class="text-sm text-[var(--text-secondary)] mb-4">
-                رئيس قسم الاعمال والتجاره الالكترونيه - جامعة الرازي
-              </p>
-
-              <a href="#" class="contact-btn">
-                تواصل معي ←
-              </a>
-
-            </div>
-          </div>
-
-
-          <!-- Academic 3 -->
-          <div class="swiper-slide">
-            <div class="academic-card">
-
-              <img
-                src="/image/IMG-20260622-WA0020.jpg"
-                alt="د. عبدالناصر احمد القاضي"
-                class="academic-img">
-
-              <h3 class="text-xl md:text-2xl font-extrabold">
-                د. عبدالناصر احمد القاضي
-              </h3>
-
-              <p class="text-[var(--primary)] font-bold text-sm">
-                دكتوراه في تمريض الحالات الحرجة
-              </p>
-
-              <div class="stars">★★★★★</div>
-
-              <p class="text-sm text-[var(--text-secondary)] mb-4">
-                دكتوراه في تمريض الحالات الحرجة - جامعة اسيوط - مصر
-              </p>
-
-              <a href="#" class="contact-btn">
-                تواصل معي ←
-              </a>
-
-            </div>
-          </div>
-
-
-          <!-- Academic 4 - القباني -->
-          <div class="swiper-slide">
-            <div class="academic-card">
-
-              <img
-                src="/image/IMG-20260813-WA0003.jpg"
-                alt="أ.م.د تركي يحيى القباني"
-                class="academic-img">
-
-              <h3 class="text-xl md:text-2xl font-extrabold">
-                أ.م.د تركي يحيى القباني
-              </h3>
-
-              <p class="text-[var(--primary)] font-bold text-sm">
-                نائب رئيس جامعه الرازي للشؤون الأكاديمية
-              </p>
-
-              <div class="stars">★★★★★</div>
-
-              <p class="text-sm text-[var(--text-secondary)] mb-4">
-
-                أ.م.د/ تركي يحيى القباني هو قامة أكاديمية وإدارية بارزة، يشغل حالياً منصب نائب رئيس جامعة الرازي للشؤون الأكاديمية. يمتلك مسيرة علمية ومهنية حافلة، حيث حصل على درجة الدكتوراه في الإدارة والتخطيط من جامعة صنعاء في اليمن. تتسم خبرته بالشمولية في مجالات الإدارة الجامعية، وضمان الجودة، والتخطيط الاستراتيجي، والبحث العلمي </p>
-
-              <a href="#" class="contact-btn">
-                تواصل معي ←
-              </a>
-
-            </div>
-          </div>
+                  <p class="text-sm text-[var(--text-secondary)] mb-4"><?= $f_bio ?></p>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          <?php endif; ?>
 
         </div>
 

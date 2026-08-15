@@ -57,6 +57,12 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
       <span class="nav-badge"><?= number_format($sb_academics_cnt) ?></span>
     </a>
 
+     <a href="../pages/featured-academics.php" class="nav-item" id="nav-featured-academics">
+      <span class="nav-icon">🎓</span>
+      <span class="nav-label">الأكاديميون المتميزون</span>
+      <span class="nav-badge"><?= number_format($sb_academics_cnt) ?></span>
+    </a>
+
     <!-- Operations -->
     <p class="nav-section-title">العمليات</p>
 

@@ -65,6 +65,19 @@ function getAllAcademics(string $status = 'approved'): array {
 }
 
 /* ─────────────────────────────────────────────
+   FEATURED ACADEMICS (الأكاديميون المتميزون)
+───────────────────────────────────────────── */
+
+function getAllFeaturedAcademics(bool $activeOnly = true): array {
+    $sql = 'SELECT * FROM featured_academics';
+    if ($activeOnly) {
+        $sql .= ' WHERE is_active = 1';
+    }
+    $sql .= ' ORDER BY sort_order ASC, id ASC';
+    return db()->query($sql)->fetchAll();
+}
+
+/* ─────────────────────────────────────────────
    SERVICES
 ───────────────────────────────────────────── */
 
