@@ -6,10 +6,10 @@
  * ============================================================
  */
 
-define('DB_HOST',     '76.13.36.168');
-define('DB_NAME',     'tawassul');
-define('DB_USER',     'tawassul');     
-define('DB_PASS',     'Tawassul');          
+define('DB_HOST',     'localhost');
+define('DB_NAME',     'acadimic');
+define('DB_USER',     'root');     
+define('DB_PASS',     '');          
 define('DB_CHARSET',  'utf8mb4');
 
 /**

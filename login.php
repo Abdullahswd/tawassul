@@ -5,24 +5,30 @@
 require_once __DIR__ . '/config/auth.php';
 require_once __DIR__ . '/config/functions.php';
 
-// If already logged in, redirect
-if (isset($_SESSION['user_id'])) {
-    header('Location: ' . ($_SESSION['user_role'] === 'admin' ? 'admin/pages/dashboard.php' : 'student/student-dashboard.php'));
-    exit;
-}
-if (isset($_SESSION['academic_id'])) {
-    header('Location: academics/academic-dashboard.php');
-    exit;
-}
-
 $error   = '';
 $success = '';
+
+// Detect current session type (using new namespace system)
+$current_session_type = null;
+$current_session_name = '';
+if (isset($_SESSION['student'])) {
+    $current_session_type = 'user';
+    $current_session_name = ($_SESSION['student']['role'] === 'admin') ? 'الإدارة' : 'الطالب';
+}
+if (isset($_SESSION['admin'])) {
+    $current_session_type = 'user';
+    $current_session_name = 'الإدارة';
+}
+if (isset($_SESSION['academic'])) {
+    $current_session_type = 'academic';
+    $current_session_name = 'الأكاديمي';
+}
 
 // ── Handle POST ──────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email']    ?? '');
     $password = trim($_POST['password'] ?? '');
-    $type     = $_POST['user_type']     ?? 'student'; // student | academic
+    $type     = $_POST['user_type']     ?? 'student'; // student | academic | admin
 
     if (!$email || !$password) {
         $error = 'يرجى تعبئة جميع الحقول.';
@@ -198,10 +204,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="alert-error">⚠️ <?= e($error) ?></div>
     <?php endif; ?>
 
+    <?php if ($current_session_type): ?>
+      <!-- رسالة للمستخدم المسجل دخوله بالفعل -->
+      <div style="background:var(--primary-light);border:1px solid var(--primary);border-radius:28px;padding:16px 20px;margin-bottom:24px;text-align:center">
+        <div style="font-size:14px;font-weight:700;color:var(--primary);margin-bottom:12px">
+          ✅ أنت مسجل الدخول حالياً بصفتك <strong><?= e($current_session_name) ?></strong>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <?php if (isset($_SESSION['admin'])): ?>
+            <a href="admin/pages/dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الإدارة</a>
+          <?php endif; ?>
+          <?php if (isset($_SESSION['student']) && $_SESSION['student']['role'] === 'student'): ?>
+            <a href="student/student-dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الطالب</a>
+          <?php endif; ?>
+          <?php if (isset($_SESSION['academic'])): ?>
+            <a href="academics/academic-dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الأكاديمي</a>
+          <?php endif; ?>
+          <a href="logout.php" class="btn btn-outline" style="padding:10px 24px;font-size:14px;border-radius:40px;border-color:var(--danger);color:var(--danger)">🚪 تسجيل خروج</a>
+        </div>
+      </div>
+      <hr style="border:none;border-top:1px solid var(--border-color);margin-bottom:24px">
+    <?php endif; ?>
+
     <!-- تبويب نوع المستخدم -->
-    <div style="display:flex;gap:16px;margin-bottom:32px">
+    <div style="display:flex;gap:12px;margin-bottom:32px;flex-wrap:wrap">
       <button type="button" class="type-btn active" id="btn-student"  onclick="setUser('student')">📚 بصفتي طالب</button>
       <button type="button" class="type-btn"        id="btn-academic" onclick="setUser('academic')">🎓 بصفتي أكاديمي</button>
+      <button type="button" class="type-btn"        id="btn-admin"    onclick="setUser('admin')">👨‍💼 بصفتي إدارة</button>
     </div>
 
     <form method="POST" action="login.php" id="loginForm">
@@ -256,6 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       document.getElementById('userTypeInput').value = type;
       document.getElementById('btn-student').classList.toggle('active', type === 'student');
       document.getElementById('btn-academic').classList.toggle('active', type === 'academic');
+      document.getElementById('btn-admin').classList.toggle('active', type === 'admin');
     }
 
     // تأثير تعطيل الزر أثناء الإرسال لمنع التكرار

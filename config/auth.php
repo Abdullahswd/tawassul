@@ -129,5 +129,17 @@ function rootUrl(): string {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host     = $_SERVER['HTTP_HOST'];
 
-    return rtrim($protocol . '://' . $host, '/');
+    // حساب مسار التطبيق (المجلد الفرعي) تلقائياً، مثلاً /tawassul عند العمل عبر XAMPP
+    $base = '';
+    $docRoot = isset($_SERVER['DOCUMENT_ROOT'])
+        ? str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT']) ?: $_SERVER['DOCUMENT_ROOT'])
+        : '';
+    if ($docRoot !== '') {
+        $appDir = str_replace('\\', '/', dirname(__DIR__)); // جذر المشروع (المجلد الحاوي على config/auth.php)
+        if (strpos($appDir, $docRoot) === 0) {
+            $base = substr($appDir, strlen($docRoot));
+        }
+    }
+
+    return rtrim($protocol . '://' . $host . $base, '/');
 }

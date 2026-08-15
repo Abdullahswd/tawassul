@@ -1,6 +1,6 @@
 -- ============================================================
 --  Tawassul Academic Platform - Database Schema
---  Database: tawassul
+--  Database: acadimic
 --  Encoding: utf8mb4_unicode_ci
 --  Generated: 2026
 -- ============================================================
