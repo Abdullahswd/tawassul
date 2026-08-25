@@ -12,23 +12,41 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $service_id     = (int)($_POST['service_id'] ?? 0);
+    $package_id     = isset($_POST['package_id']) && $_POST['package_id'] !== '' ? (int)$_POST['package_id'] : null;
     $specialty      = trim($_POST['specialty'] ?? '');
     $academic_level = $_POST['academic_level'] ?? 'بكالوريوس';
     $language       = $_POST['language'] ?? 'العربية';
     $deadline       = $_POST['deadline'] ?? '';
     $description    = trim($_POST['description'] ?? '');
-    $package_id     = isset($_POST['package_id']) && $_POST['package_id'] !== '' ? (int)$_POST['package_id'] : null;
 
-    // Calculate default or package price
-    $amount = 150.00; // Base starting price
+    $db = db();
+
+    // حساب السعر والخدمة
+    $amount = 150.00;
     if ($package_id) {
-        $db = db();
-        $stmt = $db->prepare('SELECT price FROM packages WHERE id = ? LIMIT 1');
+        $stmt = $db->prepare('SELECT price, service_ids FROM packages WHERE id = ? LIMIT 1');
         $stmt->execute([$package_id]);
-        $pkgPrice = $stmt->fetchColumn();
-        if ($pkgPrice) {
-            $amount = (float)$pkgPrice;
+        $pkg = $stmt->fetch();
+        if ($pkg) {
+            $amount = (float)$pkg['price'];
+            if (!$service_id) {
+                $pkgServices = json_decode($pkg['service_ids'] ?? '[]', true);
+                if (!empty($pkgServices)) {
+                    $service_id = (int)$pkgServices[0];
+                }
+            }
         }
+    } elseif ($service_id) {
+        $stmt = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
+        $stmt->execute([$service_id]);
+        $srvPrice = $stmt->fetchColumn();
+        if ($srvPrice && $srvPrice > 0) {
+            $amount = (float)$srvPrice;
+        }
+    }
+
+    if (!$service_id && !empty($services)) {
+        $service_id = (int)$services[0]['id'];
     }
 
     if (!$service_id || !$specialty || !$deadline || !$description) {
@@ -165,6 +183,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <a href="services.php" class="nav-item active">
           <span class="icon">📦</span>
           <span>الخدمات الأكاديمية</span>
+        </a>
+        <a href="packages.php" class="nav-item">
+          <span class="icon">🎁</span>
+          <span>الباقات المخصصة</span>
         </a>
         <a href="orders.php" class="nav-item">
           <span class="icon">📋</span>

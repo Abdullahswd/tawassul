@@ -92,6 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <span class="icon">📦</span>
           <span>الخدمات الأكاديمية</span>
         </a>
+        <a href="packages.php" class="nav-item">
+          <span class="icon">🎁</span>
+          <span>الباقات المخصصة</span>
+        </a>
         <a href="orders.php" class="nav-item">
           <span class="icon">📋</span>
           <span>طلباتي</span>

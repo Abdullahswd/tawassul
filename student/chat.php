@@ -149,6 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
         <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
         <a href="student-dashboard.php" class="nav-item"><span class="icon">📊</span><span>لوحة المعلومات</span></a>
         <a href="services.php" class="nav-item"><span class="icon">📦</span><span>الخدمات الأكاديمية</span></a>
+        <a href="packages.php" class="nav-item"><span class="icon">🎁</span><span>الباقات المخصصة</span></a>
         <a href="orders.php" class="nav-item"><span class="icon">📋</span><span>طلباتي</span></a>
         <a href="chat.php" class="nav-item active"><span class="icon">💬</span><span>المحادثات</span></a>
         <a href="payments.php" class="nav-item"><span class="icon">💳</span><span>المدفوعات</span></a>

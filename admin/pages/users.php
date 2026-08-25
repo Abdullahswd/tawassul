@@ -216,7 +216,7 @@ document.getElementById('saveUserBtn').onclick = function() {
     formData.append('phone', phone);
     if (password) formData.append('password', password);
 
-    fetch('/admin/ajax/manage_user.php', {
+    fetch('../ajax/manage_user.php', {
         method: 'POST',
         body: formData,
         credentials: 'same-origin'
@@ -249,7 +249,7 @@ function deleteUser(id) {
   if(!u) return;
   Modal.confirm('حذف الطالب', `هل تريد حذف "${u.name}" نهائياً؟`, () => {
     const fd = new FormData(); fd.append('action','delete'); fd.append('id',id);
-    fetch('/tawassul/admin/ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
+    fetch('../ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
       .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
       .catch(()=>Toast.show('خطأ في الاتصال','error'));
   });
@@ -260,7 +260,7 @@ function toggleUserStatus(id, curr) {
   const u = studentsData.find(s=>s.id===id);
   Modal.confirm(`${actionText} الحساب`, `هل تريد ${actionText} حساب "${u.name}"؟`, () => {
     const fd = new FormData(); fd.append('action','update_status'); fd.append('id',id); fd.append('status',newStatus);
-    fetch('/tawassul/admin/ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
+    fetch('../ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
       .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
       .catch(()=>Toast.show('خطأ في الاتصال','error'));
   });

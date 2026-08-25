@@ -19,12 +19,32 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/../../config/auth.php';
 require_once __DIR__ . '/../../config/functions.php';
 
-function sendJSONResponse($success, $message, $extra = []) {
+function sendJSONResponse($success, $message, $extra = [])
+{
     echo json_encode(array_merge([
         'success' => $success,
         'message' => $message
     ], $extra), JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+function uploadQualificationDoc($fileArray)
+{
+    if (!$fileArray || !isset($fileArray['error']) || $fileArray['error'] !== UPLOAD_ERR_OK) {
+        return null;
+    }
+    $uploadDir = __DIR__ . '/../../uploads/qualifications/';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0777, true);
+    }
+    $fileName = basename($fileArray['name']);
+    $ext = pathinfo($fileName, PATHINFO_EXTENSION);
+    $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . ($ext ? '.' . $ext : '');
+    $filePath = $uploadDir . $uniqueName;
+    if (move_uploaded_file($fileArray['tmp_name'], $filePath)) {
+        return 'uploads/qualifications/' . $uniqueName;
+    }
+    return null;
 }
 
 $action = $_GET['action'] ?? $_POST['action'] ?? '';
@@ -51,7 +71,7 @@ if ($action === 'register') {
     $birthPlace = trim($_POST['birthPlace'] ?? '');
     $birthDate = trim($_POST['birthDate'] ?? '');
     $address = trim($_POST['address'] ?? '');
-    
+
     // Credentials
     $password = $_POST['password'] ?? 'Academic@123'; // Default fallback if not provided
 
@@ -74,7 +94,7 @@ if ($action === 'register') {
 
     try {
         $db = db();
-        
+
         // Check email uniqueness
         $check = $db->prepare("SELECT id FROM academics WHERE email = ?");
         $check->execute([$email]);
@@ -121,21 +141,24 @@ if ($action === 'register') {
             $initials,
             $basePrice
         ]);
-        
-        $academicId = (int)$db->lastInsertId();
+
+        $academicId = (int) $db->lastInsertId();
 
         // Save Qualifications
         if ($hasBachelor) {
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'بكالوريوس', ?, ?, ?, ?, 1)")
-               ->execute([$academicId, trim($_POST['bsMajor'] ?? 'رياضيات'), trim($_POST['bsUniversity'] ?? 'جامعة الملك سعود'), trim($_POST['bsCountry'] ?? 'السعودية'), intval($_POST['bsYear'] ?? 2015)]);
+            $docFile = uploadQualificationDoc($_FILES['bsDocument'] ?? null);
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'بكالوريوس', ?, ?, ?, ?, ?, 1)")
+                ->execute([$academicId, trim($_POST['bsMajor'] ?? 'عام'), trim($_POST['bsUniversity'] ?? 'غير محدد'), trim($_POST['bsCountry'] ?? 'السعودية'), intval($_POST['bsYear'] ?? 2015), $docFile]);
         }
         if ($hasMasters) {
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'ماجستير', ?, ?, ?, ?, 1)")
-               ->execute([$academicId, trim($_POST['msMajor'] ?? 'إحصاء'), trim($_POST['msUniversity'] ?? 'جامعة الملك عبدالعزيز'), trim($_POST['msCountry'] ?? 'السعودية'), intval($_POST['msYear'] ?? 2018)]);
+            $docFile = uploadQualificationDoc($_FILES['msDocument'] ?? null);
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'ماجستير', ?, ?, ?, ?, ?, 1)")
+                ->execute([$academicId, trim($_POST['msMajor'] ?? 'عام'), trim($_POST['msUniversity'] ?? 'غير محدد'), trim($_POST['msCountry'] ?? 'السعودية'), intval($_POST['msYear'] ?? 2018), $docFile]);
         }
         if ($hasPhd) {
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, verified) VALUES (?, 'دكتوراه', ?, ?, ?, ?, 1)")
-               ->execute([$academicId, trim($_POST['phdMajor'] ?? 'إحصاء حيوي'), trim($_POST['phdUniversity'] ?? 'جامعة أوكلاند'), trim($_POST['phdCountry'] ?? 'نيوزيلندا'), intval($_POST['phdYear'] ?? 2022)]);
+            $docFile = uploadQualificationDoc($_FILES['phdDocument'] ?? null);
+            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'دكتوراه', ?, ?, ?, ?, ?, 1)")
+                ->execute([$academicId, trim($_POST['phdMajor'] ?? 'عام'), trim($_POST['phdUniversity'] ?? 'غير محدد'), trim($_POST['phdCountry'] ?? 'السعودية'), intval($_POST['phdYear'] ?? 2022), $docFile]);
         }
 
         // Save Services
@@ -212,14 +235,14 @@ if ($action === 'update_order_status') {
         if ($status === 'accepted') {
             $updateStmt = $db->prepare("UPDATE orders SET status = ?, academic_id = ? WHERE id = ?");
             $updateStmt->execute([$status, $academicId, $orderId]);
-            
+
             // Add net amount to academic's balance if payment is paid
             $payStmt = $db->prepare("SELECT academic_net, status FROM payments WHERE order_id = ? LIMIT 1");
             $payStmt->execute([$orderId]);
             $payment = $payStmt->fetch();
             if ($payment && $payment['status'] === 'paid') {
                 $db->prepare("UPDATE academics SET balance = balance + ?, total_orders = total_orders + 1 WHERE id = ?")
-                   ->execute([$payment['academic_net'], $academicId]);
+                    ->execute([$payment['academic_net'], $academicId]);
             }
         } else {
             $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
@@ -234,7 +257,7 @@ if ($action === 'update_order_status') {
             'cancelled' => 'تم إلغاء الطلب.'
         ];
         $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
-        
+
         createNotification(
             $order['student_id'],
             'student',
@@ -425,7 +448,7 @@ if ($action === 'create_order') {
                 academic_level, language, description, deadline, amount, status, created_at)
              VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
         );
-        
+
         $stmt->execute([
             $number,
             $studentId,
@@ -437,7 +460,7 @@ if ($action === 'create_order') {
             $amount
         ]);
 
-        $orderId = (int)$db->lastInsertId();
+        $orderId = (int) $db->lastInsertId();
 
         // Create Payment
         $fee = round($amount * 0.15, 2);
@@ -499,7 +522,7 @@ if ($action === 'send_message') {
 
     try {
         $db = db();
-        
+
         // Ensure academic owns the order
         $orderStmt = $db->prepare("SELECT id, student_id FROM orders WHERE id = ? AND academic_id = ?");
         $orderStmt->execute([$orderId, $academicId]);
@@ -516,13 +539,13 @@ if ($action === 'send_message') {
 
         if (!$conversationId) {
             $db->prepare("INSERT INTO conversations (order_id, student_id, academic_id) VALUES (?, ?, ?)")
-               ->execute([$orderId, $order['student_id'], $academicId]);
-            $conversationId = (int)$db->lastInsertId();
+                ->execute([$orderId, $order['student_id'], $academicId]);
+            $conversationId = (int) $db->lastInsertId();
         }
 
         // Insert Message
         $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content) VALUES (?, ?, 'academic', ?)")
-           ->execute([$conversationId, $academicId, $content]);
+            ->execute([$conversationId, $academicId, $content]);
 
         // Send notification to student
         createNotification(
@@ -553,7 +576,7 @@ if ($action === 'upload_attachment') {
 
     try {
         $db = db();
-        
+
         // Ensure academic owns the order
         $orderStmt = $db->prepare("SELECT id FROM orders WHERE id = ? AND academic_id = ?");
         $orderStmt->execute([$orderId, $academicId]);
@@ -572,14 +595,157 @@ if ($action === 'upload_attachment') {
 
         if (move_uploaded_file($file['tmp_name'], $filePath)) {
             $db->prepare("INSERT INTO order_attachments (order_id, file_name, file_path, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, 'academic')")
-               ->execute([$orderId, $fileName, 'uploads/orders/' . $uniqueName, $file['type'], $file['size']]);
-            
+                ->execute([$orderId, $fileName, 'uploads/orders/' . $uniqueName, $file['type'], $file['size']]);
+
             sendJSONResponse(true, 'تم الرفع بنجاح.');
         } else {
             sendJSONResponse(false, 'فشل في حفظ الملف.');
         }
     } catch (Exception $e) {
         sendJSONResponse(false, 'حدث خطأ: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 10. BANK ACCOUNTS (البيانات البنكية)
+// ─────────────────────────────────────────────────────────────
+if ($action === 'get_bank_accounts') {
+    try {
+        $db = db();
+        $stmt = $db->prepare("SELECT * FROM academic_bank_accounts WHERE academic_id = ? ORDER BY id ASC");
+        $stmt->execute([$academicId]);
+        sendJSONResponse(true, 'ok', ['accounts' => $stmt->fetchAll()]);
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل جلب البيانات: ' . $e->getMessage());
+    }
+}
+
+if ($action === 'add_bank_account' || $action === 'update_bank_account') {
+    $isEdit = ($action === 'update_bank_account');
+    $id = intval($_POST['id'] ?? 0);
+    $accountType = trim($_POST['account_type'] ?? 'bank');
+    $accountName = trim($_POST['account_name'] ?? '');
+    $accountNumber = trim($_POST['account_number'] ?? '');
+    $holderName = trim($_POST['holder_name'] ?? '');
+
+    if (!in_array($accountType, ['bank', 'wallet'], true)) {
+        $accountType = 'bank';
+    }
+    if (!$accountName || !$accountNumber) {
+        sendJSONResponse(false, 'يرجى إدخال اسم البنك أو المحفظة والرقم.');
+    }
+
+    try {
+        $db = db();
+
+        if ($isEdit) {
+            // Verify the academic owns this account before updating
+            $check = $db->prepare("SELECT id FROM academic_bank_accounts WHERE id = ? AND academic_id = ?");
+            $check->execute([$id, $academicId]);
+            if (!$check->fetch()) {
+                sendJSONResponse(false, 'الحساب غير موجود أو لا تملك صلاحية تعديله.');
+            }
+            $db->prepare(
+                "UPDATE academic_bank_accounts SET account_type = ?, account_name = ?, account_number = ?, holder_name = ? WHERE id = ? AND academic_id = ?"
+            )->execute([$accountType, $accountName, $accountNumber, $holderName, $id, $academicId]);
+            sendJSONResponse(true, 'تم تحديث الحساب بنجاح.');
+        } else {
+            $db->prepare(
+                "INSERT INTO academic_bank_accounts (academic_id, account_type, account_name, account_number, holder_name) VALUES (?, ?, ?, ?, ?)"
+            )->execute([$academicId, $accountType, $accountName, $accountNumber, $holderName]);
+            sendJSONResponse(true, 'تمت إضافة الحساب بنجاح.');
+        }
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل الحفظ: ' . $e->getMessage());
+    }
+}
+
+if ($action === 'delete_bank_account') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        sendJSONResponse(false, 'معرّف حساب غير صالح.');
+    }
+    try {
+        $db = db();
+        $del = $db->prepare("DELETE FROM academic_bank_accounts WHERE id = ? AND academic_id = ?");
+        $del->execute([$id, $academicId]);
+        sendJSONResponse(true, 'تم حذف الحساب بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل الحذف: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
+// 11. QUALIFICATIONS (المؤهلات الأكاديمية)
+// ─────────────────────────────────────────────────────────────
+if ($action === 'get_qualifications') {
+    try {
+        $db = db();
+        $stmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY id ASC");
+        $stmt->execute([$academicId]);
+        sendJSONResponse(true, 'ok', ['qualifications' => $stmt->fetchAll()]);
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل جلب البيانات: ' . $e->getMessage());
+    }
+}
+
+if ($action === 'add_qualification' || $action === 'update_qualification') {
+    $isEdit = ($action === 'update_qualification');
+    $id = intval($_POST['id'] ?? 0);
+    $level = trim($_POST['level'] ?? 'بكالوريوس');
+    $field = trim($_POST['field'] ?? '');
+    $university = trim($_POST['university'] ?? '');
+    $country = trim($_POST['country'] ?? '');
+    $year = !empty($_POST['graduation_year']) ? intval($_POST['graduation_year']) : null;
+
+    if (!in_array($level, ['بكالوريوس', 'ماجستير', 'دكتوراه'], true)) {
+        $level = 'بكالوريوس';
+    }
+    if (!$field || !$university) {
+        sendJSONResponse(false, 'يرجى إدخال التخصص والجامعة.');
+    }
+
+    try {
+        $db = db();
+        $docFile = uploadQualificationDoc($_FILES['document_file'] ?? null);
+
+        if ($isEdit) {
+            $check = $db->prepare("SELECT document_file FROM academic_qualifications WHERE id = ? AND academic_id = ?");
+            $check->execute([$id, $academicId]);
+            $existing = $check->fetch();
+            if (!$existing) {
+                sendJSONResponse(false, 'المؤهل غير موجود أو لا تملك صلاحية تعديله.');
+            }
+            if (!$docFile) {
+                $docFile = $existing['document_file'];
+            }
+            $db->prepare(
+                "UPDATE academic_qualifications SET level = ?, field = ?, university = ?, country = ?, graduation_year = ?, document_file = ? WHERE id = ? AND academic_id = ?"
+            )->execute([$level, $field, $university, $country, $year, $docFile, $id, $academicId]);
+            sendJSONResponse(true, 'تم تحديث المؤهل بنجاح.');
+        } else {
+            $db->prepare(
+                "INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)"
+            )->execute([$academicId, $level, $field, $university, $country, $year, $docFile]);
+            sendJSONResponse(true, 'تمت إضافة المؤهل بنجاح.');
+        }
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل حفظ المؤهل: ' . $e->getMessage());
+    }
+}
+
+if ($action === 'delete_qualification') {
+    $id = intval($_POST['id'] ?? 0);
+    if ($id <= 0) {
+        sendJSONResponse(false, 'معرّف مؤهل غير صالح.');
+    }
+    try {
+        $db = db();
+        $del = $db->prepare("DELETE FROM academic_qualifications WHERE id = ? AND academic_id = ?");
+        $del->execute([$id, $academicId]);
+        sendJSONResponse(true, 'تم حذف المؤهل بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل الحذف: ' . $e->getMessage());
     }
 }
 

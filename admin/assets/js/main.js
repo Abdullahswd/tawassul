@@ -178,11 +178,16 @@ const AdminSidebar = {
     document.body.style.overflowY = '';
   },
 
-  markActiveLink() {
+    markActiveLink() {
     const current = window.location.pathname.split('/').pop();
+    if (!current) return;
     document.querySelectorAll('.nav-item').forEach(link => {
       const href = link.getAttribute('href');
-      if (href && href.includes(current)) {
+      if (!href) return;
+      // مطابقة اسم الملف بالكامل (basename) بدلاً من substring
+      // لتجنّب تطابق "academics.php" مع "featured-academics.php"
+      const hrefPage = href.split('/').pop();
+      if (hrefPage === current) {
         link.classList.add('active');
       }
     });

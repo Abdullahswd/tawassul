@@ -17,6 +17,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $sb_db = db();
 $sb_students_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn();
 $sb_academics_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM academics")->fetchColumn();
+$sb_featured_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM featured_academics")->fetchColumn();
 $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
 ?>
 <!-- ============================================
@@ -58,9 +59,9 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
     </a>
 
      <a href="../pages/featured-academics.php" class="nav-item" id="nav-featured-academics">
-      <span class="nav-icon">🎓</span>
+      <span class="nav-icon" style="color:#f59e0b">⭐</span>
       <span class="nav-label">الأكاديميون المتميزون</span>
-      <span class="nav-badge"><?= number_format($sb_academics_cnt) ?></span>
+      <span class="nav-badge" style="background:linear-gradient(135deg,#f59e0b,#d97706)"><?= number_format($sb_featured_cnt) ?></span>
     </a>
 
     <!-- Operations -->

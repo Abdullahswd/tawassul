@@ -6,12 +6,13 @@ requireStudent();
 $user = currentUser();
 $db = db();
 
-// Compute stats
+// حساب الإحصائيات
 $total_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'])->fetchColumn();
 $active_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'revision')")->fetchColumn();
 $completed_orders = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status = 'completed'")->fetchColumn();
+$total_paid = (float) $db->query("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE student_id = " . $user['id'] . " AND status = 'paid'")->fetchColumn();
 
-// Fetch last 3 orders
+// جلب آخر 3 طلبات
 $orders_stmt = $db->prepare("
     SELECT o.*, s.name AS service_name, s.icon AS service_icon
     FROM orders o
@@ -23,7 +24,11 @@ $orders_stmt = $db->prepare("
 $orders_stmt->execute([$user['id']]);
 $recent_orders = $orders_stmt->fetchAll();
 
-// Fetch last 3 notifications
+// جلب الباقات المتاحة للمقترحات
+$packages_stmt = $db->query("SELECT * FROM packages WHERE is_active = 1 ORDER BY price ASC LIMIT 2");
+$featured_packages = $packages_stmt->fetchAll();
+
+// جلب آخر الإشعارات
 $notifications = getNotifications($user['id'], 'student');
 ?>
 <!DOCTYPE html>
@@ -33,8 +38,11 @@ $notifications = getNotifications($user['id'], 'student');
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة الطالب - تواصل</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
+  <style>
+    * { font-family: 'Tajawal', sans-serif; }
+  </style>
 </head>
 <body>
   
@@ -58,6 +66,10 @@ $notifications = getNotifications($user['id'], 'student');
         <a href="services.php" class="nav-item">
           <span class="icon">📦</span>
           <span>الخدمات الأكاديمية</span>
+        </a>
+        <a href="packages.php" class="nav-item">
+          <span class="icon">🎁</span>
+          <span>الباقات المخصصة</span>
         </a>
         <a href="orders.php" class="nav-item">
           <span class="icon">📋</span>
@@ -94,7 +106,7 @@ $notifications = getNotifications($user['id'], 'student');
       <header class="top-navbar">
         <div style="display:flex;align-items:center;gap:16px">
           <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">لوحة التحكم</div>
+          <div class="h3">لوحة التحكم الرئيسية</div>
         </div>
 
         <div class="navbar-actions">
@@ -119,36 +131,45 @@ $notifications = getNotifications($user['id'], 'student');
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px" class="anim-fade-up">
           <div>
             <h1 class="h1" style="margin-bottom:8px">مرحباً بك مجدداً، <?= e($user['name']) ?>! 👋</h1>
-            <p class="text-body">إليك ملخص سريع لحالة طلباتك ونشاطك على المنصة.</p>
+            <p class="text-body">إليك ملخص سريع لحالة طلباتك والباقات المتاحة على المنصة.</p>
           </div>
-          <div>
+          <div class="flex gap-2">
+            <a href="packages.php" class="btn btn-outline">🎁 باقات الخدمات</a>
             <a href="create-order.php" class="btn btn-primary">➕ طلب خدمة جديدة</a>
           </div>
         </div>
 
         <!-- Stats Grid -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:24px;margin-bottom:40px">
-          <div class="card anim-fade-up" style="animation-delay:0.1s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--primary)">
-            <div style="width:60px;height:60px;border-radius:16px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:28px">📋</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));gap:20px;margin-bottom:32px">
+          <div class="card anim-fade-up" style="animation-delay:0.1s;display:flex;align-items:center;gap:16px;border-bottom:4px solid var(--primary)">
+            <div style="width:54px;height:54px;border-radius:16px;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:26px">📋</div>
             <div>
               <div class="text-body" style="font-weight:700">إجمالي الطلبات</div>
               <div class="h1"><?= $total_orders ?></div>
             </div>
           </div>
           
-          <div class="card anim-fade-up" style="animation-delay:0.2s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--warning)">
-            <div style="width:60px;height:60px;border-radius:16px;background:rgba(245,158,11,0.1);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:28px">⏳</div>
+          <div class="card anim-fade-up" style="animation-delay:0.2s;display:flex;align-items:center;gap:16px;border-bottom:4px solid var(--warning)">
+            <div style="width:54px;height:54px;border-radius:16px;background:rgba(245,158,11,0.1);color:var(--warning);display:flex;align-items:center;justify-content:center;font-size:26px">⏳</div>
             <div>
               <div class="text-body" style="font-weight:700">طلبات قيد التنفيذ</div>
               <div class="h1"><?= $active_orders ?></div>
             </div>
           </div>
           
-          <div class="card anim-fade-up" style="animation-delay:0.3s;display:flex;align-items:center;gap:20px;border-bottom:4px solid var(--success)">
-            <div style="width:60px;height:60px;border-radius:16px;background:rgba(16,185,129,0.1);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:28px">✅</div>
+          <div class="card anim-fade-up" style="animation-delay:0.3s;display:flex;align-items:center;gap:16px;border-bottom:4px solid var(--success)">
+            <div style="width:54px;height:54px;border-radius:16px;background:rgba(16,185,129,0.1);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:26px">✅</div>
             <div>
               <div class="text-body" style="font-weight:700">الطلبات المكتملة</div>
               <div class="h1"><?= $completed_orders ?></div>
+            </div>
+          </div>
+
+          <div class="card anim-fade-up" style="animation-delay:0.4s;display:flex;align-items:center;gap:16px;border-bottom:4px solid #8b5cf6">
+            <div style="width:54px;height:54px;border-radius:16px;background:#f3e8ff;color:#7e22ce;display:flex;align-items:center;justify-content:center;font-size:26px">💳</div>
+            <div>
+              <div class="text-body" style="font-weight:700">إجمالي مدفوعاتك</div>
+              <div class="h1"><?= formatMoney($total_paid) ?></div>
             </div>
           </div>
         </div>
@@ -175,7 +196,7 @@ $notifications = getNotifications($user['id'], 'student');
                 </thead>
                 <tbody id="recentOrdersBody">
                   <?php if (empty($recent_orders)): ?>
-                    <tr><td colspan="5" style="text-align:center;padding:32px">ليس لديك أي طلبات حالياً.</td></tr>
+                    <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-secondary)">ليس لديك أي طلبات حالياً.</td></tr>
                   <?php else: ?>
                     <?php foreach ($recent_orders as $o): 
                       $badge = orderStatusLabel($o['status']);
@@ -200,13 +221,14 @@ $notifications = getNotifications($user['id'], 'student');
             </div>
           </div>
 
-          <!-- Quick Actions / Notifications -->
+          <!-- Quick Actions & Packages Offer -->
           <div style="display:flex;flex-direction:column;gap:24px">
             
-            <div class="card anim-fade-up" style="animation-delay:0.5s;background:linear-gradient(135deg, var(--primary), var(--secondary));color:white;border:none">
-              <h3 style="font-size:20px;font-weight:800;margin-bottom:16px">تحتاج مساعدة في بحثك؟</h3>
-              <p style="font-size:14px;opacity:0.9;margin-bottom:24px">اكتشف خدماتنا الأكاديمية المتنوعة وابدأ بطلب خدمتك الآن.</p>
-              <a href="create-order.php" class="btn" style="background:white;color:var(--primary);width:100%">🚀 اطلب خدمة جديدة</a>
+            <div class="card anim-fade-up" style="animation-delay:0.5s;background:linear-gradient(135deg, var(--primary), #5b4dff);color:white;border:none">
+              <span style="font-size:12px;background:rgba(255,255,255,0.2);padding:2px 10px;border-radius:20px;font-weight:700">باقات حصرية</span>
+              <h3 style="font-size:20px;font-weight:800;margin:8px 0 12px">احصل على خصم 30% مع الباقات</h3>
+              <p style="font-size:13px;opacity:0.9;margin-bottom:20px">تجمع لك الباقات الخدمات المكملة بسعر موفر ومتابعة أسرع.</p>
+              <a href="packages.php" class="btn" style="background:white;color:var(--primary);width:100%;font-weight:800">🎁 تصفح باقات الخدمات</a>
             </div>
 
             <div class="card anim-fade-up" style="animation-delay:0.6s">

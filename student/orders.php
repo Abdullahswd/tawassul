@@ -57,6 +57,10 @@ $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id 
           <span class="icon">📦</span>
           <span>الخدمات الأكاديمية</span>
         </a>
+        <a href="packages.php" class="nav-item">
+          <span class="icon">🎁</span>
+          <span>الباقات المخصصة</span>
+        </a>
         <a href="orders.php" class="nav-item active">
           <span class="icon">📋</span>
           <span>طلباتي</span>

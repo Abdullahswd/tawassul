@@ -17,6 +17,18 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 }
 
 $db     = db();
+
+// التأكد من وجود أعمدة icon و original_price و service_ids في جدول packages
+try {
+    $db->exec("ALTER TABLE packages ADD COLUMN icon VARCHAR(20) NOT NULL DEFAULT '📦'");
+} catch (Exception $e) {}
+try {
+    $db->exec("ALTER TABLE packages ADD COLUMN original_price DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+} catch (Exception $e) {}
+try {
+    $db->exec("ALTER TABLE packages ADD COLUMN service_ids TEXT DEFAULT NULL");
+} catch (Exception $e) {}
+
 $action = trim($_POST['action'] ?? '');
 
 /* ── TOGGLE ── */
@@ -49,13 +61,26 @@ if ($action === 'toggle') {
 
 /* ── SAVE (add / edit) ── */
 if ($action === 'save') {
-    $id           = (int)($_POST['id'] ?? 0);
-    $name         = trim($_POST['name'] ?? '');
-    $price        = (float)($_POST['price'] ?? 0);
-    $color        = trim($_POST['color'] ?? '#6366f1');
-    $active       = isset($_POST['active']) ? (int)$_POST['active'] : 1;
-    $features_raw = $_POST['features'] ?? '';
+    $id             = (int)($_POST['id'] ?? 0);
+    $name           = trim($_POST['name'] ?? '');
+    $icon           = trim($_POST['icon'] ?? '📦');
+    $price          = (float)($_POST['price'] ?? 0);
+    $original_price = (float)($_POST['original_price'] ?? 0);
+    $color          = trim($_POST['color'] ?? '#6366f1');
+    $active         = isset($_POST['active']) ? (int)$_POST['active'] : 1;
+    $service_ids_raw = $_POST['service_ids'] ?? '[]';
+    $features_raw   = $_POST['features'] ?? '';
 
+    // معالجة معرّفات الخدمات
+    if (is_array($service_ids_raw)) {
+        $service_ids_arr = array_map('intval', $service_ids_raw);
+    } else {
+        $decoded = json_decode($service_ids_raw, true);
+        $service_ids_arr = is_array($decoded) ? array_map('intval', $decoded) : [];
+    }
+    $service_ids_json = json_encode(array_values($service_ids_arr));
+
+    // معالجة النشرة/المميزات
     if (is_array($features_raw)) {
         $features_arr = $features_raw;
     } else {
@@ -71,13 +96,13 @@ if ($action === 'save') {
 
     try {
         if ($id > 0) {
-            $stmt = $db->prepare("UPDATE packages SET name = ?, price = ?, color = ?, features_json = ?, is_active = ? WHERE id = ?");
-            $ok   = $stmt->execute([$name, $price, $color, $features_json, $active, $id]);
+            $stmt = $db->prepare("UPDATE packages SET name = ?, icon = ?, price = ?, original_price = ?, color = ?, service_ids = ?, features_json = ?, is_active = ? WHERE id = ?");
+            $ok   = $stmt->execute([$name, $icon, $price, $original_price, $color, $service_ids_json, $features_json, $active, $id]);
             ob_end_clean();
             echo json_encode(['success' => (bool)$ok, 'id' => $id]);
         } else {
-            $stmt = $db->prepare("INSERT INTO packages (name, price, color, features_json, is_active) VALUES (?, ?, ?, ?, ?)");
-            $ok   = $stmt->execute([$name, $price, $color, $features_json, $active]);
+            $stmt = $db->prepare("INSERT INTO packages (name, icon, price, original_price, color, service_ids, features_json, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $ok   = $stmt->execute([$name, $icon, $price, $original_price, $color, $service_ids_json, $features_json, $active]);
             ob_end_clean();
             echo json_encode(['success' => (bool)$ok, 'id' => $db->lastInsertId()]);
         }

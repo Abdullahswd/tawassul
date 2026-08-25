@@ -17,6 +17,14 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 }
 
 $db     = db();
+
+// التأكد من وجود عمود price في جدول services
+try {
+    $db->exec("ALTER TABLE services ADD COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+} catch (Exception $e) {
+    // العمود موجود مسبقاً
+}
+
 $action = trim($_POST['action'] ?? '');
 
 /* ── TOGGLE ── */
@@ -54,6 +62,7 @@ if ($action === 'save') {
     $icon     = trim($_POST['icon'] ?? '📚');
     $active   = isset($_POST['active']) ? (int)$_POST['active'] : 1;
     $parentId = isset($_POST['parent_id']) && $_POST['parent_id'] !== '' ? (int)$_POST['parent_id'] : null;
+    $price    = isset($_POST['price']) ? (float)$_POST['price'] : 0.00;
 
     if (!$name) {
         ob_end_clean();
@@ -82,6 +91,11 @@ if ($action === 'save') {
             $level = 1;
         }
 
+        // إتاحة السعر فقط للمستوى 3
+        if ($level !== 3) {
+            $price = 0.00;
+        }
+
         // تعيين sort_order: نأخذ أكبر قيمة حالية لنفس الأب +1
         if ($parentId) {
             $stmt = $db->prepare("SELECT MAX(sort_order) FROM services WHERE parent_id = ?");
@@ -100,15 +114,14 @@ if ($action === 'save') {
                 echo json_encode(['success' => false, 'message' => 'لا يمكن جعل الخدمة أباً لنفسها']);
                 exit;
             }
-            // يمكن إضافة تحقق إضافي لعدم حدوث cycle (اختياري)
-            $stmt = $db->prepare("UPDATE services SET name = ?, icon = ?, is_active = ?, parent_id = ?, level = ?, sort_order = ? WHERE id = ?");
-            $ok = $stmt->execute([$name, $icon, $active, $parentId, $level, $sortOrder, $id]);
+            $stmt = $db->prepare("UPDATE services SET name = ?, icon = ?, price = ?, is_active = ?, parent_id = ?, level = ?, sort_order = ? WHERE id = ?");
+            $ok = $stmt->execute([$name, $icon, $price, $active, $parentId, $level, $sortOrder, $id]);
             ob_end_clean();
             echo json_encode(['success' => (bool)$ok, 'id' => $id, 'level' => $level]);
         } else {
             // إضافة جديدة
-            $stmt = $db->prepare("INSERT INTO services (parent_id, name, icon, is_active, level, sort_order) VALUES (?, ?, ?, ?, ?, ?)");
-            $ok = $stmt->execute([$parentId, $name, $icon, $active, $level, $sortOrder]);
+            $stmt = $db->prepare("INSERT INTO services (parent_id, name, icon, price, is_active, level, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            $ok = $stmt->execute([$parentId, $name, $icon, $price, $active, $level, $sortOrder]);
             $newId = $db->lastInsertId();
             ob_end_clean();
             echo json_encode(['success' => (bool)$ok, 'id' => $newId, 'level' => $level]);

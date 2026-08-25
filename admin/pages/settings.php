@@ -56,6 +56,10 @@ $smtp_password = getSetting($settings, 'smtp_password', '');
 $admin_name = $admin['name'] ?? 'المدير العام';
 $admin_email = $admin['email'] ?? 'admin@tawassul.com';
 $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
+
+// Platform payment methods (طرق الدفع)
+$paymentMethods = $db->query("SELECT * FROM platform_payment_methods ORDER BY sort_order ASC, id ASC")->fetchAll();
+$pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظة إلكترونية'];
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -97,7 +101,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
               <button class="settings-menu-btn" onclick="showSection('profile',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">👤 الملف الشخصي</button>
               <button class="settings-menu-btn" onclick="showSection('security',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">🔒 الأمان</button>
               <button class="settings-menu-btn" onclick="showSection('notifications',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">🔔 الإشعارات</button>
-              <button class="settings-menu-btn" onclick="showSection('payment',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">💳 بوابات الدفع</button>
+              <button class="settings-menu-btn" onclick="showSection('payment',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">💳 طرق الدفع</button>
               <button class="settings-menu-btn" onclick="showSection('appearance',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">🎨 المظهر</button>
               <button class="settings-menu-btn" onclick="showSection('email',this)" style="display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border-radius:10px;border:none;background:transparent;color:var(--text-secondary);font-family:Tajawal,sans-serif;font-size:14px;cursor:pointer;margin-bottom:4px;text-align:right">📧 إعدادات البريد</button>
             </div>
@@ -275,41 +279,42 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
               </div>
             </div>
 
-            <!-- Payment Gateways -->
+            <!-- Payment Methods (طرق الدفع) -->
             <div id="section-payment" class="settings-section" style="display:none">
               <div class="stat-card animate-fadeInUp" style="padding:24px">
-                <h3 style="font-size:17px;font-weight:700;margin-bottom:20px;color:var(--text-primary)">💳 بوابات الدفع</h3>
-                <div style="display:flex;flex-direction:column;gap:16px">
-                  <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                    <div style="display:flex;align-items:center;gap:14px">
-                      <div style="font-size:32px">💠</div>
-                      <div>
-                        <div style="font-size:15px;font-weight:700">Stripe</div>
-                        <div style="font-size:12px;color:var(--text-secondary)">بوابة دفع دولية</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:8px">
+                  <h3 style="font-size:17px;font-weight:700;color:var(--text-primary)">💳 طرق الدفع</h3>
+                  <button class="btn btn-primary" onclick="openMethodForm()">+ إضافة طريقة دفع</button>
+                </div>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">حسابات المنصة البنكية والمحافظ التي يحوّل إليها الطلاب عند الدفع</p>
+
+                <div id="paymentMethodsList" style="display:flex;flex-direction:column;gap:12px">
+                  <?php if (empty($paymentMethods)): ?>
+                    <p id="pmEmpty" style="color:var(--text-secondary);text-align:center;padding:30px 0">لا توجد طرق دفع بعد، اضغط "إضافة طريقة دفع" لإضافة حساب بنكي أو محفظة للمنصة.</p>
+                  <?php else: ?>
+                    <?php foreach ($paymentMethods as $pm):
+                      $isWallet = ($pm['account_type'] === 'wallet');
+                      $accent = $isWallet ? 'var(--secondary)' : 'var(--primary)';
+                      $icon = $isWallet ? '👛' : '🏦';
+                      $active = ((int)$pm['is_active'] === 1);
+                    ?>
+                      <div class="pm-item" data-id="<?= (int)$pm['id'] ?>" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--bg-card);flex-wrap:wrap;<?= $active ? '' : 'opacity:.55' ?>">
+                        <div style="display:flex;align-items:center;gap:14px">
+                          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,<?= $isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8' ?>);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0"><?= $icon ?></div>
+                          <div>
+                            <div style="font-size:13px;font-weight:700;color:<?= $accent ?>"><?= $pmTypeLabels[$pm['account_type']] ?? $pm['account_type'] ?></div>
+                            <div style="font-weight:700;color:var(--text-primary)"><?= e($pm['account_name']) ?></div>
+                            <div style="font-size:13px;color:var(--text-secondary)" dir="ltr"><?= e($pm['account_number']) ?><?= $pm['holder_name'] ? ' · ' . e($pm['holder_name']) : '' ?></div>
+                          </div>
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center">
+                          <label class="toggle-switch" title="<?= $active ? 'إيقاف' : 'تفعيل' ?>" style="margin-left:4px"><input type="checkbox" onchange="toggleMethod(<?= (int)$pm['id'] ?>)" <?= $active ? 'checked' : '' ?> /><span class="toggle-slider"></span></label>
+                          <button class="btn btn-outline btn-sm" onclick="openMethodForm(<?= (int)$pm['id'] ?>)">✏️ تعديل</button>
+                          <button class="btn btn-danger btn-sm" onclick="deleteMethod(<?= (int)$pm['id'] ?>, '<?= e($pm['account_name'], true) ?>')">🗑️ حذف</button>
+                        </div>
                       </div>
-                    </div>
-                    <div><label class="toggle-switch"><input type="checkbox" id="payment_stripe_enabled" <?= $payment_stripe_enabled == '1' ? 'checked' : '' ?> /><span class="toggle-slider"></span></label></div>
-                  </div>
-                  <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                    <div style="display:flex;align-items:center;gap:14px">
-                      <div style="font-size:32px">🟢</div>
-                      <div>
-                        <div style="font-size:15px;font-weight:700">Moyasar</div>
-                        <div style="font-size:12px;color:var(--text-secondary)">بوابة دفع سعودية</div>
-                      </div>
-                    </div>
-                    <div><label class="toggle-switch"><input type="checkbox" id="payment_moyasar_enabled" <?= $payment_moyasar_enabled == '1' ? 'checked' : '' ?> /><span class="toggle-slider"></span></label></div>
-                  </div>
-                  <div style="padding:20px;border:1px solid var(--border-color);border-radius:14px;display:flex;justify-content:space-between;align-items:center">
-                    <div style="display:flex;align-items:center;gap:14px">
-                      <div style="font-size:32px">🔵</div>
-                      <div>
-                        <div style="font-size:15px;font-weight:700">PayPal</div>
-                        <div style="font-size:12px;color:var(--text-secondary)">بوابة دفع عالمية</div>
-                      </div>
-                    </div>
-                    <div><label class="toggle-switch"><input type="checkbox" id="payment_paypal_enabled" <?= $payment_paypal_enabled == '1' ? 'checked' : '' ?> /><span class="toggle-slider"></span></label></div>
-                  </div>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
                 </div>
               </div>
             </div>
@@ -368,6 +373,51 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
     </div>
   </div>
 
+  <!-- Confirm Modal (required for Modal.confirm) -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box" style="max-width:420px">
+      <div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد الحذف</h3><button class="modal-close" data-modal-close>✕</button></div>
+      <div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:64px;margin-bottom:16px">⚠️</div><p id="confirmMessage" style="color:var(--text-secondary);font-size:15px"></p></div>
+      <div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmBtn">تأكيد</button></div>
+    </div>
+  </div>
+
+  <!-- Payment method modal -->
+  <div class="modal-overlay" id="methodModal">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-header">
+        <h3 class="modal-title" id="methodModalTitle">إضافة طريقة دفع</h3>
+        <button class="modal-close" data-modal-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="methodId" value="" />
+        <div class="form-group">
+          <label class="form-label">نوع الحساب</label>
+          <select class="form-input form-select" id="methodType" onchange="updateMethodLabels()" style="padding-left:36px">
+            <option value="bank">🏦 حساب بنكي</option>
+            <option value="wallet">👛 محفظة إلكترونية</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="methodNameLabel">اسم البنك</label>
+          <input class="form-input" id="methodName" placeholder="ادخل اسم المحفظه او البنك" />
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="methodNumberLabel">رقم الحساب (IBAN)</label>
+          <input class="form-input" id="methodNumber" dir="ltr" placeholder="0000 0000 0000 0000 0000" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">اسم صاحب الحساب</label>
+          <input class="form-input" id="methodHolder" placeholder="اسم صاحب الحساب كما في البنك" />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" data-modal-close>إلغاء</button>
+        <button class="btn btn-primary" onclick="saveMethod()">💾 حفظ</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../assets/js/main.js"></script>
   <script>
     // Helper functions
@@ -395,7 +445,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       Toast.show('تم اختيار اللون', 'success');
     }
 
-    function setTheme(mode) {
+    function setTheme(mode, showToast = true) {
       document.getElementById('theme_mode').value = mode;
       if (mode === 'dark') {
         document.body.classList.add('dark-mode');
@@ -411,7 +461,9 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
         lightDiv.querySelector('span:last-child').style.color = mode === 'light' ? 'var(--primary)' : 'var(--text-secondary)';
         darkDiv.querySelector('span:last-child').style.color = mode === 'dark' ? 'var(--primary)' : 'var(--text-secondary)';
       }
-      Toast.show(`تم تفعيل الوضع ${mode === 'dark' ? 'الداكن' : 'الفاتح'}`, 'success');
+      if (showToast) {
+        Toast.show(`تم تفعيل الوضع ${mode === 'dark' ? 'الداكن' : 'الفاتح'}`, 'success');
+      }
     }
 
     // حفظ جميع الإعدادات
@@ -451,11 +503,6 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       formData.append('daily_summary_email', document.getElementById('daily_summary_email').checked ? '1' : '0');
       formData.append('notify_new_academic', document.getElementById('notify_new_academic').checked ? '1' : '0');
 
-      // بوابات الدفع
-      formData.append('payment_stripe_enabled', document.getElementById('payment_stripe_enabled').checked ? '1' : '0');
-      formData.append('payment_moyasar_enabled', document.getElementById('payment_moyasar_enabled').checked ? '1' : '0');
-      formData.append('payment_paypal_enabled', document.getElementById('payment_paypal_enabled').checked ? '1' : '0');
-
       // المظهر
       formData.append('primary_color', document.getElementById('primary_color').value);
       formData.append('theme_mode', document.getElementById('theme_mode').value);
@@ -466,7 +513,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       formData.append('smtp_user', document.getElementById('smtp_user').value);
       formData.append('smtp_password', document.getElementById('smtp_password').value);
 
-      fetch('/tawassul/admin/ajax/manage_settings.php', {
+      fetch('../ajax/manage_settings.php', {
           method: 'POST',
           body: formData,
           credentials: 'same-origin'
@@ -496,7 +543,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       formData.append('email', document.getElementById('admin_email').value);
       formData.append('phone', document.getElementById('admin_phone').value);
 
-      fetch('/tawassul/admin/ajax/manage_settings.php', {
+      fetch('../ajax/manage_settings.php', {
           method: 'POST',
           body: formData,
           credentials: 'same-origin'
@@ -540,7 +587,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       formData.append('new_password', newPass);
       formData.append('confirm_password', confirm);
 
-      fetch('/tawassul/admin/ajax/manage_settings.php', {
+      fetch('../ajax/manage_settings.php', {
           method: 'POST',
           body: formData,
           credentials: 'same-origin'
@@ -577,7 +624,7 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
       } else {
         document.body.classList.remove('dark-mode');
       }
-      setTheme(savedTheme); // لتحديث واجهة الاختيار
+      setTheme(savedTheme, false); // تطبيق الثيم المحفوظ عند فتح الصفحة بدون إشعار
     });
 
     // إعداد القائمة النشطة
@@ -587,6 +634,156 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
         document.getElementById('section-' + id).style.display = 'block';
       }
     });
+
+    /* =============================================
+       PAYMENT METHODS (طرق الدفع)
+       ============================================= */
+    let methodStore = <?= json_encode($paymentMethods, JSON_UNESCAPED_UNICODE) ?>;
+
+    function pmEsc(v) {
+      return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    function pmJs(v) {
+      return String(v || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
+    }
+
+    function updateMethodLabels() {
+      const isWallet = document.getElementById('methodType').value === 'wallet';
+      document.getElementById('methodNameLabel').textContent = isWallet ? 'اسم المحفظة' : 'اسم البنك';
+      document.getElementById('methodNumberLabel').textContent = isWallet ? 'رقم المحفظة' : 'رقم الحساب (IBAN)';
+      document.getElementById('methodNumber').placeholder = isWallet ? 'xxxxxxxx' : '0000 0000 0000 0000 0000';
+    }
+
+    function openMethodForm(id) {
+      const mId = id ? String(id) : '';
+      document.getElementById('methodId').value = mId;
+      if (mId) {
+        const m = methodStore.find(x => String(x.id) === mId);
+        if (!m) { Toast.show('طريقة الدفع غير موجودة', 'error'); return; }
+        document.getElementById('methodModalTitle').textContent = 'تعديل طريقة دفع';
+        document.getElementById('methodType').value = m.account_type;
+        document.getElementById('methodName').value = m.account_name || '';
+        document.getElementById('methodNumber').value = m.account_number || '';
+        document.getElementById('methodHolder').value = m.holder_name || '';
+      } else {
+        document.getElementById('methodModalTitle').textContent = 'إضافة طريقة دفع';
+        document.getElementById('methodType').value = 'bank';
+        document.getElementById('methodName').value = '';
+        document.getElementById('methodNumber').value = '';
+        document.getElementById('methodHolder').value = '';
+      }
+      updateMethodLabels();
+      Modal.open('methodModal');
+    }
+
+    function methodCard(m) {
+      const isWallet = m.account_type === 'wallet';
+      const accent = isWallet ? 'var(--secondary)' : 'var(--primary)';
+      const icon = isWallet ? '👛' : '🏦';
+      const typeLabel = isWallet ? '👛 محفظة إلكترونية' : '🏦 حساب بنكي';
+      const grad = isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8';
+      const active = m.is_active == 1;
+      const holder = m.holder_name ? ' · ' + pmEsc(m.holder_name) : '';
+      return '<div class="pm-item" data-id="' + m.id + '" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--bg-card);flex-wrap:wrap;' + (active ? '' : 'opacity:.55') + '">'
+        + '<div style="display:flex;align-items:center;gap:14px">'
+        + '<div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,' + grad + ');display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">' + icon + '</div>'
+        + '<div>'
+        + '<div style="font-size:13px;font-weight:700;color:' + accent + '">' + typeLabel + '</div>'
+        + '<div style="font-weight:700;color:var(--text-primary)">' + pmEsc(m.account_name) + '</div>'
+        + '<div style="font-size:13px;color:var(--text-secondary)" dir="ltr">' + pmEsc(m.account_number) + holder + '</div>'
+        + '</div></div>'
+        + '<div style="display:flex;gap:8px;align-items:center">'
+        + '<label class="toggle-switch" style="margin-left:4px"><input type="checkbox" onchange="toggleMethod(' + m.id + ')"' + (active ? ' checked' : '') + ' /><span class="toggle-slider"></span></label>'
+        + '<button class="btn btn-outline btn-sm" onclick="openMethodForm(' + m.id + ')">✏️ تعديل</button>'
+        + '<button class="btn btn-danger btn-sm" onclick="deleteMethod(' + m.id + ', \'' + pmJs(m.account_name) + '\')">🗑️ حذف</button>'
+        + '</div></div>';
+    }
+
+    function renderMethodsList() {
+      const list = document.getElementById('paymentMethodsList');
+      if (!list) return;
+      if (!methodStore.length) {
+        list.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:30px 0">لا توجد طرق دفع بعد، اضغط "إضافة طريقة دفع" لإضافة حساب بنكي أو محفظة للمنصة.</p>';
+        return;
+      }
+      list.innerHTML = methodStore.map(methodCard).join('');
+    }
+
+    function loadMethods() {
+      const fd = new FormData();
+      fd.append('action', 'get_methods');
+      fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+          if (!res.success) { Toast.show(res.message || 'تعذر جلب البيانات', 'error'); return; }
+          methodStore = res.methods || [];
+          renderMethodsList();
+        })
+        .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+    }
+
+    function saveMethod() {
+      const id = document.getElementById('methodId').value;
+      const account_type = document.getElementById('methodType').value;
+      const account_name = document.getElementById('methodName').value.trim();
+      const account_number = document.getElementById('methodNumber').value.trim();
+      const holder_name = document.getElementById('methodHolder').value.trim();
+
+      if (!account_name || !account_number) {
+        Toast.show('يرجى إدخال اسم البنك أو المحفظة والرقم', 'error');
+        return;
+      }
+
+      const action = id ? 'update_method' : 'add_method';
+      const fd = new FormData();
+      fd.append('action', action);
+      fd.append('id', id || 0);
+      fd.append('account_type', account_type);
+      fd.append('account_name', account_name);
+      fd.append('account_number', account_number);
+      fd.append('holder_name', holder_name);
+
+      fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            Toast.show(res.message, 'success');
+            Modal.close('methodModal');
+            loadMethods();
+          } else {
+            Toast.show(res.message || 'حدث خطأ ما', 'error');
+          }
+        })
+        .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+    }
+
+    function deleteMethod(id, name) {
+      Modal.confirm('حذف طريقة الدفع', 'هل تريد حذف "' + (name || '') + '" نهائياً؟', () => {
+        const fd = new FormData();
+        fd.append('action', 'delete_method');
+        fd.append('id', id);
+        fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) { Toast.show(res.message, 'success'); loadMethods(); }
+            else Toast.show(res.message || 'حدث خطأ ما', 'error');
+          })
+          .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+      });
+    }
+
+    function toggleMethod(id) {
+      const fd = new FormData();
+      fd.append('action', 'toggle_method');
+      fd.append('id', id);
+      fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) { Toast.show(res.message, 'info'); loadMethods(); }
+          else { Toast.show(res.message || 'حدث خطأ ما', 'error'); loadMethods(); }
+        })
+        .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+    }
   </script>
 </body>
 

@@ -221,6 +221,129 @@ $payments = $payments_stmt->fetchAll();
         </div>
 
       </div>
+
+      <!-- ===================== Academic Payouts ===================== -->
+      <div class="chart-card animate-fadeInUp delay-2" style="margin-top:28px">
+        <div class="chart-header">
+          <div>
+            <h3 class="chart-title">💸 دفعات الأكاديميين</h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin-top:2px">الحسابات البنكية للأكاديميين وتسجيل المدفوعات المدفوعة لهم</p>
+          </div>
+          <button class="btn btn-primary" onclick="openPayoutForm()">➕ دفع لأكاديمي</button>
+        </div>
+      </div>
+
+      <!-- Payout stats -->
+      <div class="grid-responsive-4" style="margin:20px 0">
+        <div class="stat-card animate-fadeInUp delay-1" style="background:linear-gradient(135deg,#f59e0b,#d97706);color:white;border:none">
+          <div class="card-icon" style="background:rgba(255,255,255,0.2);margin-bottom:12px">💸</div>
+          <div class="card-value" style="font-size:26px;color:white" id="payTotal">0</div>
+          <div class="card-label" style="color:rgba(255,255,255,0.85)">إجمالي المدفوع للأكاديميين</div>
+        </div>
+        <div class="stat-card animate-fadeInUp delay-2" style="padding:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div><div class="card-value" style="font-size:26px;color:var(--success)" id="payThisMonth">0</div><div class="card-label">مدفوع هذا الشهر</div></div>
+            <div class="card-icon" style="background:rgba(16,185,129,0.1);margin:0">📅</div>
+          </div>
+        </div>
+        <div class="stat-card animate-fadeInUp delay-3" style="padding:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div><div class="card-value" style="font-size:26px;color:var(--warning)" id="payPending">0</div><div class="card-label">أرباح مستحقة (رصيد)</div></div>
+            <div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0">⏳</div>
+          </div>
+        </div>
+        <div class="stat-card animate-fadeInUp delay-4" style="padding:22px">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div><div class="card-value" style="font-size:26px;color:var(--primary)" id="payCount">0</div><div class="card-label">عدد الدفعات</div></div>
+            <div class="card-icon" style="background:rgba(99,102,241,0.1);margin:0">🧾</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Academics & bank accounts table -->
+      <div class="table-container animate-fadeInUp delay-3">
+        <div class="table-header">
+          <h3 class="table-title">أكاديميون وحساباتهم البنكية</h3>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>الأكاديمي</th>
+                <th>الحسابات البنكية / المحافظ</th>
+                <th>الرصيد المستحق</th>
+                <th>إجمالي المكاسب</th>
+                <th>سبق دفعه</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="academicsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Payout history table -->
+      <div class="table-container animate-fadeInUp delay-3" style="margin-top:20px">
+        <div class="table-header">
+          <h3 class="table-title">سجل دفعات الأكاديميين</h3>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>رقم الدفعة</th>
+                <th>الأكاديمي</th>
+                <th>الحساب المستلم</th>
+                <th>المبلغ</th>
+                <th>التاريخ</th>
+                <th>ملاحظة</th>
+              </tr>
+            </thead>
+            <tbody id="payoutsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Payout modal -->
+<div class="modal-overlay" id="payoutModal">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <h3 class="modal-title">تسجيل دفعة لأكاديمي</h3>
+      <button class="modal-close" data-modal-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">الأكاديمي</label>
+        <select class="form-input form-select" id="payoutAcademic" onchange="onPayoutAcademicChange()" style="padding-left:36px">
+          <option value="">اختر الأكاديمي</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">الحساب البنكي / المحفظة المستلمة</label>
+        <select class="form-input form-select" id="payoutBank" style="padding-left:36px">
+          <option value="0">بدون تحديد</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">المبلغ (ر.س)</label>
+        <input type="number" class="form-input" id="payoutAmount" min="0" step="0.01" placeholder="0.00" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">تاريخ الدفعة</label>
+        <input type="date" class="form-input" id="payoutDate" value="<?= date('Y-m-d') ?>" />
+      </div>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">ملاحظة (اختياري)</label>
+        <input class="form-input" id="payoutNote" placeholder="ملاحظات حول الدفعة" />
+      </div>
+      <div id="payoutBalanceHint" style="font-size:12px;color:var(--text-secondary);margin-top:12px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" data-modal-close>إلغاء</button>
+      <button class="btn btn-primary" onclick="savePayout()">💸 تأكيد الدفع</button>
     </div>
   </div>
 </div>
@@ -284,6 +407,7 @@ document.getElementById('payMethodFilter')?.addEventListener('change', applyPayF
 
 document.addEventListener('DOMContentLoaded', () => {
   renderPayments(MOCK_DATA.payments);
+  loadPayoutData();
   setTimeout(() => {
     Charts.drawLineChart('revenueChart', MOCK_DATA.chartData.revenue, MOCK_DATA.chartData.months, '#10b981');
   }, 200);
@@ -291,6 +415,161 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('resize', () => {
   Charts.drawLineChart('revenueChart', MOCK_DATA.chartData.revenue, MOCK_DATA.chartData.months, '#10b981');
 });
+
+/* =============================================
+   ACADEMIC PAYOUTS (دفعات الأكاديميين)
+   ============================================= */
+let PAYOUT_DATA = { academics: [], payouts: [], stats: {} };
+
+function fmtMoney(n) { return Number(n || 0).toLocaleString('ar'); }
+function escHtml(v) {
+  return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function bankBadge(acc) {
+  const isWallet = acc.account_type === 'wallet';
+  const icon = isWallet ? '👛' : '🏦';
+  return `<span style="display:inline-flex;align-items:center;gap:6px;background:var(--bg-main);border:1px solid var(--border-color);border-radius:8px;padding:4px 8px;font-size:12px;margin:2px 4px 2px 0"><span>${icon}</span><span>${escHtml(acc.account_name)}</span><span style="color:var(--text-secondary)" dir="ltr">${escHtml(acc.account_number)}</span></span>`;
+}
+
+function loadPayoutData() {
+  const fd = new FormData();
+  fd.append('action', 'get_data');
+  fetch('../ajax/manage_payouts.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (!res.success) { Toast.show(res.message || 'تعذر جلب البيانات', 'error'); return; }
+      PAYOUT_DATA = { academics: res.academics, payouts: res.payouts, stats: res.stats };
+      renderPayoutStats();
+      renderAcademicsTable();
+      renderPayoutsTable();
+    })
+    .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+}
+
+function renderPayoutStats() {
+  const s = PAYOUT_DATA.stats || {};
+  const set = (id, txt) => { const el = document.getElementById(id); if (el) el.textContent = txt; };
+  set('payTotal', fmtMoney(s.total_paid) + ' ر.س');
+  set('payThisMonth', fmtMoney(s.this_month) + ' ر.س');
+  set('payPending', fmtMoney(s.total_pending) + ' ر.س');
+  set('payCount', fmtMoney(s.payouts_count));
+}
+
+function renderAcademicsTable() {
+  const tbody = document.getElementById('academicsTableBody');
+  if (!tbody) return;
+  if (!PAYOUT_DATA.academics.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:24px">لم يتم العثور على أكاديميين معتمدين.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = PAYOUT_DATA.academics.map((a, i) => {
+    const banksHtml = a.bank_accounts.length
+      ? a.bank_accounts.map(bankBadge).join('')
+      : '<span style="color:var(--text-secondary);font-size:12px">لا توجد حسابات مسجلة</span>';
+    const initials = escHtml(a.avatar_initials || (a.name || '').slice(0, 2));
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="table-avatar" style="background:${getAvatarColor(i)};width:34px;height:34px;border-radius:8px;font-size:12px;color:white">${initials}</div>
+          <span style="font-weight:600">${escHtml(a.name)}</span>
+        </div>
+      </td>
+      <td style="min-width:220px">${banksHtml}</td>
+      <td><strong style="color:var(--warning)">${fmtMoney(a.balance)} ر.س</strong></td>
+      <td style="color:var(--text-secondary)">${fmtMoney(a.total_earned)} ر.س</td>
+      <td style="color:var(--success)">${fmtMoney(a.total_paid)} ر.س</td>
+      <td>
+        <button class="btn btn-sm btn-primary" onclick="openPayoutForm(${a.id})">💸 دفع</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderPayoutsTable() {
+  const tbody = document.getElementById('payoutsTableBody');
+  if (!tbody) return;
+  if (!PAYOUT_DATA.payouts.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary);padding:24px">لا توجد دفعات مسجلة بعد.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = PAYOUT_DATA.payouts.map(p => {
+    const receiver = p.bank_name
+      ? `${p.bank_type === 'wallet' ? '👛' : '🏦'} ${escHtml(p.bank_name)} <span style="color:var(--text-secondary)" dir="ltr">${escHtml(p.bank_number)}</span>`
+      : '<span style="color:var(--text-secondary)">—</span>';
+    return `<tr>
+      <td><span style="font-family:monospace;font-size:13px;background:var(--bg-main);padding:3px 8px;border-radius:6px">${escHtml(p.payout_number)}</span></td>
+      <td style="font-weight:600">${escHtml(p.academic_name || '-')}</td>
+      <td>${receiver}</td>
+      <td><strong style="color:var(--success)">${fmtMoney(p.amount)} ر.س</strong></td>
+      <td style="color:var(--text-secondary);font-size:13px">${escHtml(p.paid_at)}</td>
+      <td style="color:var(--text-secondary);font-size:13px">${escHtml(p.note || '—')}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ---- Payout modal handlers ---- */
+function openPayoutForm(academicId) {
+  const sel = document.getElementById('payoutAcademic');
+  sel.innerHTML = '<option value="">اختر الأكاديمي</option>'
+    + PAYOUT_DATA.academics.map(a => `<option value="${a.id}">${escHtml(a.name)}</option>`).join('');
+  document.getElementById('payoutBank').innerHTML = '<option value="0">بدون تحديد</option>';
+  document.getElementById('payoutAmount').value = '';
+  document.getElementById('payoutNote').value = '';
+  document.getElementById('payoutDate').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('payoutBalanceHint').textContent = '';
+  if (academicId) { sel.value = String(academicId); onPayoutAcademicChange(); }
+  Modal.open('payoutModal');
+}
+
+function onPayoutAcademicChange() {
+  const sel = document.getElementById('payoutAcademic');
+  const bankSel = document.getElementById('payoutBank');
+  const hint = document.getElementById('payoutBalanceHint');
+  const id = sel.value;
+  if (!id) { bankSel.innerHTML = '<option value="0">بدون تحديد</option>'; hint.textContent = ''; return; }
+  const a = PAYOUT_DATA.academics.find(x => String(x.id) === String(id));
+  bankSel.innerHTML = '<option value="0">بدون تحديد</option>';
+  if (a && a.bank_accounts.length) {
+    bankSel.innerHTML += a.bank_accounts.map(b => `<option value="${b.id}">${b.account_type === 'wallet' ? '👛 ' : '🏦 '}${escHtml(b.account_name)}</option>`).join('');
+  }
+  if (a) hint.textContent = 'الرصيد المستحق لهذا الأكاديمي: ' + fmtMoney(a.balance) + ' ر.س';
+}
+
+function savePayout() {
+  const academicId = document.getElementById('payoutAcademic').value;
+  const bankId = document.getElementById('payoutBank').value;
+  const amount = parseFloat(document.getElementById('payoutAmount').value);
+  const date = document.getElementById('payoutDate').value;
+  const note = document.getElementById('payoutNote').value.trim();
+
+  if (!academicId) { Toast.show('يرجى اختيار الأكاديمي', 'error'); return; }
+  if (!amount || amount <= 0) { Toast.show('يرجى إدخال مبلغ صحيح', 'error'); return; }
+
+  const a = PAYOUT_DATA.academics.find(x => String(x.id) === String(academicId));
+  if (a && amount > a.balance) { Toast.show('المبلغ أكبر من الرصيد المستحق (' + fmtMoney(a.balance) + ' ر.س)', 'error'); return; }
+
+  const fd = new FormData();
+  fd.append('action', 'add_payout');
+  fd.append('academic_id', academicId);
+  fd.append('bank_account_id', bankId || 0);
+  fd.append('amount', amount);
+  fd.append('paid_at', date);
+  fd.append('note', note);
+
+  fetch('../ajax/manage_payouts.php', { method: 'POST', body: fd })
+    .then(r => r.json())
+    .then(res => {
+      if (res.success) {
+        Toast.show(res.message, 'success');
+        Modal.close('payoutModal');
+        loadPayoutData();
+      } else {
+        Toast.show(res.message || 'حدث خطأ ما', 'error');
+      }
+    })
+    .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+}
 </script>
 </body>
 </html>
