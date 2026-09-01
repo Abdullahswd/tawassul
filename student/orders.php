@@ -23,102 +23,15 @@ $db = db();
 $cnt_all = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'])->fetchColumn();
 $cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'revision')")->fetchColumn();
 $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status = 'completed'")->fetchColumn();
+
+$pageTitle  = 'طلباتي';
+$activePage = 'orders';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>طلباتي - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
-  
-  <div class="mobile-overlay" id="mobileOverlay"></div>
 
-  <div class="app-container">
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item">
-          <span class="icon">📊</span>
-          <span>لوحة المعلومات</span>
-        </a>
-        <a href="services.php" class="nav-item">
-          <span class="icon">📦</span>
-          <span>الخدمات الأكاديمية</span>
-        </a>
-        <a href="packages.php" class="nav-item">
-          <span class="icon">🎁</span>
-          <span>الباقات المخصصة</span>
-        </a>
-        <a href="orders.php" class="nav-item active">
-          <span class="icon">📋</span>
-          <span>طلباتي</span>
-        </a>
-        <a href="chat.php" class="nav-item">
-          <span class="icon">💬</span>
-          <span>المحادثات</span>
-        </a>
-        <a href="payments.php" class="nav-item">
-          <span class="icon">💳</span>
-          <span>المدفوعات</span>
-        </a>
-        
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item">
-          <span class="icon">👤</span>
-          <span>الملف الشخصي</span>
-        </a>
-      </nav>
-      
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span>
-          <span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-area">
-      
-      <!-- Top Navbar -->
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">قائمة الطلبات</div>
-        </div>
-
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
-          </button>
-          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
-          <div class="user-profile">
-            <div class="user-info" style="text-align:left">
-              <span class="user-name"><?= e($user['name']) ?></span>
-              <span class="user-role">طالب</span>
-            </div>
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
-
-      <!-- Page Content -->
-      <div class="content-wrap">
-        
-        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px">
+      <!-- PAGE CONTENT -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:32px">
           <div>
             <h1 class="h1" style="margin-bottom:8px">طلباتي</h1>
             <p class="text-body">إدارة ومتابعة كافة طلباتك السابقة والحالية.</p>
@@ -182,10 +95,4 @@ $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id 
           </div>
         </div>
 
-      </div>
-    </main>
-  </div>
-
-  <script src="assets/js/main.js"></script>
-</body>
-</html>
+<?php require __DIR__ . '/partials/footer.php'; ?>

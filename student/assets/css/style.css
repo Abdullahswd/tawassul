@@ -7,34 +7,48 @@
 
 :root {
   /* Colors */
-  --primary: #4f46e5;      /* Indigo 600 */
-  --primary-hover: #4338ca; /* Indigo 700 */
-  --primary-light: #e0e7ff; /* Indigo 100 */
-  
-  --secondary: #ec4899;    /* Pink 500 */
-  
-  --success: #10b981;      /* Emerald 500 */
-  --warning: #f59e0b;      /* Amber 500 */
-  --danger:  #ef4444;      /* Red 500 */
-  --info:    #3b82f6;      /* Blue 500 */
+  --primary: #4f46e5;
+  /* Indigo 600 */
+  --primary-hover: #4338ca;
+  /* Indigo 700 */
+  --primary-light: #e0e7ff;
+  /* Indigo 100 */
+
+  --secondary: #ec4899;
+  /* Pink 500 */
+
+  --success: #10b981;
+  /* Emerald 500 */
+  --warning: #f59e0b;
+  /* Amber 500 */
+  --danger: #ef4444;
+  /* Red 500 */
+  --info: #3b82f6;
+  /* Blue 500 */
 
   /* Surface / Backgrounds */
-  --bg-body: #f8fafc;      /* Slate 50 */
-  --bg-card: #ffffff;      
-  --bg-hover: #f1f5f9;     /* Slate 100 */
+  --bg-body: #f8fafc;
+  /* Slate 50 */
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  /* Slate 100 */
 
   /* Typography Colors */
-  --text-primary: #0f172a; /* Slate 900 */
-  --text-secondary: #64748b; /* Slate 500 */
-  --text-muted: #94a3b8;   /* Slate 400 */
+  --text-primary: #0f172a;
+  /* Slate 900 */
+  --text-secondary: #64748b;
+  /* Slate 500 */
+  --text-muted: #94a3b8;
+  /* Slate 400 */
 
   /* Borders / Spacing */
-  --border-color: #e2e8f0; /* Slate 200 */
+  --border-color: #e2e8f0;
+  /* Slate 200 */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-full: 9999px;
-  
+
   /* Shadows */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -43,15 +57,22 @@
 
 /* Dark Mode Overrides */
 .dark {
-  --bg-body: #0f172a;      /* Slate 900 */
-  --bg-card: #1e293b;      /* Slate 800 */
-  --bg-hover: #334155;     /* Slate 700 */
+  --bg-body: #0f172a;
+  /* Slate 900 */
+  --bg-card: #1e293b;
+  /* Slate 800 */
+  --bg-hover: #334155;
+  /* Slate 700 */
 
-  --text-primary: #f8fafc; /* Slate 50 */
-  --text-secondary: #cbd5e1; /* Slate 300 */
-  --text-muted: #64748b;   /* Slate 500 */
+  --text-primary: #f8fafc;
+  /* Slate 50 */
+  --text-secondary: #cbd5e1;
+  /* Slate 300 */
+  --text-muted: #64748b;
+  /* Slate 500 */
 
-  --border-color: #334155; /* Slate 700 */
+  --border-color: #334155;
+  /* Slate 700 */
   --primary-light: rgba(79, 70, 229, 0.2);
 }
 
@@ -71,10 +92,29 @@ a {
 }
 
 /* Typography Custom Classes */
-.h1 { font-size: 28px; font-weight: 800; color: var(--text-primary); }
-.h2 { font-size: 22px; font-weight: 700; color: var(--text-primary); }
-.h3 { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.text-body { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+.h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.text-body {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
 
 /* Layout Structure */
 .app-container {
@@ -86,7 +126,8 @@ a {
 .sidebar {
   width: 260px;
   background-color: var(--bg-card);
-  border-left: 1px solid var(--border-color); /* RTL border */
+  border-left: 1px solid var(--border-color);
+  /* RTL border */
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -144,16 +185,62 @@ a {
   color: var(--primary);
 }
 
-.nav-item .icon {
+.nav-item .icon,
+.nav-icon {
   font-size: 20px;
+  flex-shrink: 0;
 }
+
+.nav-label {
+  flex: 1;
+}
+
+.nav-section-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  padding: 0 8px;
+}
+
+.nav-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.nav-item--danger {
+  color: var(--danger) !important;
+}
+
+.nav-item--danger:hover {
+  background: rgba(239, 68, 68, 0.08) !important;
+  color: var(--danger) !important;
+}
+
+.sidebar-footer {
+  padding: 20px 16px;
+  border-top: 1px solid var(--border-color);
+}
+
 
 /* Main Content Area */
 .main-area {
   flex-grow: 1;
   display: flex;
   flex-direction: column;
-  min-width: 0; /* Important for flex-grow to work properly with overflowing children */
+  min-width: 0;
+  /* Important for flex-grow to work properly with overflowing children */
 }
 
 /* Navbar (Top Header) */
@@ -178,6 +265,19 @@ a {
   color: var(--text-primary);
   cursor: pointer;
 }
+
+.navbar-start {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.navbar-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--border-color);
+}
+
 
 .navbar-actions {
   display: flex;
@@ -359,10 +459,25 @@ a {
   gap: 6px;
 }
 
-.status-new { background: rgba(59, 130, 246, 0.1); color: var(--info); }
-.status-progress { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-.status-completed { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-.status-cancelled { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+.status-new {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--info);
+}
+
+.status-progress {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning);
+}
+
+.status-completed {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--success);
+}
+
+.status-cancelled {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
 
 /* Animation Utils */
 .anim-fade-up {
@@ -372,14 +487,17 @@ a {
 }
 
 @keyframes fadeUp {
-  to { opacity: 1; transform: translateY(0); }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Mobile Overlay */
 .mobile-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   z-index: 95;
   display: none;
   opacity: 0;
@@ -390,22 +508,30 @@ a {
 @media (max-width: 1024px) {
   .sidebar {
     position: fixed;
-    top: 0; bottom: 0; right: 0;
-    transform: translateX(100%); /* RTL hide */
+    top: 0;
+    bottom: 0;
+    right: 0;
+    transform: translateX(100%);
+    /* RTL hide */
   }
+
   .sidebar.open {
     transform: translateX(0);
   }
+
   .mobile-overlay.active {
     display: block;
     opacity: 1;
   }
+
   .menu-toggle {
     display: block;
   }
+
   .top-navbar {
     padding: 0 16px;
   }
+
   .content-wrap {
     padding: 24px 16px;
   }

@@ -6,15 +6,38 @@ requireStudent();
 $user = currentUser();
 $db   = db();
 
-// Fetch all conversations for this student (orders with an assigned academic)
+// Handle order_id query param to find or open conversation
+$orderParamId = (int)($_GET['order_id'] ?? 0);
+if ($orderParamId > 0) {
+    // Check if conversation exists
+    $cStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
+    $cStmt->execute([$orderParamId, $user['id']]);
+    $foundConvId = $cStmt->fetchColumn();
+    if ($foundConvId) {
+        header('Location: chat.php?conv=' . $foundConvId);
+        exit;
+    } else {
+        // If order has an assigned academic, create the conversation
+        $oStmt = $db->prepare("SELECT id, academic_id FROM orders WHERE id = ? AND student_id = ? LIMIT 1");
+        $oStmt->execute([$orderParamId, $user['id']]);
+        $oData = $oStmt->fetch();
+        if ($oData && $oData['academic_id']) {
+            $convId = getOrCreateConversation($orderParamId, $user['id'], $oData['academic_id']);
+            header('Location: chat.php?conv=' . $convId);
+            exit;
+        }
+    }
+}
+
+// Fetch all conversations for this student
 $conv_stmt = $db->prepare(
-    'SELECT c.*, o.order_number, a.name AS academic_name, a.avatar_initials AS academic_avatar,
+    'SELECT c.*, o.order_number, o.specialty, a.name AS academic_name, a.avatar_initials AS academic_avatar,
             (SELECT content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) AS last_message,
             (SELECT sent_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) AS last_time,
             (SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id AND m.sender_type = ? AND m.is_read = 0) AS unread_count
      FROM conversations c
      JOIN orders o ON c.order_id = o.id
-     JOIN academics a ON c.academic_id = a.id
+     LEFT JOIN academics a ON c.academic_id = a.id
      WHERE c.student_id = ?
      ORDER BY last_time DESC'
 );
@@ -24,6 +47,7 @@ $conversations = $conv_stmt->fetchAll();
 // Active conversation
 $active_conv_id = (int)($_GET['conv'] ?? ($conversations[0]['id'] ?? 0));
 $active_conv    = null;
+$active_team    = [];
 $messages       = [];
 
 if ($active_conv_id) {
@@ -34,7 +58,8 @@ if ($active_conv_id) {
         }
     }
     if ($active_conv) {
-        $messages = getConversationMessages($active_conv_id);
+        $active_team = getAssignedAcademics($active_conv['order_id']);
+        $messages    = getConversationMessages($active_conv_id);
         // Mark messages from academic as read
         $db->prepare('UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = ?')
            ->execute([$active_conv_id, 'academic']);
@@ -47,26 +72,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
     $conv_id  = (int)($_POST['conv_id'] ?? 0);
     if ($content && $conv_id) {
         // Verify this conversation belongs to the student
-        $check = $db->prepare('SELECT id FROM conversations WHERE id = ? AND student_id = ? LIMIT 1');
+        $check = $db->prepare('SELECT id, order_id FROM conversations WHERE id = ? AND student_id = ? LIMIT 1');
         $check->execute([$conv_id, $user['id']]);
-        if ($check->fetch()) {
+        $cRow = $check->fetch();
+        if ($cRow) {
             sendMessage($conv_id, $user['id'], 'student', $content);
+            
+            // Notify assigned academics
+            $team = getAssignedAcademics($cRow['order_id']);
+            foreach ($team as $member) {
+                createNotification(
+                    $member['id'],
+                    'academic',
+                    'رسالة جديدة من الطالب ' . $user['name'],
+                    'أرسل الطالب رسالة في محادثة الطلب #' . ($active_conv['order_number'] ?? ''),
+                    '💬',
+                    'academics/academic-order-details.php?id=' . ($active_conv['order_number'] ?? '')
+                );
+            }
         }
     }
     header('Location: chat.php?conv=' . $conv_id);
     exit;
 }
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>المحادثات - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <style>
+<?php
+$extraCss = [
+  '<style>
     .chat-layout {
       display: grid;
       grid-template-columns: 320px 1fr;
@@ -134,58 +166,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
       .chat-layout { grid-template-columns: 1fr; height: calc(100vh - 100px); }
       .chat-sidebar { display: none; }
     }
-  </style>
-</head>
-<body>
-  <div class="mobile-overlay" id="mobileOverlay"></div>
-  <div class="app-container">
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item"><span class="icon">📊</span><span>لوحة المعلومات</span></a>
-        <a href="services.php" class="nav-item"><span class="icon">📦</span><span>الخدمات الأكاديمية</span></a>
-        <a href="packages.php" class="nav-item"><span class="icon">🎁</span><span>الباقات المخصصة</span></a>
-        <a href="orders.php" class="nav-item"><span class="icon">📋</span><span>طلباتي</span></a>
-        <a href="chat.php" class="nav-item active"><span class="icon">💬</span><span>المحادثات</span></a>
-        <a href="payments.php" class="nav-item"><span class="icon">💳</span><span>المدفوعات</span></a>
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item"><span class="icon">👤</span><span>الملف الشخصي</span></a>
-      </nav>
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span><span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
+  </style>',
+];
+$pageTitle  = 'المحادثات والتواصل الأكاديمي';
+$activePage = 'chat';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
+?>
 
-    <!-- Main Content -->
-    <main class="main-area">
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">تواصل مع الأكاديميين</div>
-        </div>
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
-          </button>
-          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
-          <div class="user-profile">
-            <div class="user-info" style="text-align:left">
-              <span class="user-name"><?= e($user['name']) ?></span>
-              <span class="user-role">طالب</span>
-            </div>
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
-
+      <!-- Page Content -->
       <div class="content-wrap" style="padding:20px;display:flex;flex-direction:column">
         <div class="chat-layout shadow-sm">
           
@@ -238,11 +227,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
               <div class="chat-header">
                 <div style="display:flex;align-items:center;gap:12px">
                   <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;display:flex;align-items:center;justify-content:center;font-weight:800">
-                    <?= e($active_conv['academic_avatar'] ?: mb_substr($active_conv['academic_name'], 0, 1, 'UTF-8')) ?>
+                    <?= count($active_team) > 1 ? '👥' : e($active_conv['academic_avatar'] ?: mb_substr($active_conv['academic_name'] ?? 'أ', 0, 1, 'UTF-8')) ?>
                   </div>
                   <div>
-                    <div style="font-weight:700;font-size:15px;color:var(--text-primary)"><?= e($active_conv['academic_name']) ?></div>
-                    <div style="font-size:12px;color:var(--success)">أكاديمي • الطلب <?= e($active_conv['order_number']) ?></div>
+                    <div style="font-weight:700;font-size:15px;color:var(--text-primary)">
+                      <?= count($active_team) > 1 ? 'مجموعة العمل الأكاديمي (' . count($active_team) . ' أكاديميين)' : e($active_conv['academic_name']) ?>
+                    </div>
+                    <div style="font-size:12px;color:var(--success)">
+                      <?= count($active_team) > 1 ? 'فريق متخصص' : 'أكاديمي متخصص' ?> • الطلب <?= e($active_conv['order_number']) ?>
+                    </div>
                   </div>
                 </div>
                 <a href="order-details.php?id=<?= $active_conv['order_id'] ?>" class="btn btn-outline" style="padding:6px 16px;font-size:13px">تفاصيل الطلب 📋</a>
@@ -266,6 +259,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
                     <div style="text-align:center;font-size:12px;color:var(--text-muted);margin:8px 0"><?= date('d/m/Y', strtotime($msg['sent_at'])) ?></div>
                   <?php endif; ?>
                     <div class="msg <?= $isSent ? 'msg-sent' : 'msg-received' ?>">
+                      <?php if (!$isSent): ?>
+                        <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px">
+                          <?= e($msg['sender_name'] ?? 'الأكاديمي') ?>
+                        </div>
+                      <?php endif; ?>
                       <?= nl2br(e($msg['content'])) ?>
                       <div class="msg-time"><?= date('H:i', strtotime($msg['sent_at'])) ?> <?= $isSent ? '✓✓' : '' ?></div>
                     </div>
@@ -296,15 +294,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
           </div>
 
         </div>
-      </div>
-    </main>
-  </div>
-
-  <script src="assets/js/main.js"></script>
+<?php
+$extraJs = ob_start() ? '' : '';
+ob_start();
+?>
   <script>
     // Auto-scroll to bottom of messages
     const chatMessages = document.getElementById('chatMessages');
     if (chatMessages) chatMessages.scrollTop = chatMessages.scrollHeight;
   </script>
-</body>
-</html>
+<?php
+$extraJs = ob_get_clean();
+require __DIR__ . '/partials/footer.php';
+?>

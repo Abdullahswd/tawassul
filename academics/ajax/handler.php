@@ -197,9 +197,18 @@ if ($action === 'create_order') {
 // ─────────────────────────────────────────────────────────────
 // 2. UPDATE ORDER STATUS
 // ─────────────────────────────────────────────────────────────
-if ($action === 'update_order_status') {
+// ─────────────────────────────────────────────────────────────
+// 2. ACCEPT / REJECT / UPDATE ORDER ASSIGNMENT
+// ─────────────────────────────────────────────────────────────
+if ($action === 'accept_assignment' || $action === 'reject_assignment' || $action === 'update_order_status') {
     $orderId = intval($_POST['order_id'] ?? 0);
     $status = trim($_POST['status'] ?? '');
+    
+    if ($action === 'accept_assignment') {
+        $status = 'accepted';
+    } elseif ($action === 'reject_assignment') {
+        $status = 'rejected';
+    }
 
     if ($orderId <= 0 || !$status) {
         sendJSONResponse(false, 'بيانات غير مكتملة.');
@@ -207,7 +216,7 @@ if ($action === 'update_order_status') {
 
     // Check ownership or assignment
     $db = db();
-    $stmt = $db->prepare("SELECT id, student_id, academic_id, status FROM orders WHERE id = ?");
+    $stmt = $db->prepare("SELECT id, order_number, student_id, academic_id, status FROM orders WHERE id = ?");
     $stmt->execute([$orderId]);
     $order = $stmt->fetch();
 
@@ -218,7 +227,7 @@ if ($action === 'update_order_status') {
     $is_authorized = false;
     if ($order['academic_id'] == $academicId) {
         $is_authorized = true;
-    } elseif ($order['academic_id'] === null && $order['status'] === 'assigned') {
+    } else {
         // Check if academic is assigned in order_assignments table
         $assignStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND academic_id = ?");
         $assignStmt->execute([$orderId, $academicId]);
@@ -233,41 +242,93 @@ if ($action === 'update_order_status') {
 
     try {
         if ($status === 'accepted') {
-            $updateStmt = $db->prepare("UPDATE orders SET status = ?, academic_id = ? WHERE id = ?");
-            $updateStmt->execute([$status, $academicId, $orderId]);
+            // Update this academic's assignment status
+            $db->prepare("UPDATE order_assignments SET status = 'accepted', response_at = NOW() WHERE order_id = ? AND academic_id = ?")
+               ->execute([$orderId, $academicId]);
 
-            // Add net amount to academic's balance if payment is paid
-            $payStmt = $db->prepare("SELECT academic_net, status FROM payments WHERE order_id = ? LIMIT 1");
-            $payStmt->execute([$orderId]);
-            $payment = $payStmt->fetch();
-            if ($payment && $payment['status'] === 'paid') {
-                $db->prepare("UPDATE academics SET balance = balance + ?, total_orders = total_orders + 1 WHERE id = ?")
-                    ->execute([$payment['academic_net'], $academicId]);
+            // If main academic_id is not set, set it to this academic
+            if (empty($order['academic_id'])) {
+                $db->prepare("UPDATE orders SET academic_id = ? WHERE id = ?")->execute([$academicId, $orderId]);
             }
+
+            // Set order status to accepted
+            $db->prepare("UPDATE orders SET status = 'accepted' WHERE id = ?")->execute([$orderId]);
+
+            // Ensure conversation exists
+            $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? LIMIT 1");
+            $convStmt->execute([$orderId]);
+            if (!$convStmt->fetchColumn()) {
+                $db->prepare("INSERT INTO conversations (order_id, student_id, academic_id) VALUES (?, ?, ?)")
+                   ->execute([$orderId, $order['student_id'], $academicId]);
+            }
+
+            // Fetch academic name
+            $acName = $db->query("SELECT name FROM academics WHERE id = $academicId")->fetchColumn() ?: 'الأكاديمي';
+
+            // Send notification to student
+            createNotification(
+                $order['student_id'],
+                'student',
+                'تم قبول طلبك بنجاح ✅',
+                'قام ' . $acName . ' بقبول طلبك #' . $order['order_number'] . ' وتم فتح قناة المحادثة لبدء العمل.',
+                '✅',
+                'student/order-details.php?id=' . $orderId
+            );
+
+            sendJSONResponse(true, 'تم قبول المهمة بنجاح، يمكنك الآن التواصل مع الطالب والبدء بالتنفيذ.');
+        } elseif ($status === 'rejected') {
+            // Mark as rejected in order_assignments
+            $db->prepare("UPDATE order_assignments SET status = 'rejected', response_at = NOW() WHERE order_id = ? AND academic_id = ?")
+               ->execute([$orderId, $academicId]);
+
+            // Check if there are other accepted or pending academics
+            $remStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status != 'rejected'");
+            $remStmt->execute([$orderId]);
+            $remaining = (int)$remStmt->fetchColumn();
+
+            if ($remaining === 0) {
+                // No one left, revert order status to pending_assignment
+                $db->prepare("UPDATE orders SET status = 'pending_assignment', academic_id = NULL WHERE id = ?")->execute([$orderId]);
+                
+                // Notify admin
+                $adminId = (int)$db->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1")->fetchColumn();
+                if ($adminId) {
+                    createNotification(
+                        $adminId,
+                        'admin',
+                        'اعتذار عن طلب ⚠️',
+                        'اعتذر الأكاديمي عن تنفيذ الطلب #' . $order['order_number'] . '، يرجى إعادة إسناد الطلب لأكاديمي آخر.',
+                        '⚠️',
+                        'admin/pages/order-details.php?id=' . $order['order_number']
+                    );
+                }
+            }
+
+            sendJSONResponse(true, 'تم تسجيل اعتذارك عن هذه المهمة بنجاح.');
         } else {
+            // Other status updates (in_progress, revision, completed, etc.)
             $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
             $updateStmt->execute([$status, $orderId]);
+
+            $statusLabels = [
+                'in_progress' => 'طلبك الآن قيد التنفيذ.',
+                'revision'    => 'طلبك حالياً تحت المراجعة والتدقيق.',
+                'completed'   => 'اكتمل تنفيذ طلبك بنجاح.',
+                'cancelled'   => 'تم إلغاء الطلب.'
+            ];
+            $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
+
+            createNotification(
+                $order['student_id'],
+                'student',
+                'تحديث للطلب #' . $order['order_number'],
+                $msg,
+                '📋',
+                'student/order-details.php?id=' . $orderId
+            );
+
+            sendJSONResponse(true, 'تم تحديث حالة الطلب بنجاح.');
         }
-
-        // Send notification to student
-        $statusLabels = [
-            'accepted' => 'تم قبول طلبك وبدأ العمل عليه.',
-            'in_progress' => 'طلبك الآن قيد التنفيذ.',
-            'completed' => 'اكتمل تنفيذ طلبك بنجاح.',
-            'cancelled' => 'تم إلغاء الطلب.'
-        ];
-        $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
-
-        createNotification(
-            $order['student_id'],
-            'student',
-            'تحديث للطلب #' . $orderId,
-            $msg,
-            '📋',
-            'student/order-details.php?id=' . $orderId
-        );
-
-        sendJSONResponse(true, 'تم تحديث حالة الطلب بنجاح.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل تحديث الحالة: ' . $e->getMessage());
     }
@@ -523,9 +584,12 @@ if ($action === 'send_message') {
     try {
         $db = db();
 
-        // Ensure academic owns the order
-        $orderStmt = $db->prepare("SELECT id, student_id FROM orders WHERE id = ? AND academic_id = ?");
-        $orderStmt->execute([$orderId, $academicId]);
+        // Ensure academic owns the order or is assigned to it
+        $orderStmt = $db->prepare("
+            SELECT id, student_id FROM orders 
+            WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+        ");
+        $orderStmt->execute([$orderId, $academicId, $academicId]);
         $order = $orderStmt->fetch();
 
         if (!$order) {
@@ -547,11 +611,14 @@ if ($action === 'send_message') {
         $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content) VALUES (?, ?, 'academic', ?)")
             ->execute([$conversationId, $academicId, $content]);
 
+        // Get academic name
+        $acName = $db->query("SELECT name FROM academics WHERE id = $academicId")->fetchColumn() ?: 'الأكاديمي';
+
         // Send notification to student
         createNotification(
             $order['student_id'],
             'student',
-            'رسالة جديدة من الأكاديمي',
+            'رسالة جديدة من ' . $acName,
             'أرسل الأكاديمي رسالة جديدة بخصوص طلبك',
             '💬',
             'student/order-details.php?id=' . $orderId
@@ -577,9 +644,12 @@ if ($action === 'upload_attachment') {
     try {
         $db = db();
 
-        // Ensure academic owns the order
-        $orderStmt = $db->prepare("SELECT id FROM orders WHERE id = ? AND academic_id = ?");
-        $orderStmt->execute([$orderId, $academicId]);
+        // Ensure academic owns the order or is assigned to it
+        $orderStmt = $db->prepare("
+            SELECT id FROM orders 
+            WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+        ");
+        $orderStmt->execute([$orderId, $academicId, $academicId]);
         if (!$orderStmt->fetch()) {
             sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
         }

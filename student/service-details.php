@@ -17,82 +17,44 @@ if (!$service) {
     exit;
 }
 
-// Fetch packages linked to this service (if any), or all packages
+// Fetch packages to show alongside this service
 $packages = getAllPackages();
 
-// Fetch average rating for academics who work on this service
+// Fetch presentation stats (completed orders + average rating) for this service
 $db = db();
 $stats_stmt = $db->prepare(
     'SELECT COUNT(DISTINCT o.id) AS total_orders,
-            AVG(r.rating) AS avg_rating,
+            AVG(r.rating)        AS avg_rating,
             COUNT(DISTINCT r.id) AS total_reviews
      FROM orders o
      LEFT JOIN reviews r ON r.order_id = o.id
-     WHERE o.service_id = ?'
+     WHERE o.service_id = ? AND o.status = "completed"'
 );
 $stats_stmt->execute([$service_id]);
-$stats = $stats_stmt->fetch();
+$stats = $stats_stmt->fetch() ?: [];
+
+// Normalise the derived values before using them in the template.
+$completedCount = (int)($stats['total_orders'] ?? 0);
+$avgRating      = (float)($stats['avg_rating'] ?? 0);
+$hasRating      = $avgRating > 0;
+
+// Real price from the services table (fallback to a friendly message if 0/NULL).
+$servicePrice = (float)($service['price'] ?? 0);
+$priceLabel   = $servicePrice > 0 ? formatMoney($servicePrice) : 'حسب المتطلبات';
+
+// Features are optional (column may be absent) → build a safe, trimmed list.
+$featureList = array_values(array_filter(
+    array_map('trim', explode("\n", (string)($service['features'] ?? '')))
+));
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= e($service['name']) ?> - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-</head>
-<body>
-  <div class="mobile-overlay" id="mobileOverlay"></div>
-  <div class="app-container">
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item"><span class="icon">📊</span><span>لوحة المعلومات</span></a>
-        <a href="services.php" class="nav-item active"><span class="icon">📦</span><span>الخدمات الأكاديمية</span></a>
-        <a href="orders.php" class="nav-item"><span class="icon">📋</span><span>طلباتي</span></a>
-        <a href="chat.php" class="nav-item"><span class="icon">💬</span><span>المحادثات</span></a>
-        <a href="payments.php" class="nav-item"><span class="icon">💳</span><span>المدفوعات</span></a>
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item"><span class="icon">👤</span><span>الملف الشخصي</span></a>
-      </nav>
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span><span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
+<?php
+$pageTitle  = 'تفاصيل الخدمة';
+$activePage = 'services';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
+?>
 
-    <!-- Main Content -->
-    <main class="main-area">
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">تفاصيل الخدمة</div>
-        </div>
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
-          </button>
-          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
-          <div class="user-profile">
-            <div class="user-info" style="text-align:left">
-              <span class="user-name"><?= e($user['name']) ?></span>
-              <span class="user-role">طالب</span>
-            </div>
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
-
-      <div class="content-wrap" style="max-width:1000px;margin:0 auto">
+      <div style="max-width:1000px;margin:0 auto">
         
         <div style="margin-bottom:24px;">
           <a href="services.php" style="color:var(--text-secondary);font-size:14px">← العودة لقائمة الخدمات</a>
@@ -112,40 +74,41 @@ $stats = $stats_stmt->fetch();
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:20px;background:var(--bg-body);padding:24px;border-radius:var(--radius-md);border:1px solid var(--border-color)">
               <div>
                 <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">يبدأ من</div>
-                <div style="font-size:24px;font-weight:900;color:var(--primary)">150 ر.س</div>
+                <div style="font-size:24px;font-weight:900;color:var(--primary)"><?= e($priceLabel) ?></div>
               </div>
               <div>
-                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">إجمالي الطلبات</div>
-                <div style="font-size:18px;font-weight:700;color:var(--text-primary)"><?= (int)$stats['total_orders'] ?> طلب</div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">مدة التنفيذ</div>
+                <div style="font-size:18px;font-weight:700;color:var(--text-primary)">تعتمد على المتطلبات</div>
               </div>
               <div>
-                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">التقييم العام</div>
-                <div style="font-size:18px;font-weight:700;color:var(--warning)">
-                  <?php $avg = round((float)$stats['avg_rating'], 1); ?>
-                  ⭐ <?= $avg > 0 ? $avg : 'جديد' ?>
-                  <?php if ($stats['total_reviews'] > 0): ?>
-                    <span style="font-size:12px;color:var(--text-muted);font-weight:400">(<?= (int)$stats['total_reviews'] ?> تقييم)</span>
-                  <?php endif; ?>
-                </div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">عدد المشاريع المكتملة</div>
+                <div style="font-size:18px;font-weight:700;color:var(--text-primary)">+<?= $completedCount ?> مشروع</div>
+              </div>
+              <div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">متوسط التقييم</div>
+                <?php if ($hasRating): ?>
+                  <div style="font-size:18px;font-weight:700;color:#f59e0b">★ <?= number_format($avgRating, 1) ?> / 5</div>
+                <?php else: ?>
+                  <div style="font-size:16px;font-weight:700;color:var(--text-secondary)">لا توجد تقييمات بعد</div>
+                <?php endif; ?>
               </div>
             </div>
 
-            <?php if (!empty($service['features'])): ?>
+            <div style="display:flex;gap:12px;margin-top:10px">
+              <a href="create-order.php?service_id=<?= $service['id'] ?>" class="btn btn-primary">اطلب الخدمة الآن 🚀</a>
+              <a href="chat.php" class="btn btn-outline" style="color:var(--text-secondary);border-color:var(--border-color)">💬 استفسار قبل الطلب</a>
+            </div>
+
+            <?php if (!empty($featureList)): ?>
             <div style="padding-top:24px">
               <h3 class="h3" style="margin-bottom:16px">مميزات الخدمة:</h3>
               <ul style="list-style:none;padding:0;color:var(--text-secondary);line-height:2">
-                <?php foreach (explode("\n", $service['features']) as $feature): ?>
-                  <?php if (trim($feature)): ?>
-                    <li>✅ <?= e(trim($feature)) ?></li>
-                  <?php endif; ?>
+                <?php foreach ($featureList as $feature): ?>
+                  <li>✅ <?= e($feature) ?></li>
                 <?php endforeach; ?>
               </ul>
             </div>
             <?php endif; ?>
-
-            <div style="margin-top:8px">
-              <a href="create-order.php?sid=<?= $service['id'] ?>" class="btn btn-primary" style="padding:16px 32px;font-size:16px;width:100%;max-width:300px">اطلب الخدمة الآن 🚀</a>
-            </div>
 
           </div>
         </div>
@@ -163,7 +126,7 @@ $stats = $stats_stmt->fetch();
                 <h3 style="font-weight:800;margin-bottom:8px"><?= e($pkg['name']) ?></h3>
                 <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px"><?= e($pkg['description'] ?? '') ?></p>
                 <div style="font-size:24px;font-weight:900;color:var(--primary);margin-bottom:16px"><?= formatMoney($pkg['price']) ?></div>
-                <a href="create-order.php?sid=<?= $service['id'] ?>&pkg=<?= $pkg['id'] ?>" class="btn btn-primary" style="width:100%">اختر هذه الباقة</a>
+                <a href="create-order.php?service_id=<?= $service['id'] ?>&package_id=<?= $pkg['id'] ?>" class="btn btn-primary" style="width:100%">اختر هذه الباقة</a>
               </div>
             <?php endforeach; ?>
           </div>
@@ -171,9 +134,5 @@ $stats = $stats_stmt->fetch();
         <?php endif; ?>
 
       </div>
-    </main>
-  </div>
 
-  <script src="assets/js/main.js"></script>
-</body>
-</html>
+<?php require __DIR__ . '/partials/footer.php'; ?>

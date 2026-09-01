@@ -39,16 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>الملف الشخصي - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <style>
+<?php
+$extraCss = [
+  '<style>
     .profile-tabs {
       display: flex;
       border-bottom: 1px solid var(--border-color);
@@ -67,82 +60,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     .alert-error   { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; padding:12px 16px; border-radius:10px; margin-bottom:20px; font-size:14px; font-weight:600; }
     .alert-success { background:#f0fdf4; border:1px solid #bbf7d0; color:#16a34a; padding:12px 16px; border-radius:10px; margin-bottom:20px; font-size:14px; font-weight:600; }
-  </style>
-</head>
-<body>
-  
-  <div class="mobile-overlay" id="mobileOverlay"></div>
+  </style>',
+];
+$pageTitle  = 'الملف الشخصي';
+$activePage = 'profile';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
+?>
 
-  <div class="app-container">
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item">
-          <span class="icon">📊</span>
-          <span>لوحة المعلومات</span>
-        </a>
-        <a href="services.php" class="nav-item">
-          <span class="icon">📦</span>
-          <span>الخدمات الأكاديمية</span>
-        </a>
-        <a href="packages.php" class="nav-item">
-          <span class="icon">🎁</span>
-          <span>الباقات المخصصة</span>
-        </a>
-        <a href="orders.php" class="nav-item">
-          <span class="icon">📋</span>
-          <span>طلباتي</span>
-        </a>
-        <a href="chat.php" class="nav-item">
-          <span class="icon">💬</span>
-          <span>المحادثات</span>
-        </a>
-        <a href="payments.php" class="nav-item">
-          <span class="icon">💳</span>
-          <span>المدفوعات</span>
-        </a>
-        
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item active">
-          <span class="icon">👤</span>
-          <span>الملف الشخصي</span>
-        </a>
-      </nav>
-      
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span>
-          <span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-area">
-      
-      <!-- Top Navbar -->
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">الملف الشخصي</div>
-        </div>
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <div class="user-profile">
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
-
-      <!-- Page Content -->
-      <div class="content-wrap" style="max-width:900px;margin:0 auto">
+      <div style="max-width:900px;margin:0 auto">
         
         <h1 class="h1" style="margin-bottom:32px">إعدادات الحساب</h1>
 
@@ -204,9 +130,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
       </div>
-    </main>
-  </div>
 
-  <script src="assets/js/main.js"></script>
-</body>
-</html>
+<?php require __DIR__ . '/partials/footer.php'; ?>

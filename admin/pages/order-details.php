@@ -107,19 +107,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Fetch approved academics belonging to the same specialty
-$orderSpecialty = $order['specialty'];
+// Fetch approved academics who have the order's service
 $academics_stmt = $db->prepare("
-    SELECT * FROM academics 
-    WHERE status = 'approved' AND (specialty LIKE ? OR ? LIKE CONCAT('%', specialty, '%'))
+    SELECT DISTINCT a.*
+    FROM academics a
+    INNER JOIN academic_services acs ON a.id = acs.academic_id
+    WHERE a.status = 'approved'
+      AND acs.service_id = ?
+    ORDER BY a.rating DESC
 ");
-$academics_stmt->execute(['%' . $orderSpecialty . '%', $orderSpecialty]);
+$academics_stmt->execute([$order['service_id']]);
 $matching_academics = $academics_stmt->fetchAll();
-
-// Fallback if no matching academics found
-if (empty($matching_academics)) {
-    $matching_academics = $db->query("SELECT * FROM academics WHERE status = 'approved'")->fetchAll();
-}
 
 // Fetch currently assigned academics for this order
 $assigned_stmt = $db->prepare("SELECT academic_id FROM order_assignments WHERE order_id = ?");
@@ -276,12 +274,12 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
               <!-- إسناد الطلب للأكاديميين المرشحين -->
               <div style="border-top:1px dashed var(--border-color);padding-top:16px">
                 <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px">📋 إسناد الطلب لأكاديمي أو أكثر</h4>
-                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">تخصص الطلب: <strong style="color:var(--primary)"><?= e($order['specialty']) ?></strong></p>
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">الخدمة: <strong style="color:var(--primary)"><?= e($order['service_icon']) ?> <?= e($order['service_name']) ?></strong> — يُعرض فقط الأكاديميون الذين يقدّمون هذه الخدمة</p>
                 <form method="POST" action="order-details.php?id=<?= e($order['order_number']) ?>">
                   <input type="hidden" name="action" value="assign_academics">
                   <div style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;padding-left:4px">
                     <?php if (empty($matching_academics)): ?>
-                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون نشطون حالياً.</p>
+                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون معتمدون يقدّمون هذه الخدمة حالياً.</p>
                     <?php else: ?>
                       <?php foreach ($matching_academics as $ac): ?>
                         <?php $checked = in_array($ac['id'], $assigned_academic_ids) ? 'checked' : ''; ?>

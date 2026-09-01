@@ -5,102 +5,130 @@ requireStudent();
 
 $user = currentUser();
 $services = getAllServices();
-$packages = getAllPackages();
+$db = db();
+
+// الخدمة المحددة مسبقاً عبر رابط (services.php / service-details.php)
+$prefillServiceId = (int) ($_GET['service_id'] ?? ($_GET['sid'] ?? 0));
+
+/* ─────────────────────────────────────────────
+   الاشتراك النشط بالباقة + الخدمات المشمولة
+───────────────────────────────────────────── */
+$activeSub = getActivePackageSubscription((int) $user['id']);
+$hasSub = (bool) $activeSub;
+$includedIds = activeSubscriptionServiceIds($activeSub);
+$includedIdsJs = empty($includedIds) ? [] : $includedIds;
+
+// الخدمة المختارة مسبقاً (لعرض تفاصيلها داخل الصفحة)
+$selectedService = null;
+if ($prefillServiceId) {
+  foreach ($services as $s) {
+    if ((int) $s['id'] === $prefillServiceId) {
+      $selectedService = $s;
+      break;
+    }
+  }
+}
+
+// السعر المبدئي المعروض لملخص الطلب قبل تنفيذ JS
+$initialPrice = 150.0;
+$initialIncluded = false;
+if ($prefillServiceId !== 0 && $hasSub && in_array($prefillServiceId, $includedIds, true)) {
+  $initialIncluded = true;
+  $initialPrice = 0.0;
+} elseif ($selectedService) {
+  $svPrice = (float) ($selectedService['price'] ?? 0);
+  $initialPrice = $svPrice > 0 ? $svPrice : 150.0;
+}
+
+// بيانات الخدمات للعرض الديناميكي عبر JS (تفاصيل الخدمة المختارة)
+$servicesDataMap = [];
+foreach ($services as $s) {
+  $servicesDataMap[(int) $s['id']] = [
+    'id' => (int) $s['id'],
+    'icon' => $s['icon'] ?? '',
+    'name' => $s['name'],
+    'price' => (float) ($s['price'] ?? 0),
+    'description' => $s['description'] ?? '',
+    'included' => in_array((int) $s['id'], $includedIds, true),
+  ];
+}
+$servicesJson = json_encode($servicesDataMap, JSON_UNESCAPED_UNICODE);
 
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $service_id     = (int)($_POST['service_id'] ?? 0);
-    $package_id     = isset($_POST['package_id']) && $_POST['package_id'] !== '' ? (int)$_POST['package_id'] : null;
-    $specialty      = trim($_POST['specialty'] ?? '');
-    $academic_level = $_POST['academic_level'] ?? 'بكالوريوس';
-    $language       = $_POST['language'] ?? 'العربية';
-    $deadline       = $_POST['deadline'] ?? '';
-    $description    = trim($_POST['description'] ?? '');
+  $service_id = (int) ($_POST['service_id'] ?? 0);
+  $specialty = trim($_POST['specialty'] ?? '');
+  $academic_level = $_POST['academic_level'] ?? 'بكالوريوس';
+  $language = $_POST['language'] ?? 'العربية';
+  $deadline = $_POST['deadline'] ?? '';
+  $description = trim($_POST['description'] ?? '');
 
-    $db = db();
-
-    // حساب السعر والخدمة
-    $amount = 150.00;
-    if ($package_id) {
-        $stmt = $db->prepare('SELECT price, service_ids FROM packages WHERE id = ? LIMIT 1');
-        $stmt->execute([$package_id]);
-        $pkg = $stmt->fetch();
-        if ($pkg) {
-            $amount = (float)$pkg['price'];
-            if (!$service_id) {
-                $pkgServices = json_decode($pkg['service_ids'] ?? '[]', true);
-                if (!empty($pkgServices)) {
-                    $service_id = (int)$pkgServices[0];
-                }
-            }
-        }
-    } elseif ($service_id) {
-        $stmt = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
-        $stmt->execute([$service_id]);
-        $srvPrice = $stmt->fetchColumn();
-        if ($srvPrice && $srvPrice > 0) {
-            $amount = (float)$srvPrice;
-        }
-    }
-
-    if (!$service_id && !empty($services)) {
-        $service_id = (int)$services[0]['id'];
-    }
-
-    if (!$service_id || !$specialty || !$deadline || !$description) {
-        $error = 'يرجى ملء كافة الحقول المطلوبة بنجاح.';
+  // حساب السعر: الخدمات المشمولة في الباقة مجانية، وما عداها يُسعَّر بشكل منفرد.
+  $amount = 150.0;
+  $package_id = null;
+  if ($service_id) {
+    if ($hasSub && $activeSub && in_array($service_id, $includedIds, true)) {
+      $amount = 0.0;
+      $package_id = (int) $activeSub['package_id'];
     } else {
-        $order_id = createOrder([
-            'student_id'     => $user['id'],
-            'service_id'     => $service_id,
-            'package_id'     => $package_id,
-            'specialty'      => $specialty,
-            'academic_level' => $academic_level,
-            'language'       => $language,
-            'deadline'       => $deadline,
-            'description'    => $description,
-            'amount'         => $amount,
-        ]);
-
-        if ($order_id) {
-            // Create welcome/success notification
-            createNotification(
-                $user['id'],
-                'student',
-                'تم إنشاء الطلب بنجاح 📋',
-                'لقد سجلنا طلبك بنجاح وجاري تعيين أكاديمي مناسب للعمل عليه.',
-                '📋',
-                'student/orders.php'
-            );
-
-            // Insert a pending payment record
-            createPayment([
-                'order_id'   => $order_id,
-                'student_id' => $user['id'],
-                'amount'     => $amount,
-                'method'     => 'credit_card'
-            ]);
-
-            header('Location: orders.php?success=1');
-            exit;
-        } else {
-            $error = 'حدث خطأ في النظام أثناء إنشاء الطلب. حاول مجدداً.';
-        }
+      $stmt = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
+      $stmt->execute([$service_id]);
+      $srvPrice = $stmt->fetchColumn();
+      if ($srvPrice && $srvPrice > 0) {
+        $amount = (float) $srvPrice;
+      }
     }
+  }
+
+  if (!$service_id || !$specialty || !$deadline || !$description) {
+    $error = 'يرجى ملء كافة الحقول المطلوبة بنجاح.';
+  } else {
+    $order_id = createOrder([
+      'student_id' => $user['id'],
+      'service_id' => $service_id,
+      'package_id' => $package_id,
+      'specialty' => $specialty,
+      'academic_level' => $academic_level,
+      'language' => $language,
+      'deadline' => $deadline,
+      'description' => $description,
+      'amount' => $amount,
+    ]);
+
+    if ($order_id) {
+      // إشعار نجاح الطلب
+      createNotification(
+        $user['id'],
+        'student',
+        'تم إنشاء الطلب بنجاح 📋',
+        'لقد سجلنا طلبك بنجاح وجاري تعيين أكاديمي مناسب للعمل عليه.',
+        '📋',
+        'student/orders.php'
+      );
+
+      // سجل دفع (يُتخطَّى للخدمات المشمولة في الباقة لأنها مجانية)
+      if ($amount > 0) {
+        createPayment([
+          'order_id' => $order_id,
+          'student_id' => $user['id'],
+          'amount' => $amount,
+          'method' => 'credit_card'
+        ]);
+      }
+
+      header('Location: orders.php?success=1');
+      exit;
+    } else {
+      $error = 'حدث خطأ في النظام أثناء إنشاء الطلب. حاول مجدداً.';
+    }
+  }
 }
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>طلب خدمة جديدة - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <style>
+<?php
+$extraCss = [
+  '<style>
     /* Multi-step progress */
     .steps-container {
       display: flex;
@@ -112,10 +140,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .steps-container::before {
       content: "";
       position: absolute;
-      top: 20px;
-      left: 30px;
-      right: 30px;
-      height: 2px;
+      top: 24px; left: 0; right: 0;
+      height: 3px;
       background: var(--border-color);
       z-index: 0;
     }
@@ -124,19 +150,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       flex-direction: column;
       align-items: center;
       gap: 8px;
-      position: relative;
       z-index: 1;
+      flex: 1;
     }
     .step-indicator .circle {
-      width: 40px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border-radius: 50%;
       background: var(--bg-card);
-      border: 2px solid var(--border-color);
+      border: 3px solid var(--border-color);
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
+      font-size: 16px;
       color: var(--text-secondary);
       transition: all 0.3s;
     }
@@ -144,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       border-color: var(--primary);
       background: var(--primary);
       color: white;
+      box-shadow: 0 0 0 4px var(--primary-light);
     }
     .step-indicator.completed .circle {
       border-color: var(--primary);
@@ -159,240 +187,228 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       color: var(--primary);
     }
     .alert-error { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; padding:12px 16px; border-radius:10px; margin-bottom:20px; font-size:14px; font-weight:600; }
-  </style>
-</head>
-<body>
-  
-  <div class="mobile-overlay" id="mobileOverlay"></div>
+  </style>',
+];
+$pageTitle = 'طلب خدمة جديدة';
+$activePage = 'services';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
+?>
 
-  <div class="app-container">
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item">
-          <span class="icon">📊</span>
-          <span>لوحة المعلومات</span>
-        </a>
-        <a href="services.php" class="nav-item active">
-          <span class="icon">📦</span>
-          <span>الخدمات الأكاديمية</span>
-        </a>
-        <a href="packages.php" class="nav-item">
-          <span class="icon">🎁</span>
-          <span>الباقات المخصصة</span>
-        </a>
-        <a href="orders.php" class="nav-item">
-          <span class="icon">📋</span>
-          <span>طلباتي</span>
-        </a>
-        <a href="chat.php" class="nav-item">
-          <span class="icon">💬</span>
-          <span>المحادثات</span>
-        </a>
-        <a href="payments.php" class="nav-item">
-          <span class="icon">💳</span>
-          <span>المدفوعات</span>
-        </a>
-        
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item">
-          <span class="icon">👤</span>
-          <span>الملف الشخصي</span>
-        </a>
-      </nav>
-      
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span>
-          <span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
+<!-- Page Content -->
+<div class="content-wrap" style="max-width:1000px;margin:0 auto">
 
-    <!-- Main Content -->
-    <main class="main-area">
-      
-      <!-- Top Navbar -->
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">طلب جديد</div>
-        </div>
-
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
-          </button>
-          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
-          <div class="user-profile">
-            <div class="user-info" style="text-align:left">
-              <span class="user-name"><?= e($user['name']) ?></span>
-              <span class="user-role">طالب</span>
-            </div>
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
-
-      <!-- Page Content -->
-      <div class="content-wrap" style="max-width:1000px;margin:0 auto">
-        
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px">
-          <div>
-            <h1 class="h1" style="margin-bottom:8px">إنشاء طلب خدمة</h1>
-            <p class="text-body">حدد الخدمة المطلوبة وقم بتزويدنا بالتفاصيل لنقوم بالباقي.</p>
-          </div>
-          <a href="services.php" class="btn btn-outline">إلغاء والعودة</a>
-        </div>
-
-        <?php if ($error): ?>
-          <div class="alert-error">⚠️ <?= e($error) ?></div>
-        <?php endif; ?>
-
-        <div style="display:grid;grid-template-columns:1fr 300px;gap:24px">
-          
-          <!-- Form Section -->
-          <div class="card" style="padding:32px">
-            
-            <div class="steps-container">
-              <div class="step-indicator active"><div class="circle">1</div><div class="step-label">نوع الخدمة</div></div>
-              <div class="step-indicator"><div class="circle">2</div><div class="step-label">التفاصيل الأساسية</div></div>
-              <div class="step-indicator"><div class="circle">3</div><div class="step-label">الملفات والشروحات</div></div>
-            </div>
-
-            <form method="POST" action="create-order.php" id="multiOrderForm">
-              
-              <!-- STEP 1 -->
-              <div class="form-step" id="step1">
-                <h3 class="h3" style="margin-bottom:24px">اختيار الخدمة والتخصص</h3>
-                
-                <div class="form-group">
-                  <label class="form-label">الخدمة المطلوبة <span style="color:var(--danger)">*</span></label>
-                  <select class="form-input" id="serviceSelect" name="service_id" required onchange="updatePricing()">
-                    <option value="">اختر الخدمة المطلوبة...</option>
-                    <?php foreach ($services as $s): ?>
-                      <option value="<?= $s['id'] ?>" data-price="150" <?= (isset($_GET['sid']) && $_GET['sid'] == $s['id']) ? 'selected' : '' ?>>
-                        <?= e($s['icon']) ?> <?= e($s['name']) ?>
-                      </option>
-                    <?php endforeach; ?>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">الباقة المرغوبة (اختياري)</label>
-                  <select class="form-input" id="packageSelect" name="package_id" onchange="updatePricing()">
-                    <option value="" data-price="150">طلب خدمة مخصصة (تبدأ من 150 ر.س)</option>
-                    <?php foreach ($packages as $pkg): ?>
-                      <option value="<?= $pkg['id'] ?>" data-price="<?= $pkg['price'] ?>">
-                        <?= e($pkg['name']) ?> (<?= formatMoney($pkg['price']) ?>)
-                      </option>
-                    <?php endforeach; ?>
-                  </select>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">التخصص الدقيق <span style="color:var(--danger)">*</span></label>
-                  <input type="text" name="specialty" class="form-input" placeholder="مثال: إدارة الموارد البشرية" required>
-                </div>
-
-              </div>
-
-              <!-- STEP 2 -->
-              <div class="form-step" id="step2" style="display:none">
-                <h3 class="h3" style="margin-bottom:24px">تفاصيل العمل المطلوبة</h3>
-                
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-                  <div class="form-group">
-                    <label class="form-label">المستوى الأكاديمي <span style="color:var(--danger)">*</span></label>
-                    <select name="academic_level" class="form-input" required>
-                      <option value="بكالوريوس">بكالوريوس</option>
-                      <option value="ماجستير">ماجستير</option>
-                      <option value="دكتوراه">دكتوراه</option>
-                    </select>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">اللغة <span style="color:var(--danger)">*</span></label>
-                    <select name="language" class="form-input" required>
-                      <option value="العربية">العربية</option>
-                      <option value="الإنجليزية">الإنجليزية</option>
-                    </select>
-                  </div>
-                  <div class="form-group" style="grid-column:1/-1">
-                    <label class="form-label">موعد التسليم المرغوب <span style="color:var(--danger)">*</span></label>
-                    <input type="date" name="deadline" class="form-input" required min="<?= date('Y-m-d') ?>">
-                  </div>
-                </div>
-              </div>
-
-              <!-- STEP 3 -->
-              <div class="form-step" id="step3" style="display:none">
-                <h3 class="h3" style="margin-bottom:24px">الشروحات والمرفقات</h3>
-                
-                <div class="form-group">
-                  <label class="form-label">وصف دقيق للطلب وملاحظاتك <span style="color:var(--danger)">*</span></label>
-                  <textarea name="description" class="form-input" rows="5" placeholder="أدخل متطلبات الطلب بالتفصيل لتسهيل فهم الأكاديمي..." required></textarea>
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label">المرفقات</label>
-                  <div style="border:2px dashed var(--border-color);border-radius:var(--radius-lg);padding:32px;text-align:center;background:var(--bg-body);cursor:pointer;transition:all 0.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-color)'" onclick="document.getElementById('fileUpload').click()">
-                    <input type="file" id="fileUpload" multiple style="display:none">
-                    <div style="font-size:32px;margin-bottom:12px">📤</div>
-                    <div style="font-weight:700">اضغط لرفع الملفات والتعليمات</div>
-                    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">PDF, DOCX, ZIP بحد أقصى 10MB</div>
-                  </div>
-                </div>
-              </div>
-
-              <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:24px;margin-top:16px">
-                <button type="button" class="btn btn-outline" id="prevBtn" style="display:none">السابق</button>
-                <div style="margin-right:auto">
-                  <button type="button" class="btn btn-primary" id="nextBtn">التالي</button>
-                  <button type="submit" class="btn btn-primary" id="submitBtn" style="display:none;background:var(--success)">✅ إنشاء الطلب</button>
-                </div>
-              </div>
-
-            </form>
-          </div>
-
-          <!-- Summary Sidebar -->
-          <div>
-            <div class="card" style="position:sticky;top:90px">
-              <h3 class="h3" style="margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border-color)">ملخص الطلب</h3>
-              
-              <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;color:var(--text-secondary)">
-                <span>السعر المبدئي للخدمة</span>
-                <span id="basePrice" style="font-weight:700;color:var(--text-primary)">150 ر.س</span>
-              </div>
-              
-              <div style="margin-top:20px;border-top:1px dashed var(--border-color);padding-top:16px;display:flex;justify-content:space-between;align-items:center">
-                <span style="font-weight:700">الإجمالي المتوقع</span>
-                <span id="totalPrice" style="font-size:24px;font-weight:800;color:var(--primary)">150 ر.س</span>
-              </div>
-
-              <div style="margin-top:24px;padding:12px;background:var(--primary-light);border-radius:var(--radius-sm);color:var(--primary);font-size:12px;line-height:1.6">
-                <strong>ملاحظة:</strong>
-                هذا تسعير مبدئي، وسيتم تأكيد السعر النهائي من الأكاديمي بناءً على متطلباتك الدقيقة.
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-      </div>
-    </main>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:32px">
+    <div>
+      <h1 class="h1" style="margin-bottom:8px">إنشاء طلب خدمة</h1>
+      <p class="text-body">حدد الخدمة المطلوبة وقم بتزويدنا بالتفاصيل لنقوم بالباقي.</p>
+    </div>
+    <a href="services.php" class="btn btn-outline">إلغاء والعودة</a>
   </div>
 
-  <script src="assets/js/main.js"></script>
+  <?php if ($error): ?>
+    <div class="alert-error">⚠️ <?= e($error) ?></div>
+  <?php endif; ?>
+
+  <div style="display:grid;grid-template-columns:1fr 300px;gap:24px">
+
+    <!-- Form Section -->
+    <div class="card" style="padding:32px">
+
+      <div class="steps-container">
+        <div class="step-indicator active">
+          <div class="circle">1</div>
+          <div class="step-label">نوع الخدمة</div>
+        </div>
+        <div class="step-indicator">
+          <div class="circle">2</div>
+          <div class="step-label">التفاصيل الأساسية</div>
+        </div>
+        <div class="step-indicator">
+          <div class="circle">3</div>
+          <div class="step-label">الملفات والشروحات</div>
+        </div>
+      </div>
+
+      <form method="POST" action="create-order.php" id="multiOrderForm">
+
+        <!-- STEP 1 -->
+        <div class="form-step" id="step1">
+          <h3 class="h3" style="margin-bottom:24px">اختيار الخدمة والتخصص</h3>
+
+          <div class="form-group">
+            <label class="form-label">الخدمة المطلوبة <span style="color:var(--danger)">*</span></label>
+            <select class="form-input" id="serviceSelect" name="service_id" onchange="updatePricing()">
+              <option value="">اختر الخدمة المطلوبة...</option>
+              <?php foreach ($services as $s): ?>
+                <option value="<?= $s['id'] ?>" data-price="<?= (float) ($s['price'] ?? 0) ?>"
+                  <?= $prefillServiceId === (int) $s['id'] ? 'selected' : '' ?>>
+                  <?= e($s['icon']) ?>   <?= e($s['name']) ?> (<?= formatMoney((float) ($s['price'] ?? 0)) ?>)
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+
+          <!-- تفاصيل الخدمة المختارة (تظهر مكان زر التفاصيل المحذوف) -->
+          <div class="form-group" id="serviceDetailsBox"
+            style="display:<?= $selectedService ? 'block' : 'none' ?>;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;background:var(--bg-body);margin-top:4px">
+            <?php if ($selectedService): ?>
+              <div style="display:flex;align-items:flex-start;gap:10px">
+                <div style="font-size:28px;flex-shrink:0"><?= e($selectedService['icon'] ?: '📦') ?></div>
+                <div style="flex:1">
+                  <div style="font-weight:800;margin-bottom:6px" id="serviceDetailsName">
+                    <?= e($selectedService['name']) ?></div>
+                  <div style="font-size:13px;color:var(--text-secondary);line-height:1.7" id="serviceDetailsDesc">
+                    <?= e($selectedService['description'] ?: '') ?></div>
+                  <div id="serviceIncludedBadge"
+                    style="display:<?= ($selectedService && $initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    ✅ هذه الخدمة مشمولة في باقتك
+                  </div>
+                  <div id="serviceNonIncludedBadge"
+                    style="display:<?= ($selectedService && !$initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    هذه الخدمة خارج باقتك وسيتم تسعيرها بشكل منفرد
+                  </div>
+                </div>
+              </div>
+            <?php endif; ?>
+          </div>
+
+          <?php if ($hasSub && $activeSub): ?>
+            <!-- الطالب مشترك في باقة -->
+            <div class="form-group"
+              style="border:1px dashed var(--primary);border-radius:var(--radius-md);padding:16px;background:var(--primary-light);margin-top:4px">
+              <div style="font-weight:800;color:var(--primary);margin-bottom:6px">
+                🎁 باقتك النشطة: <?= e($activeSub['package_name']) ?> — سارية حتى
+                <?= formatDate($activeSub['expires_at']) ?>
+              </div>
+              <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+                إذا كانت الخدمة المختارة ضمن خدمات باقتك فستكون <strong>مشمولة مجاناً</strong> في طلبك.
+                إن لم تكن مشمولة، ستُسعَّر بشكل منفرد.
+              </div>
+            </div>
+          <?php else: ?>
+            <!-- الطالب غير مشترك → نحيله لصفحة الباقات للاشتراك -->
+            <div class="form-group"
+              style="border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;background:var(--bg-body);margin-top:4px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <div style="font-size:26px">🎁</div>
+                <div style="flex:1;font-size:13px;color:var(--text-secondary);line-height:1.7">
+                  <strong>تريد الاستفادة من باقة شهرية؟</strong> الاشتراك يوفر الخدمات المشمولة دون دفع إضافي طوال صلاحية
+                  الباقة.
+                </div>
+                <a href="packages.php" class="btn btn-primary"
+                  style="padding:8px 18px;border-radius:12px;font-weight:700">اشترك بباقة 🚀</a>
+              </div>
+            </div>
+          <?php endif; ?>
+
+          <div class="form-group">
+            <label class="form-label">التخصص الدقيق <span style="color:var(--danger)">*</span></label>
+            <input type="text" name="specialty" class="form-input" placeholder="مثال: إدارة الموارد البشرية" required>
+          </div>
+
+        </div>
+
+        <!-- STEP 2 -->
+        <div class="form-step" id="step2" style="display:none">
+          <h3 class="h3" style="margin-bottom:24px">تفاصيل العمل المطلوبة</h3>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="form-group">
+              <label class="form-label">المستوى الأكاديمي <span style="color:var(--danger)">*</span></label>
+              <select name="academic_level" class="form-input" required>
+                <option value="بكالوريوس">بكالوريوس</option>
+                <option value="ماجستير">ماجستير</option>
+                <option value="دكتوراه">دكتوراه</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">اللغة <span style="color:var(--danger)">*</span></label>
+              <select name="language" class="form-input" required>
+                <option value="العربية">العربية</option>
+                <option value="الإنجليزية">الإنجليزية</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">موعد التسليم المرغوب <span style="color:var(--danger)">*</span></label>
+              <input type="date" name="deadline" class="form-input" required min="<?= date('Y-m-d') ?>">
+            </div>
+          </div>
+        </div>
+
+        <!-- STEP 3 -->
+        <div class="form-step" id="step3" style="display:none">
+          <h3 class="h3" style="margin-bottom:24px">الشروحات والمرفقات</h3>
+
+          <div class="form-group">
+            <label class="form-label">وصف دقيق للطلب وملاحظاتك <span style="color:var(--danger)">*</span></label>
+            <textarea name="description" class="form-input" rows="5"
+              placeholder="أدخل متطلبات الطلب بالتفصيل لتسهيل فهم الأكاديمي..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">المرفقات</label>
+            <div
+              style="border:2px dashed var(--border-color);border-radius:var(--radius-lg);padding:32px;text-align:center;background:var(--bg-body);cursor:pointer;transition:all 0.2s"
+              onmouseover="this.style.borderColor='var(--primary)'"
+              onmouseout="this.style.borderColor='var(--border-color)'"
+              onclick="document.getElementById('fileUpload').click()">
+              <input type="file" id="fileUpload" multiple style="display:none">
+              <div style="font-size:32px;margin-bottom:12px">📤</div>
+              <div style="font-weight:700">اضغط لرفع الملفات والتعليمات</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:8px">PDF, DOCX, ZIP بحد أقصى 10MB</div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style="display:flex;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:24px;margin-top:16px">
+          <button type="button" class="btn btn-outline" id="prevBtn" style="display:none">السابق</button>
+          <div style="margin-right:auto">
+            <button type="button" class="btn btn-primary" id="nextBtn">التالي</button>
+            <button type="submit" class="btn btn-primary" id="submitBtn"
+              style="display:none;background:var(--success)">✅ إنشاء الطلب</button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+    <!-- Summary Sidebar -->
+    <div>
+      <div class="card" style="position:sticky;top:90px">
+        <h3 class="h3" style="margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border-color)">ملخص
+          الطلب</h3>
+
+        <div
+          style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:14px;color:var(--text-secondary)">
+          <span>السعر المبدئي للخدمة</span>
+          <span id="basePrice"
+            style="font-weight:700;color:var(--text-primary)"><?= formatMoney($initialPrice) ?></span>
+        </div>
+
+        <div
+          style="margin-top:20px;border-top:1px dashed var(--border-color);padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+          <span style="font-weight:700">الإجمالي المتوقع</span>
+          <span id="totalPrice"
+            style="font-size:24px;font-weight:800;color:var(--primary)"><?= $initialIncluded ? 'مشمول بالباقة 🎁' : formatMoney($initialPrice) ?></span>
+        </div>
+
+        <div
+          style="margin-top:24px;padding:12px;background:var(--primary-light);border-radius:var(--radius-sm);color:var(--primary);font-size:12px;line-height:1.6">
+          <strong>ملاحظة:</strong>
+          هذا تسعير مبدئي، وسيتم تأكيد السعر النهائي من الأكاديمي بناءً على متطلباتك الدقيقة.
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <?php
+  $extraJs = ob_start() ? '' : '';
+  ob_start();
+  ?>
   <script>
     // Local flow control since we moved to standard forms
     const steps = document.querySelectorAll('.form-step');
@@ -401,29 +417,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     const prevBtn = document.getElementById('prevBtn');
     const submitBtn = document.getElementById('submitBtn');
     const srvSelect = document.getElementById('serviceSelect');
-    const pkgSelect = document.getElementById('packageSelect');
+    const detailsBox = document.getElementById('serviceDetailsBox');
+    const detailsName = document.getElementById('serviceDetailsName');
+    const detailsDesc = document.getElementById('serviceDetailsDesc');
+    const includedBadgeEl = document.getElementById('serviceIncludedBadge');
+    const nonIncludedBadgeEl = document.getElementById('serviceNonIncludedBadge');
     const basePriceEl = document.getElementById('basePrice');
     const totalPriceEl = document.getElementById('totalPrice');
 
+    // بيانات الخدمات + الخدمات المشمولة في الباقة (أُدخلت من PHP)
+    const servicesData = <?= $servicesJson ?>;
+    const includedIdsSet = new Set(<?= json_encode($includedIdsJs) ?>);
+
     let currentStep = 0;
 
+    function getSelectedService() {
+      if (!srvSelect || !srvSelect.value) return null;
+      return servicesData[Number(srvSelect.value)] || null;
+    }
+
+    function updateServiceCard() {
+      if (!detailsBox) return;
+      const svc = getSelectedService();
+      if (!svc) {
+        detailsBox.style.display = 'none';
+        if (includedBadgeEl) includedBadgeEl.style.display = 'none';
+        if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = 'none';
+        return;
+      }
+      detailsBox.style.display = 'block';
+      if (detailsName) detailsName.textContent = (svc.icon || '📦') + ' ' + svc.name;
+      if (detailsDesc) detailsDesc.textContent = svc.description || '';
+      const included = includedIdsSet.has(svc.id);
+      if (includedBadgeEl) includedBadgeEl.style.display = included ? 'inline-block' : 'none';
+      if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = (included || includedIdsSet.size === 0) ? 'none' : 'inline-block';
+    }
+
     function updatePricing() {
+      const svc = getSelectedService();
       let price = 150;
-      if (pkgSelect && pkgSelect.value !== "") {
-        price = parseFloat(pkgSelect.options[pkgSelect.selectedIndex].getAttribute('data-price'));
+      let included = false;
+      if (svc) {
+        included = includedIdsSet.has(svc.id);
+        price = included ? 0 : (isNaN(svc.price) ? 150 : svc.price);
       }
       basePriceEl.textContent = price + ' ر.س';
-      totalPriceEl.textContent = price + ' ر.س';
+      totalPriceEl.textContent = included ? 'مشمول بالباقة 🎁' : price + ' ر.س';
+      updateServiceCard();
     }
 
     function renderStep() {
       steps.forEach((s, idx) => {
         s.style.display = (idx === currentStep) ? 'block' : 'none';
-        
+
         // Update indicators
         const indicator = indicators[idx];
         const ci = indicator.querySelector('.circle');
-        
+
         if (idx < currentStep) {
           indicator.classList.remove('active');
           indicator.classList.add('completed');
@@ -463,9 +513,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     nextBtn?.addEventListener('click', () => {
-      if (currentStep === 0 && srvSelect && !srvSelect.value) {
-        alert('يرجى اختيار خدمة أولاً');
-        return;
+      if (currentStep === 0) {
+        const hasService = srvSelect && srvSelect.value !== "";
+        if (!hasService) {
+          alert('يرجى اختيار خدمة أولاً');
+          return;
+        }
       }
       if (currentStep < steps.length - 1) {
         currentStep++;
@@ -488,5 +541,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     updatePricing();
     renderStep();
   </script>
-</body>
-</html>
+  <?php
+  $extraJs = ob_get_clean();
+  require __DIR__ . '/partials/footer.php';
+  ?>

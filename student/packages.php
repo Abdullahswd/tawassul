@@ -38,19 +38,33 @@ try {
 } catch (Exception $e) {
     error_log("Error fetching packages for student: " . $e->getMessage());
 }
+
+/* ─────────────────────────────────────────────
+   PACKAGE SUBSCRIPTION HANDLING
+───────────────────────────────────────────── */
+// معالجة طلب الاشتراك (قبل أي إخراج HTML)
+if (isset($_GET['subscribe_package'])) {
+    $pid = (int) $_GET['subscribe_package'];
+    $pkgOk = $db->prepare('SELECT id FROM packages WHERE id = ? AND is_active = 1 LIMIT 1');
+    $pkgOk->execute([$pid]);
+    if ($pkgOk->fetch()) {
+        subscribeStudentToPackage($user['id'], $pid);
+        header('Location: packages.php?subscribed=' . $pid);
+        exit;
+    }
+}
+
+// الباقة/الاشتراك النشط الحالي للطالب
+$activePackageSub  = getActivePackageSubscription($user['id']);
+$subJustMadeId     = isset($_GET['subscribed']) ? (int) $_GET['subscribed'] : 0;
+$subscribedInfoIds = [];
+if ($activePackageSub) {
+    $subscribedInfoIds = activeSubscriptionServiceIds($activePackageSub);
+}
 ?>
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>باقات الخدمات الأكاديمية - تواصل</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/style.css">
-  <style>
-    * { font-family: 'Tajawal', sans-serif; }
-    
+<?php
+$extraCss = [
+  '<style>
     .pkg-card {
       background: var(--bg-card);
       border-radius: 24px;
@@ -126,88 +140,13 @@ try {
       flex-shrink: 0;
       font-weight: 800;
     }
-  </style>
-</head>
-<body>
-  
-  <div class="mobile-overlay" id="mobileOverlay"></div>
-
-  <div class="app-container">
-    
-    <!-- Sidebar -->
-    <aside class="sidebar" id="sidebar">
-      <div class="sidebar-header">
-        <div class="logo-icon">🎓</div>
-        <div class="logo-text">تواصل</div>
-      </div>
-      
-      <nav class="sidebar-nav">
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-bottom:8px;padding:0 8px">القائمة الرئيسية</div>
-        <a href="student-dashboard.php" class="nav-item">
-          <span class="icon">📊</span>
-          <span>لوحة المعلومات</span>
-        </a>
-        <a href="services.php" class="nav-item">
-          <span class="icon">📦</span>
-          <span>الخدمات الأكاديمية</span>
-        </a>
-        <a href="packages.php" class="nav-item active">
-          <span class="icon">🎁</span>
-          <span>الباقات المخصصة</span>
-        </a>
-        <a href="orders.php" class="nav-item">
-          <span class="icon">📋</span>
-          <span>طلباتي</span>
-        </a>
-        <a href="chat.php" class="nav-item">
-          <span class="icon">💬</span>
-          <span>المحادثات</span>
-        </a>
-        <a href="payments.php" class="nav-item">
-          <span class="icon">💳</span>
-          <span>المدفوعات</span>
-        </a>
-        
-        <div style="font-size:12px;color:var(--text-muted);font-weight:700;margin-top:24px;margin-bottom:8px;padding:0 8px">إعدادات الحساب</div>
-        <a href="profile.php" class="nav-item">
-          <span class="icon">👤</span>
-          <span>الملف الشخصي</span>
-        </a>
-      </nav>
-      
-      <div style="padding:20px;border-top:1px solid var(--border-color)">
-        <a href="../logout.php" class="nav-item" style="color:var(--danger)">
-          <span class="icon">🚪</span>
-          <span>تسجيل الخروج</span>
-        </a>
-      </div>
-    </aside>
-
-    <!-- Main Content -->
-    <main class="main-area">
-      
-      <!-- Top Navbar -->
-      <header class="top-navbar">
-        <div style="display:flex;align-items:center;gap:16px">
-          <button class="menu-toggle" id="menuToggle">☰</button>
-          <div class="h3">🎁 باقات الخدمات المجمعة</div>
-        </div>
-
-        <div class="navbar-actions">
-          <button class="icon-btn dark-toggle" aria-label="تبديل المظهر">🌙</button>
-          <button class="icon-btn" aria-label="الإشعارات">
-            🔔<span class="badge-dot"><?= countUnreadNotifications($user['id'], 'student') ?></span>
-          </button>
-          <div style="width:1px;height:30px;background:var(--border-color);margin:0 8px"></div>
-          <div class="user-profile">
-            <div class="user-info" style="text-align:left">
-              <span class="user-name"><?= e($user['name']) ?></span>
-              <span class="user-role">طالب</span>
-            </div>
-            <div class="user-avatar"><?= e($user['avatar']) ?></div>
-          </div>
-        </div>
-      </header>
+  </style>',
+];
+$pageTitle  = 'الباقات المخصصة';
+$activePage = 'packages';
+require __DIR__ . '/partials/head.php';
+require __DIR__ . '/partials/sidebar.php';
+?>
 
       <!-- Page Content -->
       <div class="content-wrap" style="padding:24px;max-width:1200px;margin:0 auto">
@@ -221,6 +160,28 @@ try {
             </p>
           </div>
         </div>
+
+        <?php if ($subJustMadeId && $activePackageSub && (int)$activePackageSub['package_id'] === $subJustMadeId): ?>
+          <div class="mb-6 rounded-2xl p-5 border" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;box-shadow:0 4px 14px rgba(0,0,0,0.04)">
+            <div class="flex items-center gap-3">
+              <div style="font-size:30px">✅</div>
+              <div>
+                <div style="font-weight:800;font-size:16px">تم اشتراكك في باقة «<?= e($activePackageSub['package_name']) ?>» بنجاح</div>
+                <div style="font-size:13px;opacity:0.9;margin-top:3px">
+                  الباقة سارية لمدة شهر واحد حتى تاريخ <?= formatDate($activePackageSub['expires_at']) ?>.
+                  تواصل للاستفادة من الخدمات المشمولة دون دفع إضافي.
+                </div>
+              </div>
+            </div>
+          </div>
+        <?php endif; ?>
+
+        <?php if ($activePackageSub): ?>
+          <div class="mb-6 text-sm" style="font-weight:700;color:var(--text-secondary)">
+            🎁 باقتك النشطة حالياً: <span style="color:var(--primary)"><?= e($activePackageSub['package_name']) ?></span>
+            — سارية حتى <?= formatDate($activePackageSub['expires_at']) ?>
+          </div>
+        <?php endif; ?>
 
         <!-- شبكة عرض الباقات -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -285,19 +246,19 @@ try {
               </div>
 
               <div class="pt-4 border-t border-slate-100 mt-4">
-                <a href="create-order.php?package_id=<?= $pkg['id'] ?>" class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-white text-sm shadow-sm transition hover:scale-[1.02]" style="background: <?= $color ?>;">
-                  الاشتراك بالباقة الآن 🚀
-                </a>
+                <?php if ($activePackageSub && (int)$activePackageSub['package_id'] === (int)$pkg['id']): ?>
+                  <div class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-sm" style="background:#dcfce7;color:#166534;border:1px solid #86efac">
+                    ✓ أنت مشترك — سارية حتى <?= formatDate($activePackageSub['expires_at']) ?>
+                  </div>
+                <?php else: ?>
+                  <a href="packages.php?subscribe_package=<?= $pkg['id'] ?>" class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-white text-sm shadow-sm transition hover:scale-[1.02]" style="background: <?= $color ?>;">
+                    اشترك بالباقة الآن 🚀
+                  </a>
+                <?php endif; ?>
               </div>
             </div>
             <?php endforeach; ?>
           <?php endif; ?>
         </div>
 
-      </div>
-    </main>
-  </div>
-
-  <script src="assets/js/main.js"></script>
-</body>
-</html>
+<?php require __DIR__ . '/partials/footer.php'; ?>

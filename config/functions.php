@@ -108,6 +108,62 @@ function getAllPackages(bool $activeOnly = true): array {
     return db()->query($sql)->fetchAll();
 }
 
+/**
+ * Get the student's currently active package subscription (if any).
+ * A subscription is "active" when its expires_at is still in the future.
+ */
+function getActivePackageSubscription(int $studentId): ?array {
+    $stmt = db()->prepare(
+        'SELECT ps.id            AS sub_id,
+                ps.started_at,
+                ps.expires_at,
+                ps.status        AS sub_status,
+                p.id             AS package_id,
+                p.name           AS package_name,
+                p.price          AS package_price,
+                p.original_price AS package_original_price,
+                p.icon           AS package_icon,
+                p.color          AS package_color,
+                p.service_ids,
+                p.features_json,
+                p.max_tasks
+         FROM package_subscriptions ps
+         JOIN packages p ON p.id = ps.package_id
+         WHERE ps.student_id = ? AND ps.status = "active" AND ps.expires_at > NOW()
+         ORDER BY ps.expires_at DESC
+         LIMIT 1'
+    );
+    $stmt->execute([$studentId]);
+    return $stmt->fetch() ?: null;
+}
+
+/**
+ * Create a new 1-month active subscription for the student on the given package.
+ * Any previously active subscription is expired first (only one active at a time).
+ */
+function subscribeStudentToPackage(int $studentId, int $packageId): int {
+    $db = db();
+    $db->prepare('UPDATE package_subscriptions SET status = "expired" WHERE student_id = ? AND status = "active"')
+       ->execute([$studentId]);
+
+    $db->prepare(
+        'INSERT INTO package_subscriptions (student_id, package_id, started_at, expires_at, status)
+         VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL 1 MONTH), "active")'
+    )->execute([$studentId, $packageId]);
+
+    return (int) $db->lastInsertId();
+}
+
+/**
+ * List of service IDs covered by the active subscription (empty if none).
+ */
+function activeSubscriptionServiceIds(?array $subscription): array {
+    if (!$subscription) return [];
+    $ids = json_decode($subscription['service_ids'] ?? '[]', true);
+    if (!is_array($ids)) return [];
+    return array_map('intval', $ids);
+}
+
 /* ─────────────────────────────────────────────
    ORDERS
 ───────────────────────────────────────────── */
@@ -200,6 +256,19 @@ function updateOrderStatus(int $orderId, string $status): bool {
     return $stmt->execute([$status, $orderId]);
 }
 
+function getAssignedAcademics(int $orderId): array {
+    $stmt = db()->prepare(
+        'SELECT a.id, a.name, a.email, a.phone, a.specialty, a.degree, a.avatar_initials, a.rating,
+                oa.status AS assignment_status, oa.assigned_at, oa.response_at
+         FROM order_assignments oa
+         JOIN academics a ON oa.academic_id = a.id
+         WHERE oa.order_id = ?
+         ORDER BY oa.assigned_at ASC'
+    );
+    $stmt->execute([$orderId]);
+    return $stmt->fetchAll();
+}
+
 /* ─────────────────────────────────────────────
    PAYMENTS
 ───────────────────────────────────────────── */
@@ -268,7 +337,16 @@ function getOrCreateConversation(int $orderId, int $studentId, int $academicId):
 
 function getConversationMessages(int $conversationId): array {
     $stmt = db()->prepare(
-        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY sent_at ASC'
+        'SELECT m.*,
+                CASE
+                    WHEN m.sender_type = \'student\'  THEN u.name
+                    WHEN m.sender_type = \'academic\' THEN a.name
+                    ELSE \'الإدارة\'
+                END AS sender_name
+         FROM messages m
+         LEFT JOIN users    u ON m.sender_id = u.id AND m.sender_type = \'student\'
+         LEFT JOIN academics a ON m.sender_id = a.id AND m.sender_type = \'academic\'
+         WHERE m.conversation_id = ? ORDER BY m.sent_at ASC'
     );
     $stmt->execute([$conversationId]);
     return $stmt->fetchAll();

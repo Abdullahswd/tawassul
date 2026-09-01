@@ -160,6 +160,26 @@ CREATE TABLE IF NOT EXISTS `orders` (
   CONSTRAINT `fk_ord_package`  FOREIGN KEY (`package_id`)  REFERENCES `packages`(`id`)  ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ============================================================
+-- 7.1. ORDER ASSIGNMENTS (إسناد الطلبات للأكاديميين)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `order_assignments` (
+  `id`             INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `order_id`       INT UNSIGNED NOT NULL,
+  `academic_id`    INT UNSIGNED NOT NULL,
+  `status`         ENUM('assigned','accepted','rejected') NOT NULL DEFAULT 'assigned',
+  `assigned_at`    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `response_at`    DATETIME DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_order_academic` (`order_id`, `academic_id`),
+  INDEX `idx_order`    (`order_id`),
+  INDEX `idx_academic` (`academic_id`),
+  CONSTRAINT `fk_oa_order`    FOREIGN KEY (`order_id`)    REFERENCES `orders`(`id`)    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_oa_academic` FOREIGN KEY (`academic_id`) REFERENCES `academics`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+
 
 -- ============================================================
 -- 8. ORDER ATTACHMENTS
@@ -263,6 +283,26 @@ CREATE TABLE IF NOT EXISTS `reviews` (
   CONSTRAINT `fk_rev_student`  FOREIGN KEY (`student_id`)  REFERENCES `users`(`id`)     ON DELETE RESTRICT,
   CONSTRAINT `fk_rev_academic` FOREIGN KEY (`academic_id`) REFERENCES `academics`(`id`) ON DELETE RESTRICT,
   CHECK (`rating` BETWEEN 1 AND 5)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 12b. PACKAGE SUBSCRIPTIONS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `package_subscriptions` (
+  `id`          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `student_id`  INT UNSIGNED NOT NULL,
+  `package_id`  INT UNSIGNED NOT NULL,
+  `started_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `expires_at`  DATETIME NOT NULL,
+  `status`      ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active',
+  `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  INDEX `idx_student` (`student_id`),
+  INDEX `idx_package` (`package_id`),
+  INDEX `idx_status`  (`status`),
+  CONSTRAINT `fk_ps_student` FOREIGN KEY (`student_id`) REFERENCES `users`(`id`)     ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_ps_package` FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
