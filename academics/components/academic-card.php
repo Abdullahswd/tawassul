@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   ============================================
   Academic Card Component
   Usage: include directly or inject via JS
@@ -25,7 +25,7 @@
 
 <h2 style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:24px">Academic Card - Component Demo</h2>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;max-width:1000px">
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-[1000px]">
 
   <!-- Card Template (rendered by JS) -->
   <div id="cardDemo"></div>
@@ -94,7 +94,7 @@ const AcademicCard = {
           <div class="academic-card-name">${name}</div>
           <div class="academic-card-spec">📚 ${specialty}</div>
 
-          <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <div class="flex gap-2 flex-wrap mb-3">
             <span class="badge badge-secondary" style="font-size:11px">🏛 ${university}</span>
           </div>
 
@@ -155,7 +155,7 @@ const AcademicCard = {
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:800;color:var(--text-primary)">${name}</div>
           <div style="font-size:13px;color:var(--text-secondary);margin:4px 0">📚 ${specialty} · 🎓 ${degree}</div>
-          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div class="flex items-center gap-3 flex-wrap">
             <span style="color:#f59e0b;font-weight:700">⭐ ${rating}</span>
             <span style="color:var(--text-secondary);font-size:12px">(${reviews} تقييم)</span>
             <span style="color:var(--text-secondary);font-size:12px">${orders} طلب</span>

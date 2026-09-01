@@ -52,7 +52,7 @@ img{max-width:100%}
 
 /* ---- Layout ---- */
 .page-layout{display:flex;min-height:100vh}
-.main-content{flex:1;margin-right:260px;transition:margin-right .3s;display:flex;flex-direction:column}
+.main-content{flex:1;margin-right:260px;transition:margin-right .3s;display:flex;flex-direction:column;min-width:0}
 .main-content.collapsed{margin-right:70px}
 .page-body{flex:1;padding:24px;padding-top:88px}
 

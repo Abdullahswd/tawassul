@@ -161,7 +161,7 @@ $attachments = $attStmt->fetchAll();
       <!-- Accept / Reject Banner (If assigned and pending response) -->
       <?php if ($myAssignmentStatus === 'assigned'): ?>
         <div class="card anim-up" style="padding:22px;background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.08));border:2px solid var(--primary);margin-bottom:24px;border-radius:16px">
-          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+          <div class="flex items-center justify-between flex-wrap gap-4">
             <div>
               <h3 style="font-size:17px;font-weight:800;color:var(--text-primary);margin-bottom:6px">📋 طلب مسند إليك من إدارة المنصة</h3>
               <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">
@@ -180,7 +180,7 @@ $attachments = $attStmt->fetchAll();
         </div>
       <?php endif; ?>
 
-      <div style="display:grid;grid-template-columns:1fr 340px;gap:24px">
+      <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
         
         <!-- MAIN COL -->
         <div style="display:flex;flex-direction:column;gap:24px">

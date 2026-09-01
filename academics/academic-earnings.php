@@ -120,7 +120,7 @@ while ($row = $earningsStmt->fetch()) {
       </div>
 
       <!-- Finance cards -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="stat-card anim-up delay-1" style="background:linear-gradient(135deg,#10b981,#059669);border:none;color:white">
           <div class="stat-icon" style="background:rgba(255,255,255,.2);margin-bottom:14px">💰</div>
           <div class="stat-value" style="color:white;font-size:26px" data-counter="<?= round($totalEarned) ?>" data-suffix=" ر.س">0</div>

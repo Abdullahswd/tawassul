@@ -76,7 +76,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
         <button class="btn btn-primary" onclick="saveSettings()">💾 حفظ التغييرات</button>
       </div>
 
-      <div style="display:grid;grid-template-columns:220px 1fr;gap:24px">
+      <div class="grid grid-cols-1 lg:grid-cols-[220px_1fr] gap-6">
 
         <!-- Settings menu -->
         <div class="card anim-up delay-1" style="padding:10px;height:fit-content">
@@ -93,21 +93,20 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
 
           <!-- Profile section -->
           <div id="sec-profile" class="s-section">
-            <div class="card" style="padding:26px;margin-bottom:18px">
-              <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">👤 البيانات الشخصية</h3>
+            <div class="card p-6 mb-5">
+              <h3 class="text-[17px] font-bold text-[var(--text-primary)] mb-5">👤 البيانات الشخصية</h3>
 
               <!-- Avatar -->
-              <div style="display:flex;align-items:center;gap:20px;margin-bottom:24px;padding:20px;background:var(--bg-main);border-radius:14px">
-                <div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;position:relative">
+              <div class="flex flex-col sm:flex-row items-center gap-5 mb-6 p-5 rounded-2xl" style="background:var(--bg-main)">
+                <div class="w-20 h-20 rounded-full flex items-center justify-center text-[30px] font-extrabold text-white relative bg-gradient-to-br from-indigo-500 to-indigo-400">
                   <?= e($academicAvatar) ?>
                 </div>
                 <div>
-                  <div style="font-size:16px;font-weight:700;color:var(--text-primary)"><?= e($academicName) ?></div>
                   <div style="font-size:13px;color:var(--text-secondary)">أكاديمي موثق ✓</div>
                 </div>
               </div>
 
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div class="form-group" style="grid-column:span 2">
                   <label class="form-label">الاسم الكامل</label>
                   <input class="form-input" id="settingsName" value="<?= e($academicData['name']) ?>"/>
@@ -122,7 +121,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
                 </div>
                 <div class="form-group">
                   <label class="form-label">التوفر</label>
-                  <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--bg-main);border-radius:var(--radius-sm);border:1.5px solid var(--border-color)">
+                  <div class="flex items-center gap-3 py-3 px-4 border-[1.5px] rounded-md" style="background:var(--bg-main);border-color:var(--border-color)">
                     <label class="toggle-switch">
                       <input type="checkbox" id="settingsAvailability" <?= $academicData['availability'] === 'available' ? 'checked' : '' ?>/>
                       <span class="toggle-slider"></span>
@@ -144,7 +143,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">⚙️ إدارة الخدمات</h3>
               <p style="font-size:13px;color:var(--text-secondary);margin-bottom:18px">اختر الخدمات التي تقدمها لطلابك</p>
               
-              <div id="servicesEditGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+              <div id="servicesEditGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                 <?php foreach ($allServicesList as $srv): ?>
                     <?php $checked = in_array($srv['id'], $selectedServices) ? 'checked' : ''; ?>
                     <label class="service-checkbox" style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;border:1.5px solid <?= $checked ? 'var(--primary)' : 'var(--border-color)' ?>;cursor:pointer;background:<?= $checked ? 'rgba(99,102,241,.06)' : 'transparent' ?>">
@@ -162,7 +161,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
             <div class="card" style="padding:28px;margin-bottom:18px">
               
               <!-- Header -->
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;padding-bottom:20px;margin-bottom:24px;border-bottom:1px solid var(--border-color)">
+              <div class="flex items-center justify-between flex-wrap gap-4 pb-5 mb-6 border-b border-[var(--border-color)]">
                 <div style="display:flex;align-items:center;gap:14px">
                   <div style="width:48px;height:48px;border-radius:14px;background:linear-gradient(135deg,rgba(99,102,241,0.15),rgba(129,140,248,0.1));border:1px solid rgba(99,102,241,0.25);display:flex;align-items:center;justify-content:center;font-size:24px">🎓</div>
                   <div>
@@ -186,16 +185,16 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
           <div id="sec-notifications" class="s-section" style="display:none">
             <div class="card" style="padding:26px">
               <h3 style="font-size:17px;font-weight:700;color:var(--text-primary);margin-bottom:18px">🔔 إعدادات الإشعارات</h3>
-              <div style="display:flex;flex-direction:column;gap:2px;border:1.5px solid var(--border-color);border-radius:14px;overflow:hidden">
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+              <div class="flex flex-col gap-0.5 border-[1.5px] border-[var(--border-color)] rounded-2xl overflow-hidden">
+                <div class="flex justify-between items-center flex-wrap gap-2 p-4 border-b border-[var(--border-color)]">
                   <div><div style="font-weight:600;color:var(--text-primary)">إشعارات الطلبات الجديدة</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند وصول طلب جديد</div></div>
                   <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border-color)">
+                <div class="flex justify-between items-center flex-wrap gap-2 p-4 border-b border-[var(--border-color)]">
                   <div><div style="font-weight:600;color:var(--text-primary)">إشعارات الأرباح</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند استلام دفعة</div></div>
                   <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px">
+                <div class="flex justify-between items-center flex-wrap gap-2 p-4">
                   <div><div style="font-weight:600;color:var(--text-primary)">إشعارات التقييمات</div><div style="font-size:12px;color:var(--text-secondary)">تنبيه عند وصول تقييم جديد</div></div>
                   <label class="toggle-switch"><input type="checkbox" checked/><span class="toggle-slider"></span></label>
                 </div>
@@ -226,14 +225,14 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
           <!-- Bank section -->
           <div id="sec-bank" class="s-section" style="display:none">
             <div class="card" style="padding:26px">
-              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+              <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
                 <h3 style="font-size:17px;font-weight:700;color:var(--text-primary)">🏦 البيانات البنكية</h3>
                 <button class="btn btn-primary" onclick="openBankForm()">+ إضافة حساب</button>
               </div>
               <div class="alert alert-info" style="margin-bottom:18px"><span>ℹ️</span><span>أضف حساباتك البنكية ومحافظك الإلكترونية لاستقبال الأرباح عبر التحويل</span></div>
 
               <!-- Bank accounts list -->
-              <div id="bankAccountsList" style="display:flex;flex-direction:column;gap:12px">
+              <div id="bankAccountsList" class="flex flex-col gap-3">
                 <?php if (empty($bankAccounts)): ?>
                     <p id="bankEmpty" style="color:var(--text-secondary);text-align:center;padding:32px 0">لا توجد حسابات بعد، اضغط "إضافة حساب" لإضافة حساب بنكي أو محفظة إلكترونية.</p>
                 <?php else: ?>
@@ -242,7 +241,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
                       $accent = $isWallet ? 'var(--secondary)' : 'var(--primary)';
                       $icon = $isWallet ? '👛' : '🏦';
                       ?>
-                        <div class="bank-acc-item" data-id="<?= (int) $acc['id'] ?>" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--bg-card);flex-wrap:wrap">
+                        <div class="bank-acc-item flex items-center justify-between gap-4 p-4 border-[1.5px] rounded-2xl flex-wrap" data-id="<?= (int) $acc['id'] ?>" style="border-color:var(--border-color);background:var(--bg-card)">
                           <div style="display:flex;align-items:center;gap:14px">
                             <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,<?= $isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8' ?>);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0"><?= $icon ?></div>
                             <div>

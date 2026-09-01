@@ -108,11 +108,11 @@ if ($academic['availability'] === 'busy') {
 
 <!-- Header -->
 <header class="public-header">
-  <div style="display:flex;align-items:center;gap:12px">
+  <div class="flex items-center gap-3">
     <div class="logo-icon" style="font-size:22px">🎓</div>
     <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
   </div>
-  <nav style="display:flex;gap:6px;align-items:center">
+  <nav class="flex items-center gap-2 flex-wrap">
     <a href="academics-list.php" class="btn btn-ghost btn-sm">← الأكاديميون</a>
     <?php if (isLoggedIn()): ?>
       <?php if (isset($_SESSION['academic_id'])): ?>
@@ -131,7 +131,7 @@ if ($academic['availability'] === 'busy') {
 <div id="profileHero" style="background:linear-gradient(135deg,#1e1b4b,#312e81);padding:48px 32px 0;position:relative;overflow:hidden">
   <div style="position:absolute;inset:0;background:radial-gradient(circle at 20% 50%,rgba(99,102,241,.3),transparent 60%)"></div>
   <div style="max-width:1100px;margin:0 auto;position:relative">
-    <div id="profileHeader" style="display:flex;align-items:flex-end;gap:28px;padding-bottom:0">
+    <div id="profileHeader" class="flex flex-col md:flex-row md:items-end gap-7 pb-0">
       <!-- Avatar -->
       <div id="profileAvatar" style="width:120px;height:120px;border-radius:24px;border:4px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:900;color:#fff;flex-shrink:0;box-shadow:0 8px 28px rgba(0,0,0,.3);background:#6366f1"><?= e($academicAvatar) ?></div>
       <!-- Info -->
@@ -141,7 +141,7 @@ if ($academic['availability'] === 'busy') {
           <span class="badge badge-success" style="background:rgba(16,185,129,.2);color:#6ee7b7">✓ موثّق</span>
         </div>
         <p id="profileSpec" style="color:rgba(255,255,255,.75);font-size:15px;margin-bottom:10px">📚 <?= e($academic['specialty']) ?> · 🎓 <?= e($academic['degree']) ?> · 🏛 <?= e($academic['university']) ?></p>
-        <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div class="flex items-center gap-5 flex-wrap">
           <span style="color:#f59e0b;font-weight:700;font-size:16px" id="profileRating">⭐ <?= number_format($academic['rating'], 1) ?> (<?= $academic['total_reviews'] ?> تقييم)</span>
           <span style="color:rgba(255,255,255,.65);font-size:14px" id="profileOrders">✅ <?= $academic['total_orders'] ?> طلب</span>
           <span style="color:rgba(255,255,255,.65);font-size:14px">🇸🇦 السعودية</span>
@@ -155,7 +155,7 @@ if ($academic['availability'] === 'busy') {
       </div>
     </div>
     <!-- Tabs nav -->
-    <div style="display:flex;gap:2px;border-bottom:none;margin-top:8px">
+    <div class="flex flex-wrap gap-1 mt-2" style="border-bottom:none">
       <button class="profile-tab-btn active" data-ptab="about" onclick="switchPTab('about',this)">نبذة</button>
       <button class="profile-tab-btn" data-ptab="quals" onclick="switchPTab('quals',this)">المؤهلات</button>
       <button class="profile-tab-btn" data-ptab="services" onclick="switchPTab('services',this)">الخدمات</button>
@@ -166,10 +166,10 @@ if ($academic['availability'] === 'busy') {
 
 <!-- Main body -->
 <div style="max-width:1100px;margin:0 auto;padding:32px">
-  <div style="display:grid;grid-template-columns:2fr 1fr;gap:28px">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-7">
 
     <!-- Left (Tab Panels) -->
-    <div>
+    <div class="lg:col-span-2">
 
       <!-- About -->
       <div id="ptab-about" class="ptab-panel active">
@@ -179,7 +179,7 @@ if ($academic['availability'] === 'busy') {
         </div>
 
         <!-- Quick stats -->
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:20px">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
           <div class="card" style="padding:20px;text-align:center">
             <div style="font-size:26px;font-weight:900;color:var(--primary)" data-counter="<?= $academic['total_orders'] ?>">0</div>
             <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">إجمالي الطلبات</div>
@@ -218,7 +218,7 @@ if ($academic['availability'] === 'busy') {
                   $bg = 'rgba(245,158,11,.1)';
               }
               ?>
-              <div style="display:flex;gap:16px;padding:18px;background:var(--bg-main);border-radius:14px;margin-bottom:12px">
+              <div class="flex flex-col sm:flex-row gap-4 p-4 mb-3" style="background:var(--bg-main);border-radius:14px">
                 <div style="width:48px;height:48px;border-radius:12px;background:<?= $bg ?>;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0"><?= $icon ?></div>
                 <div>
                   <div style="font-size:12px;font-weight:600;color:<?= $color ?>;letter-spacing:1px;margin-bottom:4px"><?= e($q['level']) ?></div>
@@ -243,14 +243,14 @@ if ($academic['availability'] === 'busy') {
       <div id="ptab-services" class="ptab-panel" style="display:none">
         <div class="card" style="padding:24px">
           <h2 style="font-size:18px;font-weight:700;color:var(--text-primary);margin-bottom:20px">⚙️ الخدمات المقدَّمة</h2>
-          <div id="profileServices" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+          <div id="profileServices" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
         </div>
       </div>
 
       <!-- Reviews -->
       <div id="ptab-reviews" class="ptab-panel" style="display:none">
         <div class="card" style="padding:24px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <div class="flex items-center justify-between flex-wrap gap-4 mb-5">
             <h2 style="font-size:18px;font-weight:700;color:var(--text-primary)">⭐ التقييمات</h2>
             <div style="text-align:left">
               <div style="font-size:40px;font-weight:900;color:#f59e0b;line-height:1"><?= number_format($academic['rating'], 1) ?></div>
@@ -264,7 +264,7 @@ if ($academic['availability'] === 'busy') {
     </div>
 
     <!-- Right sidebar -->
-    <div style="display:flex;flex-direction:column;gap:18px">
+    <div class="flex flex-col gap-5">
 
       <!-- Contact -->
       <div class="card" style="padding:20px">
@@ -311,7 +311,7 @@ if ($academic['availability'] === 'busy') {
       </div>
       <div class="form-group">
         <label class="form-label">الباقة</label>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:6px" id="packageSelector">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2" id="packageSelector">
           <label style="border:2px solid var(--border-color);border-radius:10px;padding:12px;text-align:center;cursor:pointer;transition:all .2s" onclick="selectPkg(this, 'البداية')">
             <div style="font-weight:700;color:var(--text-primary)">البداية</div>
             <div style="font-size:16px;font-weight:800;color:var(--primary);margin-top:4px">149 ر.س</div>

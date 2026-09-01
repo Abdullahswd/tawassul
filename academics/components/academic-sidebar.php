@@ -43,7 +43,7 @@ if ($currentAcademicId) {
 
   <!-- Profile mini card -->
   <div style="padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.07)">
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:12px;background:rgba(255,255,255,.06)">
+    <div class="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/5">
       <div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0"><?= e($academicAvatar) ?></div>
       <div class="logo-text" style="min-width:0">
         <div style="font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><?= e($academicName) ?></div>

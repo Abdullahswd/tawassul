@@ -100,7 +100,7 @@ foreach ($services as $s) {
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-group" style="grid-column:span 2">
               <label class="form-label">الاسم الكامل <span style="color:var(--danger)">*</span></label>
               <input class="form-input" id="fullName" name="fullName" placeholder="محمد عبدالله أحمد الزهراني" required/>
@@ -194,7 +194,7 @@ foreach ($services as $s) {
               </div>
             </div>
             <div class="degree-body" id="bachelorBody">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-group">
                   <label class="form-label">الكلية</label>
                   <input class="form-input" name="bsCollege" placeholder="كلية العلوم"/>
@@ -238,7 +238,7 @@ foreach ($services as $s) {
               </div>
             </div>
             <div class="degree-body" id="mastersBody">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-group">
                   <label class="form-label">الكلية</label>
                   <input class="form-input" name="msCollege" placeholder="كلية الدراسات العليا"/>
@@ -282,7 +282,7 @@ foreach ($services as $s) {
               </div>
             </div>
             <div class="degree-body" id="phdBody">
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-group">
                   <label class="form-label">الكلية</label>
                   <input class="form-input" name="phdCollege" placeholder="كلية الدراسات العليا"/>
@@ -322,12 +322,12 @@ foreach ($services as $s) {
             </div>
           </div>
 
-          <div id="servicesGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px"></div>
+          <div id="servicesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5"></div>
 
           <!-- Pricing -->
           <div style="border:1.5px solid var(--border-color);border-radius:var(--radius);padding:20px;margin-top:20px">
             <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">💰 تسعير الخدمة</h3>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div class="form-group">
                 <label class="form-label">السعر المبدئي للطلبات (ر.س)</label>
                 <input class="form-input" name="basePrice" type="number" placeholder="149" min="50"/>

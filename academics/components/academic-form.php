@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   ============================================
   Academic Form Component - Multi-Step Demo
   ============================================
@@ -24,7 +24,7 @@
 <!-- ====== Text Input ====== -->
 <div class="card" style="padding:24px;margin-bottom:20px">
   <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📝 حقول النص</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div class="form-group">
       <label class="form-label">حقل عادي</label>
       <input class="form-input" type="text" placeholder="اكتب هنا..."/>
@@ -57,7 +57,7 @@
 <!-- ====== File Upload ====== -->
 <div class="card" style="padding:24px;margin-bottom:20px">
   <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📤 رفع الملفات</h3>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     <div>
       <label class="form-label">رفع صورة الشهادة</label>
       <div class="file-upload-area">
@@ -129,7 +129,7 @@
   </div>
 
   <!-- Nav buttons -->
-  <div style="display:flex;justify-content:space-between;margin-top:16px">
+  <div class="flex justify-between items-center flex-wrap gap-3 mt-4">
     <button class="btn btn-outline">← السابق</button>
     <button class="btn btn-primary">التالي ←</button>
   </div>
@@ -138,7 +138,7 @@
 <!-- ====== Buttons showcase ====== -->
 <div class="card" style="padding:24px;margin-bottom:20px">
   <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">🎨 الأزرار</h3>
-  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+  <div class="flex flex-wrap gap-2 items-center">
     <button class="btn btn-primary">الأساسي</button>
     <button class="btn btn-secondary">الثانوي</button>
     <button class="btn btn-success">نجاح</button>

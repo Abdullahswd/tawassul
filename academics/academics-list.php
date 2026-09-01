@@ -110,7 +110,7 @@ foreach ($acList as $ac) {
 <div class="public-body">
 
   <!-- Stats Strip -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
     <div class="card" style="padding:20px;text-align:center">
       <div style="font-size:28px;font-weight:900;color:var(--primary)" data-counter="<?= $totalAcademicsCount ?>">0</div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">أكاديمي متخصص</div>
@@ -170,12 +170,12 @@ foreach ($acList as $ac) {
   </div>
 
   <!-- Results count -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+  <div class="flex flex-wrap gap-3 items-center justify-between mb-4">
     <p id="resultsCount" style="font-size:14px;color:var(--text-secondary)">عرض <strong><?= count($acList) ?></strong> أكاديمي</p>
   </div>
 
   <!-- Academics Grid -->
-  <div id="academicsGrid" class="academics-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:24px;margin-bottom:40px"></div>
+  <div id="academicsGrid" class="academics-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-10"></div>
 
   <!-- Empty state -->
   <div id="emptyState" style="display:none;text-align:center;padding:80px 20px">

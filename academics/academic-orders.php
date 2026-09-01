@@ -78,7 +78,7 @@ foreach ($ordersJson as $o) {
       </div>
 
       <!-- Status tabs & stats -->
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div class="stat-card anim-up delay-1" style="padding:16px;cursor:pointer;border-bottom:3px solid #6366f1" onclick="filterOrders('')">
           <div style="font-size:24px;font-weight:900;color:var(--primary)" data-counter="<?= $allCount ?>">0</div>
           <div style="font-size:13px;color:var(--text-secondary)">جميع الطلبات</div>
@@ -99,21 +99,23 @@ foreach ($ordersJson as $o) {
 
       <!-- Filters + Table -->
       <div class="tbl-container anim-up delay-2">
-        <div class="tbl-header">
+        <div class="tbl-header flex flex-col sm:flex-row flex-wrap gap-4 items-start sm:items-center justify-between">
           <h3 class="tbl-title">📋 قائمة الطلبات</h3>
-          <div class="search-box">
-            <span class="s-icon">🔍</span>
-            <input type="text" id="orderSearch" placeholder="بحث برقم أو اسم..." style="width:220px" oninput="filterOrders()"/>
+          <div class="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
+            <div class="search-box w-full sm:w-auto">
+              <span class="s-icon">🔍</span>
+              <input type="text" id="orderSearch" placeholder="بحث برقم أو اسم..." class="w-full sm:w-[220px]" oninput="filterOrders()"/>
+            </div>
+            <select class="form-input form-select w-full sm:w-auto" id="statusFilter" style="padding-left:36px;font-size:14px" onchange="filterOrders()">
+              <option value="">جميع الحالات</option>
+              <option value="new">جديد</option>
+              <option value="accepted">مقبول</option>
+              <option value="in_progress">قيد التنفيذ</option>
+              <option value="revision">تحت المراجعة</option>
+              <option value="completed">مكتمل</option>
+              <option value="cancelled">ملغي</option>
+            </select>
           </div>
-          <select class="form-input form-select" id="statusFilter" style="width:auto;padding-left:36px;font-size:14px" onchange="filterOrders()">
-            <option value="">جميع الحالات</option>
-            <option value="new">جديد</option>
-            <option value="accepted">مقبول</option>
-            <option value="in_progress">قيد التنفيذ</option>
-            <option value="revision">تحت المراجعة</option>
-            <option value="completed">مكتمل</option>
-            <option value="cancelled">ملغي</option>
-          </select>
         </div>
 
         <div style="overflow-x:auto">
@@ -180,7 +182,7 @@ function renderOrders(data) {
     <tr>
       <td><span style="font-weight:700;color:var(--primary)">${o.id}</span></td>
       <td>
-        <div style="display:flex;align-items:center;gap:9px">
+        <div class="flex items-center gap-2">
           <div class="tbl-avatar" style="background:${getAvatarColor(i)};width:34px;height:34px;border-radius:9px;font-size:12px">${o.student.slice(0,2)}</div>
           <span>${o.student}</span>
         </div>
@@ -191,7 +193,7 @@ function renderOrders(data) {
       <td>${getStatusBadge(o.status)}</td>
       <td style="color:${o.status !== 'completed' ? '#ef4444' : 'var(--text-secondary)'};font-size:13px">📅 ${o.deadline}</td>
       <td>
-        <div style="display:flex;gap:5px">
+        <div class="flex flex-wrap gap-1">
           <a href="academic-order-details.php?id=${o.id}" class="btn btn-sm btn-icon" style="background:rgba(99,102,241,.1);color:#6366f1;border:none;text-decoration:none;display:flex;align-items:center;justify-content:center" title="عرض التفاصيل">👁</a>
           ${o.status === 'assigned' || o.status === 'new' ? `<button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,.1);color:#10b981;border:none" title="قبول الطلب" onclick="acceptOrder('${o.id}')">✓</button>` : ''}
           ${o.status === 'in_progress' || o.status === 'accepted' ? `<button class="btn btn-sm btn-icon" style="background:rgba(245,158,11,.1);color:#f59e0b;border:none" title="إتمام الطلب" onclick="completeOrder('${o.id}')">🏁</button>` : ''}
@@ -222,7 +224,7 @@ function viewOrder(id) {
   if (!o) return;
   document.getElementById('orderDetailTitle').textContent = `تفاصيل الطلب ${o.id}`;
   document.getElementById('orderDetailBody').innerHTML = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الطالب</div><div style="font-weight:700;color:var(--text-primary);margin-top:4px">${o.student}</div></div>
       <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الخدمة</div><div style="font-weight:700;color:var(--text-primary);margin-top:4px">${o.service}</div></div>
       <div style="padding:14px;background:var(--bg-main);border-radius:12px"><div style="font-size:12px;color:var(--text-secondary)">الباقة</div><div style="font-weight:700;color:var(--primary);margin-top:4px">${o.package}</div></div>

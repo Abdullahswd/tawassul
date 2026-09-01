@@ -114,7 +114,7 @@ $todayDateArabic = date('Y/m/d');
       </div>
 
       <!-- Stats -->
-      <div class="stats-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px">
+      <div class="stats-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="stat-card anim-up delay-1" style="border-top:3px solid #6366f1">
           <div class="stat-icon" style="background:rgba(99,102,241,.1)">📋</div>
           <div class="stat-value" data-counter="<?= $activeOrdersCount ?>">0</div>
@@ -142,8 +142,8 @@ $todayDateArabic = date('Y/m/d');
       </div>
 
       <!-- Charts row -->
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:22px;margin-bottom:24px">
-        <div class="chart-card anim-up delay-2">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="chart-card anim-up delay-2 lg:col-span-2">
           <div class="chart-header">
             <div>
               <h3 class="chart-title">📈 الأرباح الشهرية</h3>
@@ -175,10 +175,10 @@ $todayDateArabic = date('Y/m/d');
       </div>
 
       <!-- Latest Orders + Quick Actions -->
-      <div style="display:grid;grid-template-columns:2fr 1fr;gap:22px">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         <!-- Latest orders table -->
-        <div class="tbl-container anim-up delay-3">
+        <div class="tbl-container anim-up delay-3 lg:col-span-2">
           <div class="tbl-header" style="justify-content:space-between">
             <h3 class="tbl-title">📋 آخر الطلبات</h3>
             <a href="academic-orders.php" class="btn btn-ghost btn-sm">عرض الكل ←</a>
