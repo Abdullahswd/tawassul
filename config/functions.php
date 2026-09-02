@@ -52,12 +52,13 @@ function getAcademicById(int $id): ?array {
 
 function getAllAcademics(string $status = 'approved'): array {
     $stmt = db()->prepare(
-        'SELECT a.*, GROUP_CONCAT(s.name SEPARATOR ", ") AS services_names
+        'SELECT a.*,
+            (SELECT GROUP_CONCAT(s.name SEPARATOR ", ")
+             FROM academic_services acs
+             JOIN services s ON acs.service_id = s.id
+             WHERE acs.academic_id = a.id) AS services_names
          FROM academics a
-         LEFT JOIN academic_services acs ON a.id = acs.academic_id
-         LEFT JOIN services s ON acs.service_id = s.id
          WHERE a.status = ?
-         GROUP BY a.id
          ORDER BY a.rating DESC'
     );
     $stmt->execute([$status]);

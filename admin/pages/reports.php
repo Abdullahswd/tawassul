@@ -3,6 +3,7 @@ require_once __DIR__ . '/../../config/auth.php';
 require_once __DIR__ . '/../../config/functions.php';
 requireAdmin();
 
+try {
 $db = db();
 
 // General KPIs
@@ -22,10 +23,10 @@ $months_ar = ['ينا', 'فبر', 'مار', 'أبر', 'ماي', 'يون', 'يو�
 
 // 1. Orders growth chart
 $orders_by_month = array_fill(0, 12, 0);
-$orders_stmt = $db->prepare("SELECT MONTH(created_at)-1 AS m, COUNT(*) AS cnt FROM orders WHERE YEAR(created_at) = ? GROUP BY MONTH(created_at)");
+$orders_stmt = $db->prepare("SELECT MONTH(created_at) AS m, COUNT(*) AS cnt FROM orders WHERE YEAR(created_at) = ? GROUP BY m");
 $orders_stmt->execute([date('Y')]);
 foreach ($orders_stmt->fetchAll() as $row) {
-    $orders_by_month[$row['m']] = (int)$row['cnt'];
+    $orders_by_month[$row['m'] - 1] = (int)$row['cnt'];
 }
 
 // 2. Orders breakdown
@@ -57,10 +58,10 @@ foreach ($top_services as $ts) {
 
 // 4. Revenue monthly
 $rev_by_month = array_fill(0, 12, 0);
-$rev_stmt = $db->prepare("SELECT MONTH(paid_at)-1 AS m, SUM(amount) AS rev FROM payments WHERE YEAR(paid_at) = ? AND status = 'paid' GROUP BY MONTH(paid_at)");
+$rev_stmt = $db->prepare("SELECT MONTH(paid_at) AS m, SUM(amount) AS rev FROM payments WHERE YEAR(paid_at) = ? AND status = 'paid' GROUP BY m");
 $rev_stmt->execute([date('Y')]);
 foreach ($rev_stmt->fetchAll() as $row) {
-    $rev_by_month[$row['m']] = (float)$row['rev'];
+    $rev_by_month[$row['m'] - 1] = (float)$row['rev'];
 }
 
 $non_zero_revs = array_filter($rev_by_month);
@@ -71,7 +72,7 @@ $lowest_revenue_month = count($non_zero_revs) > 0 ? min($non_zero_revs) : 0;
 // 5. Users growth cumulative
 $users_by_month = array_fill(0, 12, 0);
 $u_stmt = $db->prepare("
-    SELECT MONTH(created_at)-1 AS m, COUNT(*) AS cnt 
+    SELECT MONTH(created_at) AS m, COUNT(*) AS cnt
     FROM (
         SELECT created_at FROM users WHERE YEAR(created_at) = ? AND role = 'student'
         UNION ALL
@@ -81,7 +82,7 @@ $u_stmt = $db->prepare("
 ");
 $u_stmt->execute([date('Y'), date('Y')]);
 foreach ($u_stmt->fetchAll() as $row) {
-    $users_by_month[$row['m']] = (int)$row['cnt'];
+    $users_by_month[$row['m'] - 1] = (int)$row['cnt'];
 }
 $cumulative_users = [];
 $prev_users = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE YEAR(created_at) < " . date('Y') . " AND role = 'student') + (SELECT COUNT(*) FROM academics WHERE YEAR(created_at) < " . date('Y') . ")")->fetchColumn();
@@ -112,6 +113,18 @@ $services_report = array_map(function($s) {
     $s['orders'] = (int)$s['orders'];
     return $s;
 }, $services_report);
+} catch (Throwable $e) {
+    $log = __DIR__ . '/../../reports_error.log';
+    @file_put_contents($log, date('Y-m-d H:i:s') . ' | ' . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n\n", FILE_APPEND);
+    http_response_code(500);
+    echo '<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>خطأ</title></head>';
+    echo '<body style="font-family:sans-serif;padding:40px;direction:rtl">';
+    echo '<h2>حدث خطأ في صفحة التقارير</h2>';
+    echo '<p>تم تسجيل تفاصيل الخطأ في ملف <code>reports_error.log</code> في جذر المشروع.</p>';
+    echo '<pre style="background:#f5f5f5;padding:12px;white-space:pre-wrap">' . htmlspecialchars($e->getMessage()) . '</pre>';
+    echo '</body></html>';
+    exit;
+}
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
