@@ -69,8 +69,8 @@ $chart_revenue = array_values($revenue_by_month);
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>لوحة الإدارة - تواصل الأكاديمي</title>
-  <meta name="description" content="لوحة إدارة منصة تواصل الأكاديمية - نظرة عامة على الإحصائيات والبيانات" />
+  <title>لوحة الإدارة - Eduroad</title>
+  <meta name="description" content="لوحة إدارة منصة Eduroad - نظرة عامة على الإحصائيات والبيانات" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css" />

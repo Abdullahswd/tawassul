@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>طلباتي - منصة تواصل</title>
+  <title>طلباتي - منصة Eduroad</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -19,8 +19,8 @@
   <!-- Header -->
   <header class="public-header">
     <div style="display:flex;align-items:center;gap:12px">
-      <div style="font-size:24px">🎓</div>
-      <span style="font-size:20px;font-weight:800;color:var(--text-primary)">تواصل للخدمات</span>
+      <img src="../image/eduroad_logo.png" alt="Eduroad" style="height:28px;width:auto" />
+      <span style="font-size:20px;font-weight:800;color:var(--text-primary)">Eduroad للخدمات</span>
     </div>
     <nav style="display:flex;gap:16px;align-items:center">
       <a href="services.php" style="color:var(--text-secondary);font-weight:500;text-decoration:none">الخدمات</a>

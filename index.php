@@ -39,7 +39,7 @@ if (function_exists('getAllFeaturedAcademics')) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>تواصل - منصة الخدمات الأكاديمية الشاملة</title>
+  <title>Eduroad - منصة الخدمات الأكاديمية الشاملة</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
@@ -262,8 +262,8 @@ if (function_exists('getAllFeaturedAcademics')) {
   <!-- شريط التنقل -->
   <nav class="relative flex items-center justify-between flex-wrap p-3 md:p-4 lg:px-8 bg-white border-b border-slate-200">
     <div class="flex items-center gap-2 text-xl md:text-2xl font-extrabold">
-      <span class="text-indigo-600">🎓</span>
-      <span class="text-slate-900">تواصل</span>
+      <img src="image/eduroad_logo.png" alt="Eduroad" style="height:28px;width:auto" />
+      <span class="text-slate-900">Eduroad</span>
     </div>
 
     <div class="hidden md:flex items-center gap-5 lg:gap-6 text-sm font-semibold">
@@ -647,10 +647,10 @@ if (function_exists('getAllFeaturedAcademics')) {
   <footer class="bg-slate-900 text-white py-12 px-4">
     <div class="max-w-7xl mx-auto text-center">
       <div class="flex justify-center items-center gap-2 text-2xl font-black mb-4">
-        <span>🎓</span> <span>تواصل</span>
+        <img src="image/eduroad_logo.png" alt="Eduroad" style="height:30px;width:auto" /> <span>Eduroad</span>
       </div>
       <p class="text-slate-400 text-sm max-w-md mx-auto mb-6">المنصة الأكاديمية الرائدة لدعم الباحثين والطلاب بالوطن العربي بأعلى معايير الجودة والسرية.</p>
-      <div class="text-xs text-slate-500 border-t border-slate-800 pt-6">جميع الحقوق محفوظة © <?= date('Y') ?> منصة تواصل الأكاديمية</div>
+      <div class="text-xs text-slate-500 border-t border-slate-800 pt-6">جميع الحقوق محفوظة © <?= date('Y') ?> منصة Eduroad</div>
     </div>
   </footer>
 

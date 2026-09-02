@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Admin Payouts AJAX Handler
+ *  Eduroad - Admin Payouts AJAX Handler
  *  manages payouts from admin to academics
  * ============================================================
  */

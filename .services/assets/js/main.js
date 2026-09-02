@@ -46,7 +46,7 @@ function initServicesList() {
   // Render Categories
   catsContainer.innerHTML = `
     <button class="filter-tab active" data-id="all" onclick="filterServices('all')">الكل</button>
-    ${TawassulServices.CATEGORIES.map(c => `<button class="filter-tab" data-id="${c.id}" onclick="filterServices('${c.id}')">${c.icon} ${c.name}</button>`).join('')}
+    ${EduroadServices.CATEGORIES.map(c => `<button class="filter-tab" data-id="${c.id}" onclick="filterServices('${c.id}')">${c.icon} ${c.name}</button>`).join('')}
   `;
 
   // Give access to window for inline onclicks
@@ -63,7 +63,7 @@ function filterServices(catId) {
   if (activeBtn) activeBtn.classList.add('active');
 
   const srvContainer = document.getElementById('servicesGrid');
-  let data = catId === 'all' ? TawassulServices.SERVICES_DATA : TawassulServices.getServicesByCategory(catId);
+  let data = catId === 'all' ? EduroadServices.SERVICES_DATA : EduroadServices.getServicesByCategory(catId);
 
   if (!data.length) {
     srvContainer.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--text-secondary)">لا توجد خدمات في هذا القسم حاليا.</div>';
@@ -72,7 +72,7 @@ function filterServices(catId) {
 
   srvContainer.innerHTML = data.map((s, idx) => `
     <div class="card fade-in" style="padding:24px;display:flex;flex-direction:column;animation-delay:${idx*0.05}s">
-      <div style="font-size:32px;margin-bottom:16px;">${TawassulServices.getCategoryById(s.categoryId)?.icon || '📚'}</div>
+      <div style="font-size:32px;margin-bottom:16px;">${EduroadServices.getCategoryById(s.categoryId)?.icon || '📚'}</div>
       <h3 style="font-size:18px;font-weight:700;margin-bottom:12px">${s.name}</h3>
       <p style="font-size:14px;color:var(--text-secondary);flex-grow:1;line-height:1.6;margin-bottom:20px">${s.description.slice(0, 100)}...</p>
       <div style="display:flex;justify-content:space-between;align-items:center;padding-top:16px;border-top:1px solid var(--border-color)">
@@ -88,8 +88,8 @@ function filterServices(catId) {
 function initServiceDetails() {
   const urlParams = new URLSearchParams(window.location.search);
   const id = urlParams.get('id') || 'srv-1'; // fallback to first
-  const service = TawassulServices.getServiceById(id);
-  const cat = TawassulServices.getCategoryById(service?.categoryId);
+  const service = EduroadServices.getServiceById(id);
+  const cat = EduroadServices.getCategoryById(service?.categoryId);
 
   if (!service) {
     document.getElementById('serviceContent').innerHTML = '<div style="text-align:center;padding:100px;font-size:20px">الخدمة غير موجودة</div>';
@@ -118,12 +118,12 @@ function initCreateOrder() {
 
   // Populate categories
   catSelect.innerHTML = '<option value="">اختر القسم...</option>' + 
-    TawassulServices.CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    EduroadServices.CATEGORIES.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
   // Handle category change
   catSelect.addEventListener('change', (e) => {
     const catId = e.target.value;
-    const services = TawassulServices.getServicesByCategory(catId);
+    const services = EduroadServices.getServicesByCategory(catId);
     srvSelect.innerHTML = '<option value="">اختر الخدمة...</option>' + 
       services.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     srvSelect.disabled = !catId;
@@ -133,7 +133,7 @@ function initCreateOrder() {
 
   // Handle service change
   srvSelect.addEventListener('change', (e) => {
-    const service = TawassulServices.getServiceById(e.target.value);
+    const service = EduroadServices.getServiceById(e.target.value);
     updateDynamicFields(service);
     if(service) {
       updatePrice(service.price);
@@ -144,7 +144,7 @@ function initCreateOrder() {
   const urlParams = new URLSearchParams(window.location.search);
   const sId = urlParams.get('serviceId');
   if (sId) {
-    const s = TawassulServices.getServiceById(sId);
+    const s = EduroadServices.getServiceById(sId);
     if (s) {
       catSelect.value = s.categoryId;
       // Trigger event manually to populate services
@@ -242,7 +242,7 @@ function initOrdersList() {
   if (!tbody) return;
 
   function render(status) {
-    const list = status ? TawassulServices.MOCK_ORDERS.filter(o => o.status === status) : TawassulServices.MOCK_ORDERS;
+    const list = status ? EduroadServices.MOCK_ORDERS.filter(o => o.status === status) : EduroadServices.MOCK_ORDERS;
     tbody.innerHTML = list.map(o => `
       <tr>
         <td style="font-weight:700;color:var(--primary)"><a href="order-details.html?id=${encodeURIComponent(o.id)}">${o.id}</a></td>
@@ -271,7 +271,7 @@ function getBadgeClass(status) {
 /** Order Details */
 function initOrderDetails() {
   const id = new URLSearchParams(window.location.search).get('id') || '#ORD-9021';
-  const o = TawassulServices.MOCK_ORDERS.find(x => x.id === id);
+  const o = EduroadServices.MOCK_ORDERS.find(x => x.id === id);
   if (!o) return;
   
   if(document.getElementById('oId')) document.getElementById('oId').textContent = o.id;

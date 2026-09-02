@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Authentication & Session Management
+ *  Eduroad - Authentication & Session Management
  *  File: config/auth.php
  * ============================================================
  */
@@ -129,7 +129,7 @@ function rootUrl(): string {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host     = $_SERVER['HTTP_HOST'];
 
-    // حساب مسار التطبيق (المجلد الفرعي) تلقائياً، مثلاً /tawassul عند العمل عبر XAMPP
+    // حساب مسار التطبيق (المجلد الفرعي) تلقائياً، مثلاً /eduroad عند العمل عبر XAMPP
     $base = '';
     $docRoot = isset($_SERVER['DOCUMENT_ROOT'])
         ? str_replace('\\', '/', realpath($_SERVER['DOCUMENT_ROOT']) ?: $_SERVER['DOCUMENT_ROOT'])

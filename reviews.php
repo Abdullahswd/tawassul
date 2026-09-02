@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>التقييمات والآراء - تواصل</title>
+  <title>التقييمات والآراء - Eduroad</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/global.css">
@@ -82,7 +82,7 @@
 
   <nav class="public-nav">
     <div style="display:flex;align-items:center;gap:12px;font-size:24px;font-weight:900;color:var(--primary)">
-      🎓 <span style="color:var(--text-primary)">تواصل</span>
+      <img src="image/eduroad_logo.png" alt="Eduroad" style="height:28px;width:auto" /> <span style="color:var(--text-primary)">Eduroad</span>
     </div>
     <div class="nav-links hidden md:flex">
       <a href="index.php#features">المميزات</a>

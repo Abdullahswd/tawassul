@@ -1,5 +1,5 @@
 -- ============================================================
---  Tawassul Academic Platform - Database Schema
+--  Eduroad Academic Platform - Database Schema
 --  Database: acadimic
 --  Encoding: utf8mb4_unicode_ci
 --  Generated: 2026
@@ -337,7 +337,7 @@ SET FOREIGN_KEY_CHECKS = 1;
 
 -- Admin user (password: Admin@123)
 INSERT INTO `users` (`name`, `email`, `password`, `phone`, `role`, `status`, `avatar_initials`) VALUES
-('المدير العام', 'admin@tawassul.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0500000000', 'admin', 'active', 'مد');
+('المدير العام', 'admin@eduroad.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '0500000000', 'admin', 'active', 'مد');
 
 -- Sample students (password: Student@123)
 INSERT INTO `users` (`name`, `email`, `password`, `phone`, `role`, `status`, `avatar_initials`) VALUES

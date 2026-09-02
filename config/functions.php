@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Shared Helper Functions
+ *  Eduroad - Shared Helper Functions
  *  File: config/functions.php
  * ============================================================
  */

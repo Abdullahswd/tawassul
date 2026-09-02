@@ -1,6 +1,6 @@
 <?php
 /**
- * Sidebar Component - Tawassul Admin
+ * Sidebar Component - Eduroad Admin
  * 
  * تعليق: تم إضافة require_once لملف functions.php لتجنب خطأ "undefined function db()"
  */
@@ -21,14 +21,14 @@ $sb_featured_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM featured_academics"
 $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
 ?>
 <!-- ============================================
-     Sidebar Component - Tawassul Admin
+     Sidebar Component - Eduroad Admin
      ============================================ -->
 <aside class="sidebar" id="sidebar">
 
   <!-- Logo -->
   <div class="sidebar-logo">
-    <div class="logo-icon">🎓</div>
-    <span class="logo-text">تواصل Admin</span>
+    <div class="logo-icon" style="background:none;box-shadow:none;overflow:hidden;border-radius:10px"><img src="../../image/eduroad_logo.png" alt="Eduroad" style="width:100%;height:100%;object-fit:contain" /></div>
+    <span class="logo-text">Eduroad Admin</span>
     <button class="sidebar-mobile-close" id="sidebarMobileClose" title="إغلاق القائمة">✕</button>
   </div>
 

@@ -1,7 +1,7 @@
 <?php
 $curr_user = currentUser();
 $user_name = $curr_user ? htmlspecialchars($curr_user['name']) : 'المدير العام';
-$user_email = $curr_user ? htmlspecialchars($curr_user['email']) : 'admin@tawassul.com';
+$user_email = $curr_user ? htmlspecialchars($curr_user['email']) : 'admin@eduroad.com';
 $user_avatar = $curr_user ? htmlspecialchars($curr_user['avatar']) : 'أ';
 $user_role = ($curr_user && $curr_user['role'] === 'admin') ? 'Super Admin' : 'طالب';
 
@@ -10,7 +10,7 @@ $nb_db = db();
 $nb_unread_notifications = (int) $nb_db->query("SELECT COUNT(*) FROM notifications WHERE is_read = 0 AND user_type = 'admin'")->fetchColumn();
 ?>
 <!-- ============================================
-     Navbar Component - Tawassul Admin
+     Navbar Component - Eduroad Admin
      ============================================ -->
 <nav class="navbar" id="navbar">
 

@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Admin Payment Methods AJAX Handler
+ *  Eduroad - Admin Payment Methods AJAX Handler
  *  Manages the platform's bank accounts / wallets (طرق الدفع)
  * ============================================================
  */

@@ -191,7 +191,7 @@ require __DIR__ . '/partials/sidebar.php';
 
           <div>
             <div class="text-xs text-indigo-300">اسم الحساب الرسمي:</div>
-            <div class="text-base font-extrabold text-white">شركة تواصل للخدمات الأكاديمية والمشاريع</div>
+            <div class="text-base font-extrabold text-white">شركة Eduroad للخدمات الأكاديمية والمشاريع</div>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-indigo-500/40 text-xs">

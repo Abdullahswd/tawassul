@@ -33,8 +33,8 @@ $_unread = countUnreadNotifications($user['id'], 'student');
   <aside class="sidebar" id="sidebar">
 
     <div class="sidebar-header">
-      <div class="logo-icon">🎓</div>
-      <div class="logo-text">تواصل</div>
+      <img class="logo-icon" src="../image/eduroad_logo.png" alt="Eduroad" style="height:30px;width:auto;object-fit:contain;flex-shrink:0" />
+      <div class="logo-text">Eduroad</div>
     </div>
 
     <nav class="sidebar-nav">

@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Database Configuration
+ *  Eduroad - Database Configuration
  *  File: config/db.php
  * ============================================================
  */

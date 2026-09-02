@@ -18,7 +18,7 @@ foreach ($services as $s) {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>تسجيل أكاديمي - تواصل</title>
+  <title>تسجيل أكاديمي - Eduroad</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="assets/css/style.css"/>
@@ -43,8 +43,8 @@ foreach ($services as $s) {
   <!-- Header -->
   <div class="register-header">
     <div style="display:flex;align-items:center;gap:12px">
-      <div class="logo-icon" style="font-size:22px">🎓</div>
-      <span style="font-size:18px;font-weight:800;color:#fff">تواصل</span>
+      <div class="logo-icon" style="font-size:22px;background:none;box-shadow:none;overflow:hidden;border-radius:10px"><img src="../image/eduroad_logo.png" alt="Eduroad" style="width:100%;height:100%;object-fit:contain" /></div>
+      <span style="font-size:18px;font-weight:800;color:#fff">Eduroad</span>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <a href="academics-list.php" class="btn btn-ghost btn-sm" style="color:rgba(255,255,255,.7)">←عرض الأكاديميين</a>
@@ -57,7 +57,7 @@ foreach ($services as $s) {
     <!-- Page Title -->
     <div style="text-align:center;margin-bottom:40px" class="anim-up">
       <div style="width:70px;height:70px;border-radius:20px;background:linear-gradient(135deg,#6366f1,#818cf8);display:flex;align-items:center;justify-content:center;font-size:30px;margin:0 auto 16px;box-shadow:0 8px 24px rgba(99,102,241,.3)">🎓</div>
-      <h1 style="font-size:28px;font-weight:900;color:var(--text-primary);margin-bottom:8px">سجّل كأكاديمي في تواصل</h1>
+      <h1 style="font-size:28px;font-weight:900;color:var(--text-primary);margin-bottom:8px">سجّل كأكاديمي في Eduroad</h1>
       <p style="color:var(--text-secondary);font-size:15px">انضم لمنصتنا وابدأ في تقديم خدماتك لآلاف الطلاب</p>
     </div>
 

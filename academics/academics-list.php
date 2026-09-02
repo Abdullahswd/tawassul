@@ -37,7 +37,7 @@ foreach ($acList as $ac) {
         'avatar' => $ac['avatar_initials'] ?? mb_substr($ac['name'], 0, 2),
         'specialty' => $ac['specialty'] ?? 'عام',
         'degree' => $ac['degree'] ?? 'بكالوريوس',
-        'university' => $ac['university'] ?? 'جامعة تواصل',
+        'university' => $ac['university'] ?? 'جامعة Eduroad',
         'country' => 'السعودية',
         'rating' => (float)$ac['rating'],
         'reviews' => (int)$ac['total_reviews'],
@@ -59,8 +59,8 @@ foreach ($acList as $ac) {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>الأكاديميون - تواصل الأكاديمي</title>
-  <meta name="description" content="تصفح أفضل الأكاديميين المتخصصين في منصة تواصل الأكاديمية"/>
+  <title>الأكاديميون - Eduroad</title>
+  <meta name="description" content="تصفح أفضل الأكاديميين المتخصصين في منصة Eduroad"/>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="assets/css/style.css"/>
@@ -70,8 +70,8 @@ foreach ($acList as $ac) {
 <!-- ===== PUBLIC HEADER ===== -->
 <header class="public-header" id="mainHeader">
   <div style="display:flex;align-items:center;gap:12px">
-    <div class="logo-icon" style="font-size:22px">🎓</div>
-    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
+    <div class="logo-icon" style="font-size:22px;background:none;box-shadow:none;overflow:hidden;border-radius:10px"><img src="../image/eduroad_logo.png" alt="Eduroad" style="width:100%;height:100%;object-fit:contain" /></div>
+    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">Eduroad</span>
   </div>
   <nav style="display:flex;gap:6px;align-items:center">
     <a href="academics-list.php" class="btn btn-ghost btn-sm" style="color:var(--primary)">الأكاديميون</a>

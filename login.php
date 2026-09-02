@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>تسجيل الدخول - تواصل</title>
+  <title>تسجيل الدخول - Eduroad</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/global.css">
   <style>
@@ -194,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <!-- Header أنيق مثل باقي الصفحات -->
     <div style="text-align:center;margin-bottom:32px">
-      <a href="index.php" style="display:inline-block;font-size:36px;font-weight:900;color:var(--primary);text-decoration:none;margin-bottom:16px">🎓 تواصل</a>
+      <a href="index.php" style="display:inline-flex;align-items:center;gap:8px;font-size:36px;font-weight:900;color:var(--primary);text-decoration:none;margin-bottom:16px"><img src="image/eduroad_logo.png" alt="Eduroad" style="height:34px;width:auto" /> Eduroad</a>
       <span style="display:inline-block;background:var(--primary-light);color:var(--primary);padding:4px 16px;border-radius:40px;font-size:12px;font-weight:700;margin-bottom:16px">تسجيل الدخول</span>
       <h1 style="font-size:28px;font-weight:800;color:var(--text-primary);margin-bottom:8px">مرحباً بك مجدداً 👋</h1>
       <p style="color:var(--text-secondary);font-size:14px">قم بتسجيل الدخول للمتابعة إلى حسابك</p>
@@ -261,7 +261,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="demo-box">
       <div style="font-weight:800;margin-bottom:12px;color:var(--text-primary)">🔐 حسابات تجريبية للاختبار:</div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;font-size:13px">
-        <span>👨‍💼 مدير:</span><span><code>admin@tawassul.com</code></span>
+        <span>👨‍💼 مدير:</span><span><code>admin@eduroad.com</code></span>
         <span>👨‍🎓 طالب:</span><span><code>ahmed@student.com</code></span>
         <span>👨‍🏫 أكاديمي:</span><span><code>dr.mohammed@academic.com</code></span>
         <span>🔑 كلمة المرور:</span><span><code>password</code> (للجميع)</span>

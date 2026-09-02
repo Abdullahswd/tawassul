@@ -58,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>إنشاء حساب - تواصل</title>
+  <title>إنشاء حساب - Eduroad</title>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/global.css">
   <style>
@@ -196,7 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
 
     <!-- Header -->
     <div style="text-align:center;margin-bottom:32px">
-      <a href="index.php" style="display:inline-block;font-size:36px;font-weight:900;color:var(--primary);text-decoration:none;margin-bottom:16px">🎓 تواصل</a>
+      <a href="index.php" style="display:inline-flex;align-items:center;gap:8px;font-size:36px;font-weight:900;color:var(--primary);text-decoration:none;margin-bottom:16px"><img src="image/eduroad_logo.png" alt="Eduroad" style="height:34px;width:auto" /> Eduroad</a>
       <span style="display:inline-block;background:var(--primary-light);color:var(--primary);padding:4px 16px;border-radius:40px;font-size:12px;font-weight:700;margin-bottom:16px">انضم إلينا</span>
       <h1 style="font-size:28px;font-weight:800;color:var(--text-primary);margin-bottom:8px">كن متصلاً بشبكة المعرفة ✨</h1>
       <p style="color:var(--text-secondary);font-size:14px">اختر نوع الحساب الذي يناسبك وابدأ رحلتك الأكاديمية</p>

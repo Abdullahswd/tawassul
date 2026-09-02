@@ -1,7 +1,7 @@
 /**
  * ============================================
  * Services Data Module
- * Tawassul Academic Platform
+ * Eduroad Academic Platform
  * Updated based on 'خدمات المنصة.docx'
  * ============================================
  */
@@ -115,7 +115,7 @@ const MOCK_ORDERS = [
   { id: '#ORD-9023', serviceName: 'تصميم الاستبيانات', status: 'completed', date: '2026-04-10', total: 200 },
 ];
 
-window.TawassulServices = {
+window.EduroadServices = {
   CATEGORIES,
   SERVICES_DATA,
   PACKAGES_DATA,

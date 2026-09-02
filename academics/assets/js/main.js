@@ -1,7 +1,7 @@
 /**
  * ============================================
  * Academics Module - Main JavaScript
- * Tawassul Academic Platform
+ * Eduroad Academic Platform
  * ============================================
  */
 

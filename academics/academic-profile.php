@@ -99,7 +99,7 @@ if ($academic['availability'] === 'busy') {
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>الملف الشخصي للأكاديمي <?= e($academicName) ?> - تواصل</title>
+  <title>الملف الشخصي للأكاديمي <?= e($academicName) ?> - Eduroad</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="assets/css/style.css"/>
@@ -109,8 +109,8 @@ if ($academic['availability'] === 'busy') {
 <!-- Header -->
 <header class="public-header">
   <div class="flex items-center gap-3">
-    <div class="logo-icon" style="font-size:22px">🎓</div>
-    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">تواصل</span>
+    <div class="logo-icon" style="font-size:22px;background:none;box-shadow:none;overflow:hidden;border-radius:10px"><img src="../image/eduroad_logo.png" alt="Eduroad" style="width:100%;height:100%;object-fit:contain" /></div>
+    <span style="font-size:18px;font-weight:800;color:var(--text-primary)">Eduroad</span>
   </div>
   <nav class="flex items-center gap-2 flex-wrap">
     <a href="academics-list.php" class="btn btn-ghost btn-sm">← الأكاديميون</a>

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>تواصل - لوحة الإدارة</title>
-  <meta name="description" content="لوحة إدارة منصة تواصل الأكاديمية" />
+  <title>Eduroad - لوحة الإدارة</title>
+  <meta name="description" content="لوحة إدارة منصة Eduroad" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="assets/css/style.css" />
@@ -164,8 +164,8 @@
 
     <!-- Logo -->
     <div class="login-logo">
-      <div class="logo-icon-lg">🎓</div>
-      <h1>تواصل Admin</h1>
+      <div class="logo-icon-lg" style="background:none;box-shadow:none;overflow:hidden"><img src="../image/eduroad_logo.png" alt="Eduroad" style="width:100%;height:100%;object-fit:contain;border-radius:20px" /></div>
+      <h1>Eduroad Admin</h1>
       <p>لوحة إدارة المنصة الأكاديمية</p>
     </div>
 
@@ -174,7 +174,7 @@
 
       <div>
         <label class="login-label">البريد الإلكتروني</label>
-        <input class="login-input" type="email" id="loginEmail" placeholder="admin@tawassul.com" required />
+        <input class="login-input" type="email" id="loginEmail" placeholder="admin@eduroad.com" required />
       </div>
 
       <div>
@@ -202,12 +202,12 @@
     <!-- Quick Access Note -->
     <div style="margin-top:24px;padding:14px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:12px">
       <p style="font-size:12px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:6px">بيانات الدخول التجريبية</p>
-      <p style="font-size:13px;color:#a5b4fc;text-align:center;font-weight:500">admin@tawassul.com / 123456</p>
+      <p style="font-size:13px;color:#a5b4fc;text-align:center;font-weight:500">admin@eduroad.com / 123456</p>
     </div>
 
     <!-- Footer -->
     <p style="text-align:center;font-size:12px;color:rgba(255,255,255,0.3);margin-top:24px">
-      © 2024 تواصل الأكاديمي · جميع الحقوق محفوظة
+      © 2024 Eduroad · جميع الحقوق محفوظة
     </p>
 
   </div>

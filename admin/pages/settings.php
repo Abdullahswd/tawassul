@@ -24,10 +24,10 @@ function getSetting($settings, $key, $default = '')
 }
 
 // تعيين المتغيرات للاستخدام في HTML
-$site_name = getSetting($settings, 'site_name', 'تواصل الأكاديمي');
-$site_email = getSetting($settings, 'site_email', 'info@tawassul.com');
+$site_name = getSetting($settings, 'site_name', 'Eduroad');
+$site_email = getSetting($settings, 'site_email', 'info@eduroad.com');
 $site_phone = getSetting($settings, 'site_phone', '+966 11 000 0000');
-$site_url = getSetting($settings, 'site_url', 'https://tawassul.com');
+$site_url = getSetting($settings, 'site_url', 'https://eduroad.com');
 $site_language = getSetting($settings, 'site_language', 'ar');
 $site_timezone = getSetting($settings, 'site_timezone', 'Asia/Riyadh');
 $site_description = getSetting($settings, 'site_description', '');
@@ -50,11 +50,11 @@ $primary_color = getSetting($settings, 'primary_color', '#6366f1');
 $theme_mode = getSetting($settings, 'theme_mode', 'light');
 $smtp_host = getSetting($settings, 'smtp_host', 'smtp.gmail.com');
 $smtp_port = getSetting($settings, 'smtp_port', '587');
-$smtp_user = getSetting($settings, 'smtp_user', 'noreply@tawassul.com');
+$smtp_user = getSetting($settings, 'smtp_user', 'noreply@eduroad.com');
 $smtp_password = getSetting($settings, 'smtp_password', '');
 
 $admin_name = $admin['name'] ?? 'المدير العام';
-$admin_email = $admin['email'] ?? 'admin@tawassul.com';
+$admin_email = $admin['email'] ?? 'admin@eduroad.com';
 $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
 
 // Platform payment methods (طرق الدفع)
@@ -67,7 +67,7 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>الإعدادات - تواصل Admin</title>
+  <title>الإعدادات - Eduroad Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css" />

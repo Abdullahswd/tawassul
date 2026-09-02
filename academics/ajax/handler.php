@@ -1,7 +1,7 @@
 <?php
 /**
  * ============================================================
- *  Tawassul - Academics AJAX Handler
+ *  Eduroad - Academics AJAX Handler
  *  File: academics/ajax/handler.php
  * ============================================================
  */

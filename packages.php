@@ -44,7 +44,7 @@ try {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>باقات الخدمات الأكاديمية - تواصل</title>
+  <title>باقات الخدمات الأكاديمية - Eduroad</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/global.css">
@@ -153,8 +153,8 @@ try {
   <!-- شريط التنقل الرئيسي -->
   <nav class="relative flex items-center justify-between flex-wrap p-4 lg:px-8 bg-white border-b border-slate-200">
     <div class="flex items-center gap-2 text-2xl font-black">
-      <span class="text-indigo-600">🎓</span>
-      <span class="text-slate-900">تواصل</span>
+      <img src="image/eduroad_logo.png" alt="Eduroad" style="height:28px;width:auto" />
+      <span class="text-slate-900">Eduroad</span>
     </div>
     <div class="hidden md:flex items-center gap-6 text-sm font-semibold">
       <a href="index.php#features" class="text-slate-600 hover:text-indigo-600 transition">الخدمات والأقسام</a>
@@ -269,7 +269,7 @@ try {
 
   <footer class="bg-slate-900 text-white py-10 px-4 mt-16">
     <div class="max-w-7xl mx-auto text-center text-xs text-slate-500">
-      جميع الحقوق محفوظة © <?= date('Y') ?> منصة تواصل الأكاديمية
+      جميع الحقوق محفوظة © <?= date('Y') ?> منصة Eduroad
     </div>
   </footer>
 
