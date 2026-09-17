@@ -350,7 +350,7 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
                           </div>
                           <div style="display:flex;gap:8px">
                             <button class="btn btn-outline btn-sm" onclick="openBankForm(<?= (int) $acc['id'] ?>)">✏️ تعديل</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteBankAccount(<?= (int) $acc['id'] ?>, '<?= e($acc['account_name'], true) ?>')">🗑️ حذف</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteBankAccount(<?= (int) $acc['id'] ?>, '<?= e(addslashes($acc['account_name'])) ?>')">🗑️ حذف</button>
                           </div>
                         </div>
                     <?php endforeach; ?>
