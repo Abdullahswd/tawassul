@@ -32,6 +32,14 @@ if (!$order) {
     exit;
 }
 
+// مرفقات الطلب المرفوعة من الطالب
+$attStmt = $db->prepare("SELECT * FROM order_attachments WHERE order_id = ? ORDER BY id ASC");
+$attStmt->execute([(int) $order['id']]);
+$orderAttachments = $attStmt->fetchAll();
+
+// مسار التطبيق الأساسي لبناء روابط الملفات
+$adminAppBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
+
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
     $new_status = $_POST['status'] ?? '';
@@ -228,7 +236,41 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
           <!-- Files -->
           <div class="stat-card animate-fadeInUp delay-2" style="padding:20px">
             <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">📎 الملفات المرفوعة</h3>
-            <p style="font-size:13px;color:var(--text-secondary)">لا يوجد أي ملفات مرفوعة حالياً للطلب.</p>
+            <?php if (empty($orderAttachments)): ?>
+              <p style="font-size:13px;color:var(--text-secondary)">لا يوجد أي ملفات مرفوعة حالياً للطلب.</p>
+            <?php else: ?>
+              <div style="display:flex;flex-direction:column;gap:10px">
+                <?php foreach ($orderAttachments as $att):
+                  $ext = strtolower(pathinfo($att['file_name'], PATHINFO_EXTENSION));
+                  $iconMap = [
+                    'pdf' => '📕', 'doc' => '📄', 'docx' => '📄',
+                    'xls' => '📊', 'xlsx' => '📊',
+                    'ppt' => '📽️', 'pptx' => '📽️',
+                    'zip' => '🗜️', 'rar' => '🗜️',
+                    'jpg' => '🖼️', 'jpeg' => '🖼️', 'png' => '🖼️', 'gif' => '🖼️', 'webp' => '🖼️',
+                    'txt' => '📝',
+                  ];
+                  $attIcon = $iconMap[$ext] ?? '📎';
+                  $attSize = (float) $att['file_size'];
+                  $attSizeTxt = $attSize >= 1048576
+                    ? number_format($attSize / 1048576, 2) . ' MB'
+                    : number_format($attSize / 1024, 1) . ' KB';
+                  $attPath = $adminAppBase . '/' . $att['file_path'];
+                  $attDate = !empty($att['created_at']) ? formatDate($att['created_at']) : '';
+                ?>
+                  <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg-main);border-radius:12px;border:1px solid var(--border-color)">
+                    <div style="font-size:26px;flex-shrink:0"><?= $attIcon ?></div>
+                    <div style="flex:1;min-width:0">
+                      <div style="font-weight:700;font-size:13px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="<?= e($att['file_name']) ?>"><?= e($att['file_name']) ?></div>
+                      <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">
+                        <?= e($attSizeTxt) ?><?= $attDate ? ' · ' . e($attDate) : '' ?>
+                      </div>
+                    </div>
+                    <a href="<?= e($attPath) ?>" target="_blank" class="btn btn-outline" style="padding:6px 14px;font-size:12px;flex-shrink:0">عرض 👁️</a>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
           </div>
 
           <!-- Notes -->

@@ -331,7 +331,7 @@ $attachments = $attStmt->fetchAll();
               </div>
               <div style="display:flex;justify-content:space-between">
                 <span style="color:var(--text-secondary);font-size:13px">الموعد النهائي</span>
-                <span style="font-weight:700;color:#ef4444"><?= $order['deadline'] ?></span>
+                <span style="font-weight:700;color:#ef4444"><?= $order['deadline'] ? e($order['deadline']) : '—' ?></span>
               </div>
             </div>
 

@@ -656,7 +656,7 @@ function e(mixed $value): string {
 /**
  * Format date to Arabic readable format
  */
-function formatDate(string $date): string {
+function formatDate(?string $date): string {
     if (!$date) return '-';
     return date('Y/m/d', strtotime($date));
 }
