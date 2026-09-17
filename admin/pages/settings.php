@@ -60,6 +60,11 @@ $admin_phone = $admin['phone'] ?? '+966 5X XXX XXXX';
 // Platform payment methods (طرق الدفع)
 $paymentMethods = $db->query("SELECT * FROM platform_payment_methods ORDER BY sort_order ASC, id ASC")->fetchAll();
 $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظة إلكترونية'];
+
+// المسار الأساسي للتطبيق (جذر المشروع) لبناء روابط الشعارات من أي مجلد
+$scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+$scriptName = preg_replace('#/admin/pages/[^/]+\.php$#', '', $scriptName);
+$appBaseUrl = rtrim($scriptName, '/');
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -300,7 +305,13 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
                     ?>
                       <div class="pm-item" data-id="<?= (int)$pm['id'] ?>" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--bg-card);flex-wrap:wrap;<?= $active ? '' : 'opacity:.55' ?>">
                         <div style="display:flex;align-items:center;gap:14px">
-                          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,<?= $isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8' ?>);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0"><?= $icon ?></div>
+                          <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,<?= $isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8' ?>);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0;overflow:hidden">
+                            <?php if (!empty($pm['logo'])): ?>
+                              <img src="<?= htmlspecialchars($appBaseUrl . '/' . ltrim($pm['logo'], '/'), ENT_QUOTES) ?>" alt="الشعار" style="width:100%;height:100%;object-fit:contain;padding:5px;background:#fff" onerror="this.remove()" />
+                            <?php else: ?>
+                              <?= $icon ?>
+                            <?php endif; ?>
+                          </div>
                           <div>
                             <div style="font-size:13px;font-weight:700;color:<?= $accent ?>"><?= $pmTypeLabels[$pm['account_type']] ?? $pm['account_type'] ?></div>
                             <div style="font-weight:700;color:var(--text-primary)"><?= e($pm['account_name']) ?></div>
@@ -409,6 +420,21 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">اسم صاحب الحساب</label>
           <input class="form-input" id="methodHolder" placeholder="اسم صاحب الحساب كما في البنك" />
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">شعار البنك / المحفظة (اختياري)</label>
+          <div id="logoUploadBox" style="display:flex;align-items:center;gap:12px;border:2px dashed var(--border-color);border-radius:12px;padding:12px 14px;background:var(--bg-main);">
+            <div id="logoPreview" style="display:none;position:relative;width:52px;height:52px;border-radius:10px;overflow:hidden;border:1px solid var(--border-color);background:white;flex-shrink:0;">
+              <img id="logoPreviewImg" src="" alt="الشعار" style="width:100%;height:100%;object-fit:contain;padding:4px;" />
+              <button type="button" onclick="removeUploadedLogo()" title="إزالة الشعار" style="position:absolute;top:-7px;right:-7px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:white;border:none;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+            </div>
+            <label for="logoFile" style="display:inline-flex;align-items:center;gap:8px;background:var(--bg-card);border:1px solid var(--border-color);border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;color:var(--text-primary);cursor:pointer;transition:.2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-color)'">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--primary);color:white;font-size:14px;font-weight:700">＋</span>
+              <span>رفع الشعار من الجهاز</span>
+            </label>
+            <input type="file" id="logoFile" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" style="display:none" onchange="handleLogoUpload(this)" />
+          </div>
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:6px">إن لم ترفع شعاراً سيظهر رمز البنك/المحفظة الافتراضي.</div>
         </div>
       </div>
       <div class="modal-footer">
@@ -647,6 +673,64 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
       return String(v || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, ' ');
     }
 
+    // حالة الشعار المرفوع لطريقة الدفع
+    let selectedLogo = '';
+    let selectedLogoCleared = false;
+    // قاعدة مسار المشروع لبناء روابط الصور
+    const PM_APP_BASE = '<?= htmlspecialchars($appBaseUrl, ENT_QUOTES) ?>';
+
+    function pmAssetUrl(path) {
+      if (!path) return '';
+      if (/^(https?:)?\/\//.test(path)) return path;
+      return PM_APP_BASE + '/' + String(path).replace(/^\/+/, '');
+    }
+
+    function handleLogoUpload(input) {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('action', 'upload_logo');
+      fd.append('image', file);
+      Toast.show('جارٍ رفع الشعار...', 'info');
+      fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            selectedLogo = res.image;
+            selectedLogoCleared = false;
+            showLogoPreview(res.image);
+            Toast.show('تم رفع الشعار بنجاح', 'success');
+          } else {
+            input.value = '';
+            Toast.show(res.message || 'فشل رفع الشعار', 'error');
+          }
+        })
+        .catch(() => { input.value = ''; Toast.show('حدث خطأ في الاتصال بالخادم', 'error'); });
+    }
+
+    function removeUploadedLogo() {
+      selectedLogo = '';
+      selectedLogoCleared = true;
+      document.getElementById('logoFile').value = '';
+      resetLogoPreview();
+    }
+
+    function showLogoPreview(src) {
+      const preview = document.getElementById('logoPreview');
+      document.getElementById('logoPreviewImg').src = pmAssetUrl(src);
+      preview.style.display = 'block';
+      document.getElementById('logoUploadBox').style.borderColor = '#86efac';
+      document.getElementById('logoUploadBox').style.background = '#f0fdf4';
+    }
+
+    function resetLogoPreview() {
+      document.getElementById('logoPreview').style.display = 'none';
+      document.getElementById('logoPreviewImg').removeAttribute('src');
+      const box = document.getElementById('logoUploadBox');
+      box.style.borderColor = 'var(--border-color)';
+      box.style.background = 'var(--bg-main)';
+    }
+
     function updateMethodLabels() {
       const isWallet = document.getElementById('methodType').value === 'wallet';
       document.getElementById('methodNameLabel').textContent = isWallet ? 'اسم المحفظة' : 'اسم البنك';
@@ -665,12 +749,19 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
         document.getElementById('methodName').value = m.account_name || '';
         document.getElementById('methodNumber').value = m.account_number || '';
         document.getElementById('methodHolder').value = m.holder_name || '';
+        selectedLogo = m.logo || '';
+        selectedLogoCleared = false;
+        if (selectedLogo) showLogoPreview(selectedLogo); else resetLogoPreview();
       } else {
         document.getElementById('methodModalTitle').textContent = 'إضافة طريقة دفع';
         document.getElementById('methodType').value = 'bank';
         document.getElementById('methodName').value = '';
         document.getElementById('methodNumber').value = '';
         document.getElementById('methodHolder').value = '';
+        selectedLogo = '';
+        selectedLogoCleared = false;
+        document.getElementById('logoFile').value = '';
+        resetLogoPreview();
       }
       updateMethodLabels();
       Modal.open('methodModal');
@@ -684,9 +775,12 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
       const grad = isWallet ? '#0ea5e9,#38bdf8' : '#6366f1,#818cf8';
       const active = m.is_active == 1;
       const holder = m.holder_name ? ' · ' + pmEsc(m.holder_name) : '';
+      const logoHtml = m.logo
+        ? '<img src="' + pmAssetUrl(m.logo) + '" alt="الشعار" style="width:100%;height:100%;object-fit:contain;padding:5px;background:#fff;border-radius:12px" onerror="this.remove()" />'
+        : icon;
       return '<div class="pm-item" data-id="' + m.id + '" style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 18px;border:1.5px solid var(--border-color);border-radius:14px;background:var(--bg-card);flex-wrap:wrap;' + (active ? '' : 'opacity:.55') + '">'
         + '<div style="display:flex;align-items:center;gap:14px">'
-        + '<div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,' + grad + ');display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0">' + icon + '</div>'
+        + '<div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,' + grad + ');display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;flex-shrink:0;overflow:hidden">' + logoHtml + '</div>'
         + '<div>'
         + '<div style="font-size:13px;font-weight:700;color:' + accent + '">' + typeLabel + '</div>'
         + '<div style="font-weight:700;color:var(--text-primary)">' + pmEsc(m.account_name) + '</div>'
@@ -742,6 +836,8 @@ $pmTypeLabels = ['bank' => '🏦 حساب بنكي', 'wallet' => '👛 محفظ�
       fd.append('account_name', account_name);
       fd.append('account_number', account_number);
       fd.append('holder_name', holder_name);
+      fd.append('logo', selectedLogo);
+      fd.append('logo_cleared', selectedLogoCleared ? 1 : 0);
 
       fetch('../ajax/manage_payment_methods.php', { method: 'POST', body: fd })
         .then(r => r.json())

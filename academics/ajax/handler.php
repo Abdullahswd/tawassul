@@ -53,6 +53,175 @@ if (!$action) {
     sendJSONResponse(false, 'إجراء غير محدد.');
 }
 
+// ── إضافة تلقائية للأعمدة (logo + الصورة الشخصية) إن لم تكن موجودة ──
+// تعمل عند أي استدعاء، وتعود بنتيجة لمعرفة إن نجحت أم لا
+function columnExists($conn, $table, $column) {
+    try {
+        // استخدام information_schema بدلاً من SHOW COLUMNS ... LIKE ?
+        // لأن SHOW لا يدعم المعاملات في وضع الـ native prepared statements
+        // فيعود استثناء دائماً حتى لو كان العمود موجوداً.
+        $stmt = $conn->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+        );
+        $stmt->execute([$table, $column]);
+        return (int)$stmt->fetchColumn() > 0;
+    } catch (Exception $e) {
+        error_log("columnExists failed for $table.$column: " . $e->getMessage());
+        return false;
+    }
+}
+
+function ensureColumn($conn, $table, $column, $definition) {
+    try {
+        if (!columnExists($conn, $table, $column)) {
+            $conn->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
+        }
+        return true;
+    } catch (Exception $e) {
+        error_log("ensureColumn failed for $table.$column: " . $e->getMessage());
+        return false;
+    }
+}
+
+try {
+    $dbEnsure = db();
+    if ($dbEnsure) {
+        ensureColumn($dbEnsure, 'academic_bank_accounts', 'logo', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($dbEnsure, 'academics', 'avatar', 'VARCHAR(255) DEFAULT NULL');
+        ensureColumn($dbEnsure, 'academic_qualifications', 'document_file', 'VARCHAR(255) DEFAULT NULL');
+    }
+} catch (Exception $e) {
+    // تجاهل
+}
+
+// رفع الصورة الشخصية للأكاديمي
+if ($action === 'upload_avatar') {
+    if (empty($_FILES['image'])) {
+        sendJSONResponse(false, 'لم يتم استلام الصورة.');
+    }
+    $file = $_FILES['image'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        sendJSONResponse(false, 'حدث خطأ أثناء رفع الصورة (رمز ' . $file['error'] . ').');
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed, true)) {
+        sendJSONResponse(false, 'صيغة الصورة غير مدعومة (JPG/PNG/GIF/WEBP).');
+    }
+
+    $isRealImage = false;
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file((string)$file['tmp_name']);
+        $isRealImage = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+    } else {
+        $info = @getimagesize($file['tmp_name']);
+        $isRealImage = is_array($info) && !empty($info['mime'])
+            && in_array($info['mime'], ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+    }
+    if (!$isRealImage) {
+        sendJSONResponse(false, 'الملف ليس صورة صالحة.');
+    }
+
+    $uploadDir = dirname(__DIR__) . '/../uploads/avatars';
+    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+    if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+        sendJSONResponse(false, 'مجلد رفع الصور (uploads/avatars) غير قابل للكتابة.');
+    }
+
+    $fileName = 'av_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
+    $dest = rtrim($uploadDir, '/\\') . '/' . $fileName;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        sendJSONResponse(false, 'فشل حفظ الصورة على الخادم.');
+    }
+
+    sendJSONResponse(true, 'تم رفع الصورة بنجاح.', ['image' => 'uploads/avatars/' . $fileName]);
+}
+
+// ─────────────────────────────────────────────────────────────
+// 0. UPDATE ACADEMIC PROFILE (البيانات الشخصية + الصورة الشخصية)
+// ─────────────────────────────────────────────────────────────
+if ($action === 'update_profile') {
+    if (empty($_SESSION['academic_id'])) {
+        sendJSONResponse(false, 'الجلسة منتهية، يرجى تسجيل الدخول مرة أخرى.');
+    }
+        $academicId = (int) $_SESSION['academic_id'];
+    $dbGet = db();
+    $stmtGet = $dbGet->prepare("SELECT * FROM academics WHERE id = ?");
+    $stmtGet->execute([$academicId]);
+    $academic = $stmtGet->fetch() ?: [];
+
+
+    $name      = trim($_POST['name'] ?? '');
+    $email     = trim($_POST['email'] ?? '');
+    $phone     = trim($_POST['phone'] ?? '');
+    $bio       = trim($_POST['bio'] ?? '');
+    $available = isset($_POST['availability']) ? 'available' : 'unavailable';
+
+    if (!$name || !$email || !$phone) {
+        sendJSONResponse(false, 'يرجى ملء الاسم، البريد الوإيميل، ورقم الهاتف.');
+    }
+
+    // Validate email uniqueness (excluding current academic)
+        try {
+        $db = db();
+        $chk = $db->prepare("SELECT id FROM academics WHERE email = ? AND id != ?");
+        $chk->execute([$email, $academicId]);
+        if ($chk->fetch()) {
+            sendJSONResponse(false, 'هذا البريد الإلكتروني مستخدم مسبقاً من قبل أكاديمي آخر.');
+        }
+
+        $sql = "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?";
+        $params = [$name, $email, $phone, $bio, $available];
+
+        // التأكد من وجود عمود الصورة الشخصية قبل محاولة التحديث
+        // (في السيرفرات المبنية من نسخة قديمة قد لا يكون موجوداً)
+        $dbAvatarChk = db();
+        if (!columnExists($dbAvatarChk, 'academics', 'avatar')) {
+            if (ensureColumn($dbAvatarChk, 'academics', 'avatar', 'VARCHAR(255) DEFAULT NULL')) {
+                // أُضيف الآن — نكمل
+            } else {
+                sendJSONResponse(false, 'تعذر حفظ الصورة الشخصية: عمود الصورة غير موجود في قاعدة البيانات، ولم تنجح الإضافة التلقائية (ينقص المستخدم صلاحية ALTER TABLE). يُرجى تشغيل ملف الترحيل migrations/2026_09_14_01_add_avatar_to_academics.sql على قاعدة البيانات.');
+            }
+        }
+
+        // تخزين/تحديث أو حذف الصورة الشخصية.
+        // الافتراضي: الإبقاء على الصورة الحالية (كي لا تُمسح عند حفظ
+        // تغييرات أخرى لا تشمل حقل avatar، مثل زر «حفظ التغييرات»).
+        $avatarPath = $academic['avatar'] ?? null;
+        if (isset($_POST['avatar'])) {
+            $avatarPath = trim($_POST['avatar']);
+            if ($avatarPath === '' || $avatarPath === 'null') {
+                $avatarPath = null;
+            }
+        }
+        // إزالة الصورة إذا أُرسل العلم avatar_cleared
+        if (!empty($_POST['avatar_cleared'])) {
+            $avatarPath = null;
+        }
+        // حذف الصورة القديمة من القرص إذا تم استبدالها بأخرى
+        $oldAvatar = $academic['avatar'] ?? '';
+        if (!empty($_POST['avatar']) && $oldAvatar && $avatarPath && $avatarPath !== $oldAvatar) {
+            $oldFile = dirname(__DIR__) . '/../' . $oldAvatar;
+            if (is_file($oldFile) && strpos($oldAvatar, 'uploads/avatars/') === 0) {
+                @unlink($oldFile);
+            }
+        }
+        $sql .= ", avatar = ?";
+        $params[] = $avatarPath;
+
+        $sql .= " WHERE id = ?";
+        $params[] = $academicId;
+
+        $db->prepare($sql)->execute($params);
+        sendJSONResponse(true, 'تم حفظ البيانات الشخصية بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل حفظ البيانات: ' . $e->getMessage());
+    }
+}
+
 // ─────────────────────────────────────────────────────────────
 // 1. ACADEMIC REGISTRATION
 // ─────────────────────────────────────────────────────────────
@@ -348,6 +517,8 @@ if ($action === 'update_profile') {
     $bankName = trim($_POST['bank_name'] ?? '');
     $accountName = trim($_POST['account_name'] ?? '');
     $services = $_POST['services'] ?? []; // Array of services
+    $avatar = trim($_POST['avatar'] ?? '');
+    $avatarCleared = isset($_POST['avatar_cleared']) ? (intval($_POST['avatar_cleared']) ? true : false) : false;
 
     if (!$name || !$email || !$phone) {
         sendJSONResponse(false, 'الاسم والبريد ورقم الجوال حقول مطلوبة.');
@@ -576,8 +747,9 @@ if ($action === 'mark_notifications_read') {
 if ($action === 'send_message') {
     $orderId = intval($_POST['order_id'] ?? 0);
     $content = trim($_POST['content'] ?? '');
+    $hasFile = !empty($_FILES['file']['name']);
 
-    if ($orderId <= 0 || !$content) {
+    if ($orderId <= 0 || (!$content && !$hasFile)) {
         sendJSONResponse(false, 'معلومات غير مكتملة.');
     }
 
@@ -607,9 +779,9 @@ if ($action === 'send_message') {
             $conversationId = (int) $db->lastInsertId();
         }
 
-        // Insert Message
-        $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content) VALUES (?, ?, 'academic', ?)")
-            ->execute([$conversationId, $academicId, $content]);
+        // رفع الملف (إن وجد) + إدراج الرسالة
+        $fileInfo = saveChatAttachmentUpload($_FILES['file'] ?? null);
+        sendMessage((int)$conversationId, $academicId, 'academic', $content, $fileInfo);
 
         // Get academic name
         $acName = $db->query("SELECT name FROM academics WHERE id = $academicId")->fetchColumn() ?: 'الأكاديمي';
@@ -619,7 +791,7 @@ if ($action === 'send_message') {
             $order['student_id'],
             'student',
             'رسالة جديدة من ' . $acName,
-            'أرسل الأكاديمي رسالة جديدة بخصوص طلبك',
+            ($fileInfo ? 'أرفق ' : 'أرسل ') . 'الأكاديمي رسالة بخصوص طلبك',
             '💬',
             'student/order-details.php?id=' . $orderId
         );
@@ -690,6 +862,51 @@ if ($action === 'get_bank_accounts') {
     }
 }
 
+// رفع شعار البنك/المحفظة (اختياري)
+if ($action === 'upload_bank_logo') {
+    if (empty($_FILES['image'])) {
+        sendJSONResponse(false, 'لم يتم استلام الصورة.');
+    }
+    $file = $_FILES['image'];
+    if ($file['error'] !== UPLOAD_ERR_OK) {
+        sendJSONResponse(false, 'حدث خطأ أثناء رفع الصورة (رمز ' . $file['error'] . ').');
+    }
+
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed, true)) {
+        sendJSONResponse(false, 'صيغة الصورة غير مدعومة (JPG/PNG/GIF/WEBP/SVG).');
+    }
+
+    $isRealImage = false;
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file((string)$file['tmp_name']);
+        $isRealImage = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']);
+    } else {
+        $info = @getimagesize($file['tmp_name']);
+        $isRealImage = is_array($info) && !empty($info['mime'])
+            && in_array($info['mime'], ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+    }
+    if (!$isRealImage) {
+        sendJSONResponse(false, 'الملف ليس صورة صالحة.');
+    }
+
+    $uploadDir = dirname(__DIR__) . '/../uploads/bank_logos';
+    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+    if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+        sendJSONResponse(false, 'مجلد رفع الشعارات (uploads/bank_logos) غير قابل للكتابة.');
+    }
+
+    $fileName = 'bank_logo_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
+    $dest = rtrim($uploadDir, '/\\') . '/' . $fileName;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) {
+        sendJSONResponse(false, 'فشل حفظ الصورة على الخادم.');
+    }
+
+    sendJSONResponse(true, 'تم رفع الشعار بنجاح.', ['image' => 'uploads/bank_logos/' . $fileName]);
+}
+
 if ($action === 'add_bank_account' || $action === 'update_bank_account') {
     $isEdit = ($action === 'update_bank_account');
     $id = intval($_POST['id'] ?? 0);
@@ -697,6 +914,8 @@ if ($action === 'add_bank_account' || $action === 'update_bank_account') {
     $accountName = trim($_POST['account_name'] ?? '');
     $accountNumber = trim($_POST['account_number'] ?? '');
     $holderName = trim($_POST['holder_name'] ?? '');
+    $logo = trim($_POST['logo'] ?? '');
+    $logoCleared = isset($_POST['logo_cleared']) ? (intval($_POST['logo_cleared']) ? true : false) : false;
 
     if (!in_array($accountType, ['bank', 'wallet'], true)) {
         $accountType = 'bank';
@@ -710,19 +929,29 @@ if ($action === 'add_bank_account' || $action === 'update_bank_account') {
 
         if ($isEdit) {
             // Verify the academic owns this account before updating
-            $check = $db->prepare("SELECT id FROM academic_bank_accounts WHERE id = ? AND academic_id = ?");
+            $check = $db->prepare("SELECT id, logo FROM academic_bank_accounts WHERE id = ? AND academic_id = ?");
             $check->execute([$id, $academicId]);
-            if (!$check->fetch()) {
+            $existing = $check->fetch();
+            if (!$existing) {
                 sendJSONResponse(false, 'الحساب غير موجود أو لا تملك صلاحية تعديله.');
             }
+
+            // معالجة الشعار: إزالة صريحة / صورة جديدة / الاحتفاظ بالقديمة
+            if ($logoCleared) {
+                $logo = null;
+            } elseif ($logo === '') {
+                $logo = $existing['logo'] ?? null;
+            }
+
             $db->prepare(
-                "UPDATE academic_bank_accounts SET account_type = ?, account_name = ?, account_number = ?, holder_name = ? WHERE id = ? AND academic_id = ?"
-            )->execute([$accountType, $accountName, $accountNumber, $holderName, $id, $academicId]);
+                "UPDATE academic_bank_accounts SET account_type = ?, account_name = ?, account_number = ?, holder_name = ?, logo = ? WHERE id = ? AND academic_id = ?"
+            )->execute([$accountType, $accountName, $accountNumber, $holderName, $logo, $id, $academicId]);
             sendJSONResponse(true, 'تم تحديث الحساب بنجاح.');
         } else {
+            if ($logoCleared) $logo = null;
             $db->prepare(
-                "INSERT INTO academic_bank_accounts (academic_id, account_type, account_name, account_number, holder_name) VALUES (?, ?, ?, ?, ?)"
-            )->execute([$academicId, $accountType, $accountName, $accountNumber, $holderName]);
+                "INSERT INTO academic_bank_accounts (academic_id, account_type, account_name, account_number, holder_name, logo) VALUES (?, ?, ?, ?, ?, ?)"
+            )->execute([$academicId, $accountType, $accountName, $accountNumber, $holderName, $logo]);
             sendJSONResponse(true, 'تمت إضافة الحساب بنجاح.');
         }
     } catch (Exception $e) {
@@ -777,6 +1006,14 @@ if ($action === 'add_qualification' || $action === 'update_qualification') {
 
     try {
         $db = db();
+
+        // التأكد من وجود عمود وثيقة المؤهل قبل الحفظ (السيرفرات القديمة تفتقده)
+        if (!columnExists($db, 'academic_qualifications', 'document_file')) {
+            if (!ensureColumn($db, 'academic_qualifications', 'document_file', 'VARCHAR(255) DEFAULT NULL')) {
+                sendJSONResponse(false, 'تعذر حفظ المؤهل: عمود الوثيقة (document_file) غير موجود في قاعدة البيانات ولم تنجح الإضافة التلقائية (ينقص المستخدم صلاحية ALTER TABLE). يُرجى تشغيل ملف الترحيل migrations/2026_09_14_02_add_document_file_to_academic_qualifications.sql على قاعدة البيانات.');
+            }
+        }
+
         $docFile = uploadQualificationDoc($_FILES['document_file'] ?? null);
 
         if ($isEdit) {

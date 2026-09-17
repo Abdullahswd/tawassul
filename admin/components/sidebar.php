@@ -101,6 +101,17 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
     <!-- System -->
     <p class="nav-section-title">النظام</p>
 
+    <a href="../pages/support.php" class="nav-item" id="nav-support">
+      <span class="nav-icon">🛟</span>
+      <span class="nav-label">الدعم الفني والشكاوى</span>
+      <?php
+      require_once __DIR__ . '/../../config/support_functions.php';
+      $sb_support_cnt = countUnreadSupportForAdmin('student') + countUnreadSupportForAdmin('academic');
+      if ($sb_support_cnt > 0): ?>
+        <span class="nav-badge" style="background:#ef4444"><?= $sb_support_cnt ?></span>
+      <?php endif; ?>
+    </a>
+
     <a href="../pages/settings.php" class="nav-item" id="nav-settings">
       <span class="nav-icon">🔧</span>
       <span class="nav-label">الإعدادات</span>

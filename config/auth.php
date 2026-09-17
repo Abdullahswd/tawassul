@@ -10,6 +10,9 @@ require_once __DIR__ . '/db.php';
 
 // Start session if not started
 if (session_status() === PHP_SESSION_NONE) {
+    // يجب ضبط cache limiter قبل بدء الجلسة وإلا يتجاهل PHP الترويسات اليدوية
+    // ويطلق تحذير session_cache_limiter مع أي header() لاحق
+    session_cache_limiter('nocache');
     session_start();
 }
 
@@ -70,6 +73,7 @@ function loginUser(array $user): void {
     $_SESSION['user_email'] = $user['email'];
     $_SESSION['user_role']  = $user['role'];
     $_SESSION['user_avatar']= $user['avatar_initials'] ?? substr($user['name'], 0, 2);
+    $_SESSION['user_avatar_path'] = $user['avatar_path'] ?? null;
 }
 
 /**

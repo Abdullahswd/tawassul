@@ -21,6 +21,15 @@ if (!is_array($all_services)) {
 }
 
 $all_services_json = json_encode($all_services, JSON_UNESCAPED_UNICODE);
+
+// ── خدمة الطالب بالباقات: الخدمات المشمولة المتبقية (مرة واحدة لكل خدمة) ──
+// لا تُتاح مزايا الباقة إلا بعد اعتماد إشعار الدفع من الإدارة
+$activeSubs = getApprovedActivePackageSubscriptions((int)$user['id']); // كل الباقات النشطة المعتمدة
+$remainingIncludedIds = remainingIncludedServiceIds((int)$user['id']);
+$remainingIncludedIdsJson = json_encode($remainingIncludedIds, JSON_UNESCAPED_UNICODE);
+$includedAllIds = studentIncludedServiceIds((int)$user['id']); // اتحاد خدمات كل الباقات
+$includedAllIdsJson = json_encode($includedAllIds, JSON_UNESCAPED_UNICODE);
+$hasActivePackage = !empty($activeSubs);
 ?>
 <?php
 $extraCss = [
@@ -85,6 +94,9 @@ ob_start();
 ?>
   <script>
     const allServices = <?= $all_services_json ?>;
+    const remainingIncludedIds = <?= $remainingIncludedIdsJson ?>;
+    const includedAllIds = <?= $includedAllIdsJson ?>;
+    const hasActivePackage = <?= json_encode($hasActivePackage) ?>;
     let selectedCatId = 'all';
 
     function initTabs() {
@@ -113,6 +125,10 @@ ob_start();
       const grandParent = allServices.find(s => s.id === parent.parent_id);
       return grandParent ? grandParent.id : parent.id;
     }
+    // هل الخدمة مشمولة في باقة الطالب (سواء مستهلكة أم لا)؟
+    function activePackageHasService(serviceId) {
+      return includedAllIds.includes(serviceId);
+    }
     function renderStudentServices() {
       const grid = document.getElementById('studentServicesGrid');
       const searchTerm = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -128,7 +144,15 @@ ob_start();
         grid.innerHTML = `<div style="grid-column:1/-1;background:var(--bg-card);border-radius:16px;padding:40px;text-align:center;color:var(--text-secondary);border:1px solid var(--border-color);"><div style="font-size:48px;margin-bottom:12px">🔍</div><h3 style="font-weight:700;font-size:16px">لا توجد خدمات تطابق خياراتك</h3></div>`;
         return;
       }
-      grid.innerHTML = items.map((s, idx) => `
+      grid.innerHTML = items.map((s, idx) => {
+        const isRemaining = remainingIncludedIds.includes(s.id);
+        const usedFromPackage = hasActivePackage && activePackageHasService(s.id) && !isRemaining;
+        const actionBtn = isRemaining
+          ? `<a href="create-order.php?service_id=${s.id}" class="btn btn-primary btn-sm" style="padding:8px 14px;border-radius:12px;font-weight:700;background:linear-gradient(135deg,#10b981,#059669)">✅ اطلبها مجاناً (مرة واحدة)</a>`
+          : (usedFromPackage
+              ? `<a href="create-order.php?service_id=${s.id}" class="btn btn-primary" style="padding:8px 18px;border-radius:12px;font-weight:700">🔁 اطلبها مجدداً بسعرها 🚀</a>`
+              : `<a href="create-order.php?service_id=${s.id}" class="btn btn-primary" style="padding:8px 18px;border-radius:12px;font-weight:700">اطلب الآن 🚀</a>`);
+        return `
         <div class="service-card anim-fade-up" style="animation-delay:${idx * 0.05}s">
           <div>
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
@@ -139,13 +163,15 @@ ob_start();
           </div>
           <div style="display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border-color);padding-top:16px">
             <div>
-              <div style="font-size:11px;color:var(--text-muted);font-weight:600">السعر المعين</div>
-              <div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>
+              ${isRemaining ? '<div style="font-size:11px;color:#10b981;font-weight:600">مشمولة في باقتك</div><div style="font-weight:900;color:#10b981;font-size:18px">مجاناً</div>'
+                : (usedFromPackage
+                  ? `<div style="font-size:11px;color:#d97706;font-weight:700">🔁 استُخدمت من باقتك — الطلب مجدداً بسعرها</div><div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>`
+                  : `<div style="font-size:11px;color:var(--text-muted);font-weight:600">السعر المعين</div><div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>`)}
             </div>
-            <a href="create-order.php?service_id=${s.id}" class="btn btn-primary" style="padding:8px 18px;border-radius:12px;font-weight:700">اطلب الآن 🚀</a>
+            ${actionBtn}
           </div>
-        </div>
-      `).join('');
+        </div>`;
+      }).join('');
     }
     document.addEventListener('DOMContentLoaded', () => { initTabs(); renderStudentServices(); });
   </script>

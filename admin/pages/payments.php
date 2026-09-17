@@ -87,6 +87,27 @@ $payments_stmt = $db->query("
 ");
 
 $payments = $payments_stmt->fetchAll();
+
+/* ─────────────────────────────
+   Payment receipts (إشعارات الدفع)
+──────────────────────────── */
+
+// اعتماد / رفض إشعار
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'], $_POST['receipt_action'])) {
+    $rid = (int) $_POST['receipt_id'];
+    $action = $_POST['receipt_action'] === 'approve' ? 'approved' : 'rejected';
+    updatePaymentReceiptStatus($rid, $action);
+    header('Location: payments.php?receipt_' . ($action === 'approved' ? 'approved' : 'rejected') . '=1');
+    exit;
+}
+
+$receipts = getAllPaymentReceipts();
+$adminAppBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
+$receiptStatusLabels = [
+    'pending'  => ['قيد المراجعة ⏳', '#fef9c3', '#854d0e', '#fde047'],
+    'approved' => ['مُعتمد ✅', '#dcfce7', '#166534', '#86efac'],
+    'rejected' => ['مرفوض ❌', '#fee2e2', '#991b1b', '#fca5a5'],
+];
 ?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
@@ -220,6 +241,64 @@ $payments = $payments_stmt->fetchAll();
           </div>
         </div>
 
+      </div>
+
+      <!-- ===================== Payment Receipts (إشعارات الدفع) ===================== -->
+      <div class="table-container animate-fadeInUp delay-2" style="margin-top:28px">
+        <div class="table-header">
+          <h3 class="table-title">🧾 إشعارات الدفع المرفقة من الطلاب</h3>
+          <p style="font-size:13px;color:var(--text-secondary)">راجع إشعارات التحويل وأعتمدها لتأكيد الدفع</p>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>الطالب</th>
+                <th>النوع</th>
+                <th>حساب الدفع</th>
+                <th>المبلغ</th>
+                <th>التاريخ</th>
+                <th>الإشعار</th>
+                <th>الحالة</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (empty($receipts)): ?>
+                <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary)">لا توجد إشعارات دفع بعد</td></tr>
+              <?php endif; ?>
+              <?php foreach ($receipts as $rc): $sl = $receiptStatusLabels[$rc['status']] ?? $receiptStatusLabels['pending']; ?>
+                <tr>
+                  <td style="font-weight:700"><?= e($rc['student_name'] ?? '—') ?></td>
+                  <td><?= $rc['order_id'] ? '📋 طلب ' . e($rc['order_number'] ?? '') : '📦 باقة ' . e($rc['package_name'] ?? '') ?></td>
+                  <td style="font-size:13px"><?= e($rc['method_label'] ?: '—') ?></td>
+                  <td style="font-weight:800"><?= number_format((float)$rc['amount'], 2) ?> ر.س</td>
+                  <td style="font-size:13px"><?= formatDate($rc['created_at']) ?></td>
+                  <td><a href="<?= e($adminAppBase . '/' . $rc['receipt_path']) ?>" target="_blank" class="btn btn-outline" style="padding:6px 12px;font-size:12px">عرض 👁️</a></td>
+                  <td><span style="background:<?= $sl[1] ?>;color:<?= $sl[2] ?>;border:1px solid <?= $sl[3] ?>;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800"><?= $sl[0] ?></span></td>
+                  <td>
+                    <?php if ($rc['status'] === 'pending'): ?>
+                      <div style="display:flex;gap:6px">
+                        <form method="POST" style="margin:0">
+                          <input type="hidden" name="receipt_id" value="<?= (int)$rc['id'] ?>">
+                          <input type="hidden" name="receipt_action" value="approve">
+                          <button type="submit" style="background:#10b981;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">اعتماد ✓</button>
+                        </form>
+                        <form method="POST" style="margin:0">
+                          <input type="hidden" name="receipt_id" value="<?= (int)$rc['id'] ?>">
+                          <input type="hidden" name="receipt_action" value="reject">
+                          <button type="submit" style="background:#ef4444;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">رفض ✕</button>
+                        </form>
+                      </div>
+                    <?php else: ?>
+                      <span style="font-size:12px;color:var(--text-secondary)">—</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- ===================== Academic Payouts ===================== -->

@@ -82,6 +82,17 @@ if ($currentAcademicId) {
       <span class="nav-text">الإعدادات</span>
     </a>
 
+    <a href="academic-support.php" class="nav-item" id="nav-support">
+      <span class="nav-icon">🛟</span>
+      <span class="nav-text">الدعم الفني</span>
+      <?php
+      require_once __DIR__ . '/../../config/support_functions.php';
+      $supUnread = $currentAcademicId ? countUnreadSupportForUser((int) $currentAcademicId, 'academic') : 0;
+      if ($supUnread > 0): ?>
+        <span class="nav-text" style="margin-right:auto;background:#ef4444;color:#fff;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700"><?= $supUnread ?></span>
+      <?php endif; ?>
+    </a>
+
     <a href="academic-profile.php?id=<?= $currentAcademicId ?>" target="_blank" class="nav-item" id="nav-profile">
       <span class="nav-icon">👤</span>
       <span class="nav-text">عرض ملفي للطلاب</span>

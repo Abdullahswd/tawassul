@@ -11,12 +11,17 @@ $db = db();
 $prefillServiceId = (int) ($_GET['service_id'] ?? ($_GET['sid'] ?? 0));
 
 /* ─────────────────────────────────────────────
-   الاشتراك النشط بالباقة + الخدمات المشمولة
+   الاشتراكات النشطة بالباقات + الخدمات المشمولة
 ───────────────────────────────────────────── */
-$activeSub = getActivePackageSubscription((int) $user['id']);
-$hasSub = (bool) $activeSub;
-$includedIds = activeSubscriptionServiceIds($activeSub);
-$includedIdsJs = empty($includedIds) ? [] : $includedIds;
+// مزايا الباقات لا تُفعّل إلا بعد اعتماد إشعار الدفع من الإدارة
+$activeSubs = getApprovedActivePackageSubscriptions((int) $user['id']); // كل الباقات النشطة المعتمدة
+$hasSub = !empty($activeSubs);
+$includedIds = studentIncludedServiceIds((int) $user['id']); // اتحاد خدمات كل الباقات
+// المشمولات المستهلكة سابقاً: يمكن طلبها مجدداً لكن بسعرها المحدد (كأنها خارج الباقة)
+$usedIncludedIds = $hasSub ? usedPackageServiceIds((int) $user['id']) : [];
+$remainingIncludedIds = array_values(array_diff($includedIds, $usedIncludedIds));
+$includedIdsJs = $remainingIncludedIds;      // غير المستهلكة → مجانية لمرة واحدة
+$usedIncludedIdsJs = $usedIncludedIds;       // المستهلكة → طلب مجدد بسعر الخدمة
 
 // الخدمة المختارة مسبقاً (لعرض تفاصيلها داخل الصفحة)
 $selectedService = null;
@@ -32,7 +37,7 @@ if ($prefillServiceId) {
 // السعر المبدئي المعروض لملخص الطلب قبل تنفيذ JS
 $initialPrice = 150.0;
 $initialIncluded = false;
-if ($prefillServiceId !== 0 && $hasSub && in_array($prefillServiceId, $includedIds, true)) {
+if ($prefillServiceId !== 0 && $hasSub && in_array($prefillServiceId, $remainingIncludedIds, true)) {
   $initialIncluded = true;
   $initialPrice = 0.0;
 } elseif ($selectedService) {
@@ -49,10 +54,15 @@ foreach ($services as $s) {
     'name' => $s['name'],
     'price' => (float) ($s['price'] ?? 0),
     'description' => $s['description'] ?? '',
-    'included' => in_array((int) $s['id'], $includedIds, true),
+    'included' => in_array((int) $s['id'], $remainingIncludedIds, true),
+    'used'     => in_array((int) $s['id'], $usedIncludedIds, true),
   ];
 }
 $servicesJson = json_encode($servicesDataMap, JSON_UNESCAPED_UNICODE);
+
+// حسابات المنصة (بنوك/محافظ) لخطوة الدفع + جذر المشروع لبناء روابط الشعارات
+$paymentMethods = getActivePaymentMethods();
+$appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 
 $error = '';
 $success = '';
@@ -65,13 +75,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $deadline = $_POST['deadline'] ?? '';
   $description = trim($_POST['description'] ?? '');
 
-  // حساب السعر: الخدمات المشمولة في الباقة مجانية، وما عداها يُسعَّر بشكل منفرد.
+  // حساب السعر: المشمولة وغير المستهلكة → مجانية لمرة واحدة.
+  // المشمولة لكن المستهلكة سابقاً (أو خارج الباقة) → بسعر الخدمة المحدد.
+  $usedIncludedIds = $hasSub ? usedPackageServiceIds((int) $user['id']) : [];
   $amount = 150.0;
   $package_id = null;
+  $isIncludedSvc = false;
   if ($service_id) {
-    if ($hasSub && $activeSub && in_array($service_id, $includedIds, true)) {
+    // تحديد الباقة النشطة المعتمدة التي تشمل هذه الخدمة (إن وُجدت)
+    $coveringSub = null;
+    if ($hasSub) {
+      foreach ($activeSubs as $s) {
+        if (in_array($service_id, activeSubscriptionServiceIds($s), true)) { $coveringSub = $s; break; }
+      }
+    }
+    if ($coveringSub && !in_array($service_id, $usedIncludedIds, true)) {
+      $isIncludedSvc = true;
       $amount = 0.0;
-      $package_id = (int) $activeSub['package_id'];
+      $package_id = (int) $coveringSub['package_id'];
     } else {
       $stmt = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
       $stmt->execute([$service_id]);
@@ -97,6 +118,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'amount' => $amount,
     ]);
 
+    // تسجيل استهلاك الخدمة من الباقة (مرة واحدة فقط)
+    if ($order_id && $isIncludedSvc) {
+      consumePackageService((int)$user['id'], $service_id);
+    }
+
+    // حفظ مرفقات الطلب المرفوعة من الطالب
+    if ($order_id) {
+      saveOrderAttachmentUploads($_FILES['order_attachments'] ?? null, (int) $order_id);
+    }
+
     if ($order_id) {
       // إشعار نجاح الطلب
       createNotification(
@@ -118,6 +149,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
       }
 
+      // تسجيل إشعار الدفع المرفق (خطوة الدفع) للطلبات المدفوعة
+      if ($amount > 0) {
+        $rcptPath = saveReceiptUpload($_FILES['payment_receipt'] ?? null);
+        if ($rcptPath) {
+          $methodId = (int) ($_POST['payment_method_id'] ?? 0) ?: null;
+          savePaymentReceipt([
+            'order_id'     => $order_id,
+            'student_id'   => $user['id'],
+            'method_id'    => $methodId,
+            'method_label' => getPaymentMethodLabel($methodId),
+            'amount'       => $amount,
+            'receipt_path' => $rcptPath,
+          ]);
+          createNotification(
+            1,
+            'admin',
+            'إشعار دفع جديد 🧾',
+            'أرفق الطالب ' . $user['name'] . ' إشعار دفع مع الطلب ' . generateOrderNumber() . '.',
+            '🧾',
+            'admin/pages/payments.php'
+          );
+        }
+      }
+    }
+
+    if ($order_id) {
       header('Location: orders.php?success=1');
       exit;
     } else {
@@ -228,9 +285,13 @@ require __DIR__ . '/partials/sidebar.php';
           <div class="circle">3</div>
           <div class="step-label">الملفات والشروحات</div>
         </div>
+        <div class="step-indicator">
+          <div class="circle">4</div>
+          <div class="step-label">الدفع</div>
+        </div>
       </div>
 
-      <form method="POST" action="create-order.php" id="multiOrderForm">
+      <form method="POST" action="create-order.php" id="multiOrderForm" enctype="multipart/form-data">
 
         <!-- STEP 1 -->
         <div class="form-step" id="step1">
@@ -264,6 +325,10 @@ require __DIR__ . '/partials/sidebar.php';
                     style="display:<?= ($selectedService && $initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
                     ✅ هذه الخدمة مشمولة في باقتك
                   </div>
+                  <div id="serviceUsedBadge"
+                    style="display:<?= ($selectedService && !$initialIncluded && in_array($prefillServiceId, $usedIncludedIdsJs, true)) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    🔁 استُخدمت من باقتك سابقاً — سيُسعَّر هذا الطلب بسعر الخدمة المحدد
+                  </div>
                   <div id="serviceNonIncludedBadge"
                     style="display:<?= ($selectedService && !$initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
                     هذه الخدمة خارج باقتك وسيتم تسعيرها بشكل منفرد
@@ -273,16 +338,19 @@ require __DIR__ . '/partials/sidebar.php';
             <?php endif; ?>
           </div>
 
-          <?php if ($hasSub && $activeSub): ?>
-            <!-- الطالب مشترك في باقة -->
+          <?php if ($hasSub && !empty($activeSubs)): ?>
+            <!-- الطالب مشترك في باقة أو أكثر -->
             <div class="form-group"
               style="border:1px dashed var(--primary);border-radius:var(--radius-md);padding:16px;background:var(--primary-light);margin-top:4px">
               <div style="font-weight:800;color:var(--primary);margin-bottom:6px">
-                🎁 باقتك النشطة: <?= e($activeSub['package_name']) ?> — سارية حتى
-                <?= formatDate($activeSub['expires_at']) ?>
+                🎁 باقاتك النشطة:
+                <?php foreach ($activeSubs as $i => $s): ?>
+                  <?= e($s['package_name']) ?><?= $i < count($activeSubs) - 1 ? '، ' : '' ?>
+                <?php endforeach; ?>
+                — سارية بشكل غير محدد (بدون تاريخ انتهاء)
               </div>
               <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
-                إذا كانت الخدمة المختارة ضمن خدمات باقتك فستكون <strong>مشمولة مجاناً</strong> في طلبك.
+                إذا كانت الخدمة المختارة ضمن خدمات إحدى باقاتك فستكون <strong>مشمولة مجاناً</strong> في طلبك.
                 إن لم تكن مشمولة، ستُسعَّر بشكل منفرد.
               </div>
             </div>
@@ -353,10 +421,76 @@ require __DIR__ . '/partials/sidebar.php';
               onmouseover="this.style.borderColor='var(--primary)'"
               onmouseout="this.style.borderColor='var(--border-color)'"
               onclick="document.getElementById('fileUpload').click()">
-              <input type="file" id="fileUpload" multiple style="display:none">
+              <input type="file" id="fileUpload" name="order_attachments[]" multiple style="display:none"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
               <div style="font-size:32px;margin-bottom:12px">📤</div>
               <div style="font-weight:700">اضغط لرفع الملفات والتعليمات</div>
-              <div style="font-size:12px;color:var(--text-muted);margin-top:8px">PDF, DOCX, ZIP بحد أقصى 10MB</div>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:8px">PDF, DOCX, ZIP بحد أقصى 10MB لكل ملف</div>
+            </div>
+            <div id="fileUploadList" style="display:none;margin-top:12px;display:flex;flex-direction:column;gap:6px"></div>
+            <script>
+              document.getElementById('fileUpload').addEventListener('change', function () {
+                const list = document.getElementById('fileUploadList');
+                list.innerHTML = '';
+                if (!this.files.length) { list.style.display = 'none'; return; }
+                list.style.display = 'flex';
+                Array.from(this.files).forEach(function (f) {
+                  const row = document.createElement('div');
+                  row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-secondary);background:var(--bg-body);border:1px solid var(--border-color);border-radius:10px;padding:8px 12px';
+                  row.innerHTML = '<span>📎</span><span style="flex:1;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><span style="flex-shrink:0">' + (f.size / 1024 / 1024).toFixed(2) + ' MB</span>';
+                  row.querySelector('span:nth-child(2)').textContent = f.name;
+                  list.appendChild(row);
+                });
+              });
+            </script>
+          </div>
+        </div>
+
+        <!-- STEP 4: الدفع -->
+        <div class="form-step" id="step4" style="display:none">
+          <h3 class="h3" style="margin-bottom:8px">خطوة الدفع 💳</h3>
+          <p class="text-body" style="margin-bottom:20px">
+            حوّل المبلغ إلى أحد حسابات المنصة أدناه، ثم اختر الحساب الذي حولت إليه وأرفق إشعار الدفع مع طلبك.
+          </p>
+
+          <div id="payStepFreeNote" style="display:none;background:#dcfce7;color:#166534;border:1px solid #86efac;padding:16px;border-radius:12px;font-weight:700;margin-bottom:16px">
+            🎁 هذه الخدمة مشمولة في باقتك — الإجمالي مجاني، لا حاجة لخطوات الدفع. اضغط "إنشاء الطلب" لإتمام الطلب.
+          </div>
+
+          <div id="payStepContent">
+            <div class="form-group">
+              <label class="form-label">اختر حساب المنصة الذي حوّلت إليه <span style="color:var(--danger)">*</span></label>
+              <?php if (empty($paymentMethods)): ?>
+                <div style="background:#fef3c7;color:#92400e;padding:12px;border-radius:10px;font-size:13px;font-weight:600">
+                  لا توجد حسابات دفع مفعّلة حالياً — سيتم التواصل معك لإتمام الدفع.
+                </div>
+              <?php else: ?>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px">
+                  <?php foreach ($paymentMethods as $pm): ?>
+                    <label style="display:flex;align-items:center;gap:12px;border:2px solid var(--border-color);border-radius:14px;padding:14px;cursor:pointer;transition:all .2s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="if(!this.querySelector('input').checked)this.style.borderColor='var(--border-color)'">
+                      <input type="radio" name="payment_method_id" value="<?= (int)$pm['id'] ?>" style="accent-color:var(--primary);width:18px;height:18px;flex-shrink:0">
+                      <?php if (!empty($pm['logo'])): ?>
+                        <img src="<?= e($appBase . '/' . $pm['logo']) ?>" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:8px;background:#fff;border:1px solid var(--border-color);flex-shrink:0">
+                      <?php else: ?>
+                        <span style="font-size:26px"><?= ($pm['account_type'] ?? 'bank') === 'wallet' ? '👛' : '🏦' ?></span>
+                      <?php endif; ?>
+                      <span style="min-width:0">
+                        <strong style="display:block;font-size:14px"><?= e($pm['account_name']) ?></strong>
+                        <span style="font-size:12px;color:var(--text-secondary);direction:ltr;unicode-bidi:embed"><?= e($pm['account_number']) ?></span>
+                        <?php if (!empty($pm['holder_name'])): ?>
+                          <span style="display:block;font-size:11px;color:var(--text-secondary)"><?= e($pm['holder_name']) ?></span>
+                        <?php endif; ?>
+                      </span>
+                    </label>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">إرفاق إشعار الدفع (صورة أو PDF)</label>
+              <input type="file" class="form-input" name="payment_receipt" accept="image/*,.pdf">
+              <small style="color:var(--text-secondary);font-size:12px">بعد التحويل، صوّر إشعار التحويل أو إيصال الدفع وأرفقه هنا (حتى 10MB).</small>
             </div>
           </div>
         </div>
@@ -421,13 +555,15 @@ require __DIR__ . '/partials/sidebar.php';
     const detailsName = document.getElementById('serviceDetailsName');
     const detailsDesc = document.getElementById('serviceDetailsDesc');
     const includedBadgeEl = document.getElementById('serviceIncludedBadge');
+    const usedBadgeEl = document.getElementById('serviceUsedBadge');
     const nonIncludedBadgeEl = document.getElementById('serviceNonIncludedBadge');
     const basePriceEl = document.getElementById('basePrice');
     const totalPriceEl = document.getElementById('totalPrice');
 
     // بيانات الخدمات + الخدمات المشمولة في الباقة (أُدخلت من PHP)
     const servicesData = <?= $servicesJson ?>;
-    const includedIdsSet = new Set(<?= json_encode($includedIdsJs) ?>);
+    const includedIdsSet = new Set(<?= json_encode($includedIdsJs) ?>);      // المشمولات غير المستهلكة → مجانية
+    const usedIncludedSet = new Set(<?= json_encode($usedIncludedIdsJs) ?>); // المستهلكة سابقاً → بسعر الخدمة
 
     let currentStep = 0;
 
@@ -442,6 +578,7 @@ require __DIR__ . '/partials/sidebar.php';
       if (!svc) {
         detailsBox.style.display = 'none';
         if (includedBadgeEl) includedBadgeEl.style.display = 'none';
+        if (usedBadgeEl) usedBadgeEl.style.display = 'none';
         if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = 'none';
         return;
       }
@@ -449,8 +586,10 @@ require __DIR__ . '/partials/sidebar.php';
       if (detailsName) detailsName.textContent = (svc.icon || '📦') + ' ' + svc.name;
       if (detailsDesc) detailsDesc.textContent = svc.description || '';
       const included = includedIdsSet.has(svc.id);
+      const usedBefore = usedIncludedSet.has(svc.id);
       if (includedBadgeEl) includedBadgeEl.style.display = included ? 'inline-block' : 'none';
-      if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = (included || includedIdsSet.size === 0) ? 'none' : 'inline-block';
+      if (usedBadgeEl) usedBadgeEl.style.display = (!included && usedBefore) ? 'inline-block' : 'none';
+      if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = (!included && !usedBefore && includedIdsSet.size !== 0) ? 'inline-block' : 'none';
     }
 
     function updatePricing() {
@@ -506,6 +645,15 @@ require __DIR__ . '/partials/sidebar.php';
       if (currentStep === steps.length - 1) {
         nextBtn.style.display = 'none';
         submitBtn.style.display = 'inline-flex';
+        // خطوة الدفع: تُخفى تفاصيل الدفع إذا كانت الخدمة مجانية (مشمولة بالباقة)
+        const svc = getSelectedService();
+        const isFree = svc && includedIdsSet.has(svc.id);
+        const freeNote = document.getElementById('payStepFreeNote');
+        const payContent = document.getElementById('payStepContent');
+        if (freeNote && payContent) {
+          freeNote.style.display = isFree ? 'block' : 'none';
+          payContent.style.display = isFree ? 'none' : 'block';
+        }
       } else {
         nextBtn.style.display = 'inline-flex';
         submitBtn.style.display = 'none';

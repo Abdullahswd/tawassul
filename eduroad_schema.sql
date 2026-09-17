@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS `academics` (
   `degree`          ENUM('بكالوريوس','ماجستير','دكتوراه') DEFAULT NULL,
   `university`      VARCHAR(200) DEFAULT NULL,
   `bio`             TEXT DEFAULT NULL,
+  `avatar`          VARCHAR(255) DEFAULT NULL COMMENT 'Uploaded profile picture path',
   `avatar_initials` VARCHAR(4) DEFAULT NULL,
   `starting_price`  DECIMAL(10,2) DEFAULT 0.00 COMMENT 'Minimum price per order',
   `balance`         DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Pending withdrawal balance',
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS `academic_qualifications` (
   `university`       VARCHAR(200) NOT NULL,
   `country`          VARCHAR(100) DEFAULT NULL,
   `graduation_year`  YEAR DEFAULT NULL,
+  `document_file`    VARCHAR(255) DEFAULT NULL COMMENT 'Path to the uploaded documentation/evidence file',
   `verified`         TINYINT(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_qual_academic` FOREIGN KEY (`academic_id`)
@@ -88,6 +90,14 @@ CREATE TABLE IF NOT EXISTS `services` (
   `name`        VARCHAR(150) NOT NULL,
   `icon`        VARCHAR(10) DEFAULT NULL COMMENT 'Emoji icon',
   `description` TEXT DEFAULT NULL,
+  `icon_image`  VARCHAR(255) DEFAULT NULL COMMENT 'Uploaded icon image path',
+  `needs_multiple_academics` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'Service requires more than one academic',
+  `price`       DECIMAL(10,2) NOT NULL DEFAULT 0.00 COMMENT 'Service unit price',
+  `platform_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT 'Platform share percentage (%)',
+  `discount_percent` DECIMAL(5,2) NOT NULL DEFAULT 0.00 COMMENT 'Discount percentage (%) on service',
+  `parent_id`   INT UNSIGNED DEFAULT NULL COMMENT 'Parent for hierarchy (level up to 3)',
+  `level`       TINYINT UNSIGNED NOT NULL DEFAULT 1,
+  `sort_order`  INT NOT NULL DEFAULT 0,
   `is_active`   TINYINT(1) NOT NULL DEFAULT 1,
   `order_count` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT 'Cached count for performance',
   `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -294,7 +304,7 @@ CREATE TABLE IF NOT EXISTS `package_subscriptions` (
   `student_id`  INT UNSIGNED NOT NULL,
   `package_id`  INT UNSIGNED NOT NULL,
   `started_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `expires_at`  DATETIME NOT NULL,
+  `expires_at`  DATETIME NULL DEFAULT NULL COMMENT 'NULL = lifetime (غير محدد بتاريخ)',
   `status`      ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active',
   `created_at`  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -303,6 +313,22 @@ CREATE TABLE IF NOT EXISTS `package_subscriptions` (
   INDEX `idx_status`  (`status`),
   CONSTRAINT `fk_ps_student` FOREIGN KEY (`student_id`) REFERENCES `users`(`id`)     ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_ps_package` FOREIGN KEY (`package_id`) REFERENCES `packages`(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- 12c. PACKAGE SUBSCRIPTION USES (استهلاك الخدمات المشمولة مرة واحدة)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `package_subscription_uses` (
+  `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `subscription_id` INT UNSIGNED NOT NULL,
+  `service_id`      INT UNSIGNED NOT NULL,
+  `used_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_use_sub_service` (`subscription_id`, `service_id`),
+  INDEX `idx_use_sub`  (`subscription_id`),
+  INDEX `idx_use_svc`  (`service_id`),
+  CONSTRAINT `fk_use_sub` FOREIGN KEY (`subscription_id`) REFERENCES `package_subscriptions`(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_use_svc` FOREIGN KEY (`service_id`)      REFERENCES `services`(`id`)            ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 

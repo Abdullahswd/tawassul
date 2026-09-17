@@ -9,6 +9,15 @@ if ($currentAcademicId) {
 }
 $academicName = $academicData['name'] ?? 'أكاديمي';
 $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0, 2);
+// إذا تم رفع صورة شخصية، استخدمها بدلاً من الحرفين
+$academicAvatarUrl = (!empty($academicData['avatar'])) ? htmlAssetUrl($academicData['avatar']) : null;
+function htmlAssetUrl($path) {
+    $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $base = rtrim(preg_replace('#/academics/[^/]+\.php$#', '', $scriptName), '/');
+    if (!$path) return '';
+    if (preg_match('#^https?://#i', $path)) return $path;
+    return $base . '/' . ltrim($path, '/');
+}
 
 $notifsList = [];
 $unreadCount = 0;

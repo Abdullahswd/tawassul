@@ -31,6 +31,8 @@ if (!$order) {
 
 $orderId = $order['id'];
 $studentId = $order['student_id'];
+$appBase = rtrim(preg_replace('#/academics/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
+ensureMessageFileColumns();
 
 // 1.1 Fetch Assigned Team of Academics
 $assignedTeam = getAssignedAcademics($orderId);
@@ -195,24 +197,41 @@ $attachments = $attStmt->fetchAll();
             </div>
             
             <div class="chat-box" id="chatBox">
+              <?php $lastMsgIdPhp = 0; ?>
               <?php if (empty($messages)): ?>
-                <div style="text-align:center;color:var(--text-secondary);margin:auto">لا توجد رسائل سابقة. ابدأ المحادثة الآن.</div>
+                <div id="chatPlaceholder" style="text-align:center;color:var(--text-secondary);margin:auto">لا توجد رسائل سابقة. ابدأ المحادثة الآن.</div>
               <?php else: ?>
                 <?php foreach ($messages as $msg): ?>
-                  <?php $isMe = ($msg['sender_type'] === 'academic' && $msg['sender_id'] == $academicId); ?>
-                  <div class="msg <?= $isMe ? 'msg-academic' : 'msg-student' ?>">
+                  <?php 
+                  $isMe = ($msg['sender_type'] === 'academic' && $msg['sender_id'] == $academicId); 
+                  $lastMsgIdPhp = max($lastMsgIdPhp, (int)$msg['id']);
+                  ?>
+                  <div class="msg <?= $isMe ? 'msg-academic' : 'msg-student' ?>" data-msg-id="<?= (int)$msg['id'] ?>" data-date="<?= date('Y-m-d', strtotime($msg['sent_at'])) ?>">
                     <div style="font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85">
                       <?= $isMe ? 'أنت' : e($msg['sender_name']) ?> (<?= $msg['sender_type'] === 'academic' ? 'أكاديمي' : 'الطالب' ?>)
                     </div>
-                    <div><?= nl2br(e($msg['content'])) ?></div>
+                    <?php if (!empty($msg['file_path'])): ?>
+                      <div style="margin-bottom:<?= !empty($msg['content']) ? '6px' : '0' ?>;display:flex;justify-content:<?= $isMe ? 'flex-end' : 'flex-start' ?>">
+                        <a href="<?= e($appBase . '/' . $msg['file_path']) ?>" target="_blank" download style="display:inline-flex;align-items:center;gap:8px;background:<?= $isMe ? 'rgba(255,255,255,0.2)' : 'var(--primary-light)' ?>;color:<?= $isMe ? '#fff' : 'var(--primary)' ?>;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px">
+                          <span style="font-size:16px">📎</span>
+                          <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($msg['file_name'] ?: 'ملف') ?></span>
+                        </a>
+                      </div>
+                    <?php endif; ?>
+                    <?php if (!empty($msg['content'])): ?>
+                      <div><?= nl2br(e($msg['content'])) ?></div>
+                    <?php endif; ?>
                     <span class="msg-time" style="text-align: <?= $isMe ? 'left' : 'right' ?>"><?= date('h:i A', strtotime($msg['sent_at'])) ?></span>
                   </div>
                 <?php endforeach; ?>
               <?php endif; ?>
             </div>
 
-            <div style="margin-top:16px;display:flex;gap:10px">
+            <div style="margin-top:16px;display:flex;gap:10px;align-items:flex-end">
+              <input type="file" id="chatFileInput" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
+              <span id="chatFileName" style="display:none;font-size:11px;color:var(--text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
               <textarea id="chatInput" class="form-input" rows="2" placeholder="اكتب رسالتك هنا..." style="resize:none;flex:1"></textarea>
+              <span title="إرفاق ملف (حتى 10MB)" style="cursor:pointer;font-size:22px;padding:10px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('chatFileInput').click()">📎</span>
               <button class="btn btn-primary" onclick="sendMessage()" style="padding:0 24px;height:auto">إرسال ✈️</button>
             </div>
           </div>
@@ -347,6 +366,110 @@ const chatBox = document.getElementById('chatBox');
 if(chatBox) chatBox.scrollTop = chatBox.scrollHeight;
 
 const orderId = <?= $orderId ?>;
+const orderNumberJs = <?= json_encode($orderNumber) ?>;
+const myAcademicId = <?= (int)$academicId ?>;
+const APP_BASE = <?= json_encode($appBase) ?>;
+const convIdJs = <?= (int)($conversationId ?: 0) ?>;
+let lastMsgId = <?= (int)$lastMsgIdPhp ?>;
+let chatSending = false;
+
+/* ─────────────────────────────────────────────
+   تحديث فوري للمحادثة (AJAX Polling خفيف)
+   - كل 5 ثوانٍ: جلب الرسائل الأحدث فقط (id > lastMsgId)
+   - يتوقف مؤقتاً عند إخفاء التبويب لتقليل الحمل على السيرفر
+───────────────────────────────────────────── */
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s == null ? '' : String(s);
+  return d.innerHTML;
+}
+
+function formatTime12(hhmm) {
+  const parts = (hhmm || '').split(':');
+  if (parts.length < 2) return hhmm || '';
+  let h = parseInt(parts[0], 10);
+  const m = parts[1];
+  const ap = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if (h === 0) h = 12;
+  return String(h).padStart(2, '0') + ':' + m + ' ' + ap;
+}
+
+function scrollToChatBottom(smooth) {
+  if (!chatBox) return;
+  chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+}
+
+function appendMessage(m) {
+  // إزالة رسالة "لا توجد رسائل سابقة" عند وصول أول رسالة
+  const ph = document.getElementById('chatPlaceholder');
+  if (ph) ph.remove();
+
+  const mDate = (m.sent_at || '').substring(0, 10);
+  const mTime = formatTime12((m.sent_at || '').substring(11, 16));
+  const isMe  = (m.sender_type === 'academic' && parseInt(m.sender_id, 10) === myAcademicId);
+
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + (isMe ? 'msg-academic' : 'msg-student');
+  wrap.dataset.msgId = m.id;
+  wrap.dataset.date = mDate || '';
+
+  const name = document.createElement('div');
+  name.style.cssText = 'font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85';
+  name.textContent = (isMe ? 'أنت' : (m.sender_name || '')) + ' (' + (m.sender_type === 'academic' ? 'أكاديمي' : 'الطالب') + ')';
+  wrap.appendChild(name);
+
+  const body = document.createElement('div');
+  if (m.file_path) {
+    const fileRow = document.createElement('div');
+    fileRow.style.marginBottom = m.content ? '6px' : '0';
+    fileRow.style.display = 'flex';
+    fileRow.style.justifyContent = isMe ? 'flex-end' : 'flex-start';
+    const aLink = document.createElement('a');
+    aLink.href = APP_BASE + '/' + m.file_path;
+    aLink.target = '_blank';
+    aLink.download = '';
+    aLink.style.cssText = 'display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px';
+    if (isMe) { aLink.style.background = 'rgba(255,255,255,0.2)'; aLink.style.color = '#fff'; }
+    else { aLink.style.background = 'var(--primary-light)'; aLink.style.color = 'var(--primary)'; }
+    const ic = document.createElement('span'); ic.style.fontSize = '16px'; ic.textContent = '📎';
+    const nm = document.createElement('span'); nm.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; nm.textContent = m.file_name || 'ملف';
+    aLink.appendChild(ic); aLink.appendChild(nm);
+    fileRow.appendChild(aLink);
+    body.appendChild(fileRow);
+  }
+  if (m.content) {
+    const textNode = document.createElement('div');
+    textNode.innerHTML = escapeHtml(m.content).replace(/\n/g, '<br>');
+    body.appendChild(textNode);
+  }
+  if (body.childNodes.length) wrap.appendChild(body);
+
+  const time = document.createElement('span');
+  time.className = 'msg-time';
+  time.style.textAlign = isMe ? 'left' : 'right';
+  time.textContent = mTime;
+  wrap.appendChild(time);
+
+  chatBox.appendChild(wrap);
+}
+
+async function pollChat() {
+  if (document.hidden || !convIdJs || chatSending) return;
+  try {
+    const res = await fetch('ajax/chat-poll.php?order=' + encodeURIComponent(orderNumberJs) + '&after=' + lastMsgId, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.ok || !Array.isArray(data.messages) || !data.messages.length) return;
+    const nearBottom = chatBox ? (chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight) < 150 : false;
+    data.messages.forEach(appendMessage);
+    lastMsgId = data.last_id || lastMsgId;
+    if (nearBottom) scrollToChatBottom(true);
+  } catch (e) { /* تجاهل أخطاء الشبكة المؤقتة */ }
+}
+setInterval(pollChat, 5000);
+document.addEventListener('visibilitychange', function () { if (!document.hidden) pollChat(); });
 
 function respondOrder(actionName) {
   const confirmMsg = actionName === 'accept_assignment' ? 'هل أنت متأكد من قبول هذه المهمة الأكاديمية؟' : 'هل أنت متأكد من الاعتذار عن هذه المهمة؟';
@@ -389,14 +512,18 @@ function updateOrderStatus() {
 
 function sendMessage() {
   const input = document.getElementById('chatInput');
+  const fileInput = document.getElementById('chatFileInput');
   const txt = input.value.trim();
-  if(!txt) return;
+  const hasFile = fileInput && fileInput.files.length > 0;
+  if((!txt && !hasFile) || chatSending) return;
 
   const formData = new FormData();
   formData.append('order_id', orderId);
   formData.append('content', txt);
+  if (hasFile) formData.append('file', fileInput.files[0]);
 
   input.disabled = true;
+  chatSending = true;
 
   fetch('ajax/handler.php?action=send_message', {
     method: 'POST',
@@ -405,23 +532,32 @@ function sendMessage() {
   .then(res => res.json())
   .then(data => {
     input.disabled = false;
+    chatSending = false;
     if (data.success) {
       input.value = '';
-      
-      if (chatBox.innerHTML.includes('لا توجد رسائل سابقة')) {
-        chatBox.innerHTML = '';
-      }
-
-      const div = document.createElement('div');
-      div.className = 'msg msg-academic';
-      div.innerHTML = `<div style="font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85">أنت (أكاديمي)</div><div>${txt.replace(/\n/g, '<br/>')}</div><span class="msg-time" style="text-align:left">الآن</span>`;
-      chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      if (fileInput) fileInput.value = '';
+      const fn = document.getElementById('chatFileName');
+      if (fn) fn.style.display = 'none';
+      input.focus();
+      pollChat(); // جلب الرسالة المرسلة (وجميع الرسائل الجديدة) وعرضها فوراً
     } else {
       Toast.show(data.message, 'error');
     }
-  });
+  })
+  .catch(() => { input.disabled = false; chatSending = false; Toast.show('تعذر إرسال الرسالة، حاول مجدداً.', 'error'); });
 }
+
+// إظهار اسم الملف المحدد للإرسال
+(function () {
+  const fi = document.getElementById('chatFileInput');
+  if (!fi) return;
+  fi.addEventListener('change', function () {
+    const fn = document.getElementById('chatFileName');
+    if (!fn) return;
+    if (fi.files.length) { fn.textContent = '📄 ' + fi.files[0].name; fn.style.display = ''; }
+    else fn.style.display = 'none';
+  });
+})();
 
 function uploadFile() {
   const file = document.getElementById('fileInput').files[0];

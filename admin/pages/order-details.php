@@ -13,7 +13,7 @@ $db = db();
 
 // Fetch order
 $stmt = $db->prepare("
-    SELECT o.*, s.name AS service_name, s.icon AS service_icon,
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon, s.platform_percent AS service_platform_percent,
            p.name AS package_name, p.price AS package_price,
            u.name AS student_name, u.email AS student_email, u.phone AS student_phone,
            a.name AS academic_name, a.email AS academic_email, a.specialty AS academic_specialty, a.rating AS academic_rating
@@ -119,6 +119,10 @@ $academics_stmt = $db->prepare("
 $academics_stmt->execute([$order['service_id']]);
 $matching_academics = $academics_stmt->fetchAll();
 
+// جلب جميع الأكاديميين المعتمدين (للإسناد اليدوي حتى لمن لا يقدم هذه الخدمة)
+$all_academics = $db->query("SELECT * FROM academics WHERE status = 'approved' ORDER BY rating DESC, name ASC")->fetchAll();
+$matching_ids = array_map('intval', array_column($matching_academics, 'id'));
+
 // Fetch currently assigned academics for this order
 $assigned_stmt = $db->prepare("SELECT academic_id FROM order_assignments WHERE order_id = ?");
 $assigned_stmt->execute([$order['id']]);
@@ -126,8 +130,9 @@ $assigned_academic_ids = $assigned_stmt->fetchAll(PDO::FETCH_COLUMN);
 
 $badge = orderStatusLabel($order['status']);
 
-// Platform fees
-$platform_fee = round($order['amount'] * 0.15, 2);
+// Platform fees — نسبة العمولة تُجلب من عمود platform_percent الخاص بالخدمة
+$commission_pct = isset($order['service_platform_percent']) ? (float)$order['service_platform_percent'] : 0.00;
+$platform_fee = round($order['amount'] * $commission_pct / 100, 2);
 $academic_net = round($order['amount'] - $platform_fee, 2);
 ?>
 <!DOCTYPE html>
@@ -274,12 +279,17 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
               <!-- إسناد الطلب للأكاديميين المرشحين -->
               <div style="border-top:1px dashed var(--border-color);padding-top:16px">
                 <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px">📋 إسناد الطلب لأكاديمي أو أكثر</h4>
-                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">الخدمة: <strong style="color:var(--primary)"><?= e($order['service_icon']) ?> <?= e($order['service_name']) ?></strong> — يُعرض فقط الأكاديميون الذين يقدّمون هذه الخدمة</p>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+                  <p style="font-size:11px;color:var(--text-secondary);margin:0">الخدمة: <strong style="color:var(--primary)"><?= e($order['service_icon']) ?> <?= e($order['service_name']) ?></strong></p>
+                  <button type="button" id="toggleAllBtn" class="btn btn-outline btn-sm" onclick="toggleAllAcademics()">👥 عرض كل الأكاديميين (<?= count($all_academics) ?>)</button>
+                </div>
                 <form method="POST" action="order-details.php?id=<?= e($order['order_number']) ?>">
                   <input type="hidden" name="action" value="assign_academics">
-                  <div style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;padding-left:4px">
+
+                  <!-- القائمة الافتراضية: الأكاديميون المتخصصون فقط -->
+                  <div id="matchingList" style="display:flex;flex-direction:column;gap:8px;max-height:180px;overflow-y:auto;margin-bottom:12px;padding-left:4px">
                     <?php if (empty($matching_academics)): ?>
-                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون معتمدون يقدّمون هذه الخدمة حالياً.</p>
+                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون معتمدون يقدّمون هذه الخدمة حالياً — استخدم زر «عرض كل الأكاديميين» للإسناد اليدوي.</p>
                     <?php else: ?>
                       <?php foreach ($matching_academics as $ac): ?>
                         <?php $checked = in_array($ac['id'], $assigned_academic_ids) ? 'checked' : ''; ?>
@@ -293,6 +303,37 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                       <?php endforeach; ?>
                     <?php endif; ?>
                   </div>
+
+                  <!-- القائمة البديلة: جميع الأكاديميين المعتمدين -->
+                  <div id="allAcademicsList" style="display:none;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto;margin-bottom:12px;padding-left:4px">
+                    <?php if (empty($all_academics)): ?>
+                      <p style="font-size:12px;color:var(--text-secondary)">لا يوجد أكاديميون معتمدون في المنصة حالياً.</p>
+                    <?php else: ?>
+                      <?php
+                      // ترتيب: من يقدم الخدمة أولاً ثم حسب التقييم
+                      $sorted_all = $all_academics;
+                      usort($sorted_all, function($a, $b) use ($matching_ids) {
+                          $aMatch = in_array((int)$a['id'], $matching_ids) ? 1 : 0;
+                          $bMatch = in_array((int)$b['id'], $matching_ids) ? 1 : 0;
+                          if ($aMatch !== $bMatch) return $bMatch - $aMatch;
+                          return (float)$b['rating'] <=> (float)$a['rating'];
+                      });
+                      foreach ($sorted_all as $ac):
+                        $isMatch = in_array((int)$ac['id'], $matching_ids);
+                        $checked = in_array($ac['id'], $assigned_academic_ids) ? 'checked' : '';
+                      ?>
+                        <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-main);border-radius:8px;cursor:pointer;font-size:13px;<?= $isMatch ? 'border:1px solid var(--primary);' : '' ?>">
+                          <input type="checkbox" name="academic_ids[]" value="<?= $ac['id'] ?>" <?= $checked ?> style="width:16px;height:16px;accent-color:var(--primary)" />
+                          <div style="flex:1">
+                            <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
+                            <?php if ($isMatch): ?><span style="font-size:10px;color:var(--primary);font-weight:700"> ✓ يقدم هذه الخدمة</span><?php endif; ?>
+                            <span style="font-size:10px;color:var(--text-secondary);display:block"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?> · ⭐ <?= number_format((float)$ac['rating'], 1) ?></span>
+                          </div>
+                        </label>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </div>
+
                   <button type="submit" class="btn btn-primary btn-block btn-sm" style="justify-content:center;width:100%">💾 حفظ وإرسال الإسناد</button>
                 </form>
               </div>
@@ -323,7 +364,7 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
               <span style="font-weight:600"><?= formatMoney($order['amount']) ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)">
-              <span style="font-size:13px;color:var(--text-secondary)">العمولة (15%)</span>
+              <span style="font-size:13px;color:var(--text-secondary)">العمولة (<?= number_format($commission_pct, 2) ?>%)</span>
               <span style="font-weight:600;color:var(--primary)"><?= formatMoney($platform_fee) ?></span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border-color)">
@@ -342,5 +383,21 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
   </div>
 </div>
 <script src="../assets/js/main.js"></script>
+<script>
+  // التبديل بين قائمة المتخصصين وقائمة جميع الأكاديميين عند الإسناد
+  function toggleAllAcademics() {
+    const matchList = document.getElementById('matchingList');
+    const allList = document.getElementById('allAcademicsList');
+    const btn = document.getElementById('toggleAllBtn');
+    if (!matchList || !allList || !btn) return;
+
+    const showAll = (allList.style.display === 'none' || allList.style.display === '');
+    allList.style.display = showAll ? 'flex' : 'none';
+    matchList.style.display = showAll ? 'none' : 'flex';
+    btn.textContent = showAll ? '🎯 الأكاديميون المتخصصون فقط' : '👥 عرض كل الأكاديميين';
+    btn.classList.toggle('btn-primary', showAll);
+    btn.classList.toggle('btn-outline', !showAll);
+  }
+</script>
 </body>
 </html>

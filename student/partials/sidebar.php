@@ -13,6 +13,8 @@ if (!isset($user))       $user       = currentUser();
 if (!isset($activePage)) $activePage = '';
 if (!isset($pageTitle))  $pageTitle  = 'لوحة التحكم';
 
+require_once __DIR__ . '/../../config/support_functions.php';
+
 $_navItems = [
     ['key' => 'dashboard', 'href' => 'student-dashboard.php', 'icon' => '📊', 'label' => 'لوحة المعلومات'],
     ['key' => 'services',  'href' => 'services.php',          'icon' => '📦', 'label' => 'الخدمات الأكاديمية'],
@@ -20,9 +22,11 @@ $_navItems = [
     ['key' => 'orders',    'href' => 'orders.php',            'icon' => '📋', 'label' => 'طلباتي'],
     ['key' => 'chat',      'href' => 'chat.php',              'icon' => '💬', 'label' => 'المحادثات'],
     ['key' => 'payments',  'href' => 'payments.php',          'icon' => '💳', 'label' => 'المدفوعات'],
+    ['key' => 'support',   'href' => 'support.php',           'icon' => '🛟', 'label' => 'الدعم الفني'],
 ];
 
 $_unread = countUnreadNotifications($user['id'], 'student');
+$_unreadSupport = countUnreadSupportForUser($user['id'], 'student');
 ?>
 
 <div class="mobile-overlay" id="mobileOverlay"></div>
@@ -48,6 +52,8 @@ $_unread = countUnreadNotifications($user['id'], 'student');
           <span class="nav-label"><?= $_item['label'] ?></span>
           <?php if ($_item['key'] === 'chat' && $_unread > 0): ?>
             <span class="nav-badge"><?= $_unread ?></span>
+          <?php elseif ($_item['key'] === 'support' && $_unreadSupport > 0): ?>
+            <span class="nav-badge"><?= $_unreadSupport ?></span>
           <?php endif; ?>
         </a>
       <?php endforeach; ?>
@@ -96,7 +102,13 @@ $_unread = countUnreadNotifications($user['id'], 'student');
             <span class="user-name"><?= e($user['name']) ?></span>
             <span class="user-role">طالب</span>
           </div>
-          <div class="user-avatar"><?= e($user['avatar'] ?? mb_substr($user['name'], 0, 1, 'UTF-8')) ?></div>
+          <?php if (!empty($_SESSION['user_avatar_path'])): ?>
+            <div class="user-avatar" style="overflow:hidden;padding:0;background:none">
+              <img src="<?= e('../' . $_SESSION['user_avatar_path']) ?>" alt="" style="width:100%;height:100%;object-fit:cover">
+            </div>
+          <?php else: ?>
+            <div class="user-avatar"><?= e($user['avatar'] ?? mb_substr($user['name'], 0, 1, 'UTF-8')) ?></div>
+          <?php endif; ?>
         </a>
       </div>
     </header>

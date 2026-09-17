@@ -18,6 +18,10 @@ if (!$order || $order['student_id'] !== $user['id']) {
     exit;
 }
 
+// إشعار الدفع المرفق مع الطلب (إن وُجد)
+$orderReceipt = (float)($order['amount'] ?? 0) > 0 ? getReceiptForOrder($order_id) : null;
+$appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
+
 // Fetch assigned team of academics
 $assignedTeam = getAssignedAcademics($order_id);
 
@@ -26,6 +30,11 @@ $db = db();
 $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
 $convStmt->execute([$order_id, $user['id']]);
 $convId = (int)$convStmt->fetchColumn();
+
+// مرفقات الطلب
+$attStmt = $db->prepare("SELECT * FROM order_attachments WHERE order_id = ? ORDER BY id ASC");
+$attStmt->execute([$order_id]);
+$orderAttachments = $attStmt->fetchAll();
 
 $badge = orderStatusLabel($order['status']);
 ?>
@@ -89,6 +98,23 @@ require __DIR__ . '/partials/sidebar.php';
           <a href="orders.php" style="color:var(--text-secondary);font-size:14px">← العودة لقائمة الطلبات</a>
         </div>
 
+        <?php if ($orderReceipt): ?>
+          <div style="background:<?= $orderReceipt['status'] === 'approved' ? '#dcfce7' : '#fef9c3' ?>;border:1px solid <?= $orderReceipt['status'] === 'approved' ? '#86efac' : '#fde047' ?>;border-radius:14px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span style="font-size:26px">🧾</span>
+            <div style="flex:1;min-width:200px">
+              <strong style="display:block;font-size:14px">
+                إشعار الدفع <?= $orderReceipt['status'] === 'approved' ? 'مُعتمد ✅' : ($orderReceipt['status'] === 'rejected' ? 'مرفوض ❌' : 'قيد المراجعة ⏳') ?>
+              </strong>
+              <span style="font-size:12px;color:var(--text-secondary)">
+                المبلغ: <?= number_format((float)$orderReceipt['amount'], 2) ?> ر.س
+                <?= $orderReceipt['method_label'] ? ' • ' . e($orderReceipt['method_label']) : '' ?>
+                • <?= formatDate($orderReceipt['created_at']) ?>
+              </span>
+            </div>
+            <a href="<?= e($appBase . '/' . $orderReceipt['receipt_path']) ?>" target="_blank" class="btn btn-outline" style="font-size:13px">عرض الإشعار 👁️</a>
+          </div>
+        <?php endif; ?>
+
         <div style="display:grid;grid-template-columns:2fr 1fr;gap:24px">
           
           <!-- Left Column -->
@@ -127,7 +153,26 @@ require __DIR__ . '/partials/sidebar.php';
             <!-- Attachments -->
             <div class="card">
               <h2 class="h2" style="margin-bottom:20px">الملفات المرفوعة</h2>
-              <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">لا توجد ملفات مرفوعة حالياً للطلب.</p>
+              <?php if (empty($orderAttachments)): ?>
+                <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">لا توجد ملفات مرفوعة حالياً للطلب.</p>
+              <?php else: ?>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                  <?php foreach ($orderAttachments as $att): ?>
+                    <div style="display:flex;align-items:center;gap:12px;background:var(--bg-body);border:1px solid var(--border-color);border-radius:12px;padding:12px 14px">
+                      <span style="font-size:22px">📎</span>
+                      <div style="flex:1;min-width:0">
+                        <div style="font-weight:700;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($att['file_name']) ?></div>
+                        <div style="font-size:11px;color:var(--text-secondary)">
+                          <?= number_format((float)$att['file_size'] / 1024 / 1024, 2) ?> MB
+                          • <?= $att['uploaded_by'] === 'student' ? 'من الطالب' : ($att['uploaded_by'] === 'academic' ? 'من الأكاديمي' : 'من الإدارة') ?>
+                          <?= !empty($att['uploaded_at']) ? '• ' . formatDate($att['uploaded_at']) : '' ?>
+                        </div>
+                      </div>
+                      <a href="<?= e($appBase . '/' . $att['file_path']) ?>" target="_blank" class="btn btn-outline" style="font-size:12px;flex-shrink:0">عرض 👁️</a>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
 
               <!-- Draggable file upload UI -->
               <div style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:24px;text-align:center;background:var(--bg-body);margin-top:20px;cursor:pointer">

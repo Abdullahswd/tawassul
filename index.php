@@ -19,8 +19,77 @@ if (!is_array($all_services)) {
   $all_services = [];
 }
 
+// ── استبعاد أي خدمة/قسم يقع تحت قسم غير مفعّل (المستوى الأول أو الثاني) ──
+// حتى لا تظهر في الفلترة أو العرض إذا تم إيقاف القسم الأب
+$byId = [];
+foreach ($all_services as $row) {
+  $byId[(int)$row['id']] = $row;
+}
+
+function hasInactiveAncestor(array $row, array $byId): bool
+{
+  $pid = $row['parent_id'] ? (int)$row['parent_id'] : null;
+  while ($pid !== null && isset($byId[$pid])) {
+    $parent = $byId[$pid];
+    if (!(int)$parent['is_active']) return true;
+    $pid = $parent['parent_id'] ? (int)$parent['parent_id'] : null;
+  }
+  return false;
+}
+
+$all_services = array_values(array_filter($all_services, function ($row) use ($byId) {
+  return !hasInactiveAncestor($row, $byId);
+}));
+
+// ── إعادة الترتيب الهرمي (نفس تسلسل عرض admin/pages/services.php) ──
+// كل قسم رئيسي بترتيبه، ثم أقسامه الفرعية بترتيبها، ثم خدمات كل قسم فرعي
+$childrenMap = [];
+foreach ($all_services as $row) {
+  $pid = $row['parent_id'] ? (int)$row['parent_id'] : 0;
+  $childrenMap[$pid][] = $row;
+}
+$orderedServices = [];
+$buildOrderedServices = function ($pid) use (&$buildOrderedServices, &$orderedServices, $childrenMap) {
+  foreach ($childrenMap[$pid] ?? [] as $row) {
+    $orderedServices[] = $row;
+    $buildOrderedServices((int)$row['id']);
+  }
+};
+$buildOrderedServices(0);
+$all_services = $orderedServices;
+
 // تحويل البيانات إلى JSON للاستخدام في JavaScript
 $all_services_json = json_encode($all_services, JSON_UNESCAPED_UNICODE);
+
+// ── جلب الخدمات المميزة (جدول منفصل featured_services) ──
+// تُعرض أولاً في قسم خدماتنا، ثم زر لعرض باقي الخدمات
+$featured_services = [];
+$featured_ids = [];
+try {
+    $fstmt = $db->query("
+        SELECT f.id AS fid, f.service_id, f.badge, f.sort_order, f.is_active AS f_active,
+               s.id AS sid, s.parent_id, s.name, s.icon, s.icon_image, s.description, s.price,
+               s.level, s.is_active,
+               (SELECT name FROM services p WHERE p.id = s.parent_id) AS parent_name
+        FROM featured_services f
+        JOIN services s ON s.id = f.service_id
+        WHERE f.is_active = 1 AND s.is_active = 1
+        ORDER BY f.sort_order ASC, f.id ASC
+    ");
+    $featured_services = $fstmt->fetchAll() ?: [];
+    // استبعاد أي خدمة مميزة تقع تحت قسم غير مفعّل + استبعاد غير المستوى الثالث
+    $featured_services = array_values(array_filter($featured_services, function ($row) use ($byId) {
+        if ((int)($row['level'] ?? 0) !== 3) return false;
+        $tmp = ['id' => $row['sid'], 'parent_id' => $row['parent_id'], 'is_active' => $row['is_active']];
+        return !hasInactiveAncestor($tmp, $byId);
+    }));
+    foreach ($featured_services as $fr) { $featured_ids[] = (int)$fr['service_id']; }
+} catch (Throwable $e) {
+    $featured_services = [];
+    $featured_ids = [];
+}
+$featured_services_json = json_encode($featured_services, JSON_UNESCAPED_UNICODE);
+$featured_ids_json = json_encode($featured_ids, JSON_UNESCAPED_UNICODE);
 
 // جلب الأكاديميين المتميزين
 $all_featured = [];
@@ -66,6 +135,86 @@ if (function_exists('getAllFeaturedAcademics')) {
         margin: 20px 20px 0 20px;
       }
     }
+
+    /* ===== قسم الخدمات المميزة ⭐ (تُعرض أولاً في الواجهة) ===== */
+    .featured-card {
+      background: linear-gradient(135deg, #fffbeb 0%, #ffffff 60%);
+      border-radius: 24px;
+      padding: 24px 20px;
+      text-align: right;
+      transition: all 0.3s ease;
+      border: 2px solid #fcd34d;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: 0 6px 20px rgba(245,158,11,0.12);
+      position: relative;
+      overflow: hidden;
+    }
+    .featured-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 40px -10px rgba(245,158,11,0.30);
+      border-color: #f59e0b;
+    }
+    .featured-card .feature-icon {
+      width: 60px; height: 60px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff; border-radius: 20px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; margin-bottom: 16px; transition: all 0.3s;
+    }
+    .featured-card:hover .feature-icon { transform: scale(1.05) rotate(-3deg); }
+    .featured-ribbon {
+      position: absolute; top: 14px; left: -34px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #fff; font-size: 11px; font-weight: 800;
+      padding: 4px 36px; transform: rotate(-35deg);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    .featured-badge-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #fef3c7; border: 1px solid #fcd34d; color: #92400e;
+      font-size: 11px; font-weight: 800; padding: 3px 10px; border-radius: 20px;
+    }
+    .featured-divider {
+      display: flex; align-items: center; gap: 12px; margin: 26px 0 4px;
+    }
+    .featured-divider::before, .featured-divider::after {
+      content: ''; flex: 1; height: 1px; background: #e2e8f0;
+    }
+    .toggle-all-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+      color: #fff; font-weight: 800; font-size: 15px;
+      padding: 12px 30px; border-radius: 9999px; border: none; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(79,70,229,0.30); transition: all 0.25s ease;
+    }
+    .toggle-all-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 10px 28px rgba(79,70,229,0.40); }
+    .toggle-all-btn.collapse { background: linear-gradient(135deg, #64748b 0%, #94a3b8 100%); box-shadow: 0 6px 20px rgba(100,116,139,0.25); }
+    #allServicesWrapper { overflow: hidden; transition: opacity 0.3s ease; }
+    #allServicesWrapper.hidden-box { opacity: 0; margin: 0 !important; }
+    #allServicesWrapper.shown-box { opacity: 1; }
+    /* زر عائم ثابت لإغلاق القائمة (يبقى ظاهراً أثناء التمرير مهما طالت القائمة) */
+    .floating-close-btn {
+      position: fixed; z-index: 999; bottom: 22px; left: 50%;
+      transform: translateX(-50%);
+      align-items: center; gap: 8px;
+      background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
+      color: #fff; font-weight: 800; font-size: 14px;
+      padding: 12px 26px; border-radius: 9999px; border: none; cursor: pointer;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.35);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .floating-close-btn:hover { transform: translateX(-50%) translateY(-2px); box-shadow: 0 14px 34px rgba(15, 23, 42, 0.45); }
+    /* زر إغلاق أسفل القائمة */
+    .close-bottom-btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: #ffffff; color: #334155; font-weight: 800; font-size: 14px;
+      padding: 11px 26px; border-radius: 9999px; border: 2px solid #cbd5e1; cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .close-bottom-btn:hover { background: #f1f5f9; border-color: #94a3b8; }
 
     .feature-card {
       background: #ffffff;
@@ -312,6 +461,56 @@ if (function_exists('getAllFeaturedAcademics')) {
       <p class="text-slate-600 max-w-2xl mx-auto text-sm md:text-base">استعرض كافة الخدمات أو قم بالفلترة والبحث السريع للوصول إلى طلبك المحدد فوراً</p>
     </div>
 
+    <?php if (!empty($featured_services)): ?>
+    <!-- ⭐ الخدمات المميزة — تُعرض أولاً -->
+    <div class="mb-2 fade-up">
+      <div class="featured-divider">
+        <span class="text-lg md:text-xl font-black text-amber-700">⭐ الخدمات المميزة</span>
+      </div>
+      <p class="text-center text-slate-500 text-xs md:text-sm mb-6">مختارات مميزة بعناية — ثم يمكنك استعراض باقي الخدمات بالزر أدناه</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 mb-4" id="featuredServicesGrid">
+      <?php foreach ($featured_services as $i => $fs): ?>
+        <div class="featured-card fade-up" style="animation-delay:<?= ($i % 6) * 0.08 ?>s;">
+          <span class="featured-ribbon">مميزة ⭐</span>
+          <div>
+            <div class="flex items-center mb-3">
+              <div class="feature-icon" style="margin-bottom:0;"><?= htmlspecialchars($fs['icon'] ?: '⭐') ?></div>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 mb-2"><?= htmlspecialchars($fs['name']) ?></h3>
+            <div class="mb-3 flex items-center gap-2 flex-wrap">
+              <?php if (!empty($fs['parent_name'])): ?>
+                <span class="text-xs text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-full"><?= htmlspecialchars($fs['parent_name']) ?></span>
+              <?php endif; ?>
+              <?php if (!empty($fs['badge'])): ?>
+                <span class="featured-badge-tag">🏷️ <?= htmlspecialchars($fs['badge']) ?></span>
+              <?php endif; ?>
+            </div>
+            <?php if (!empty($fs['description'])): ?>
+              <p class="text-slate-500 text-xs md:text-sm leading-6 mb-3"><?= htmlspecialchars(mb_strimwidth($fs['description'], 0, 140, '…')) ?></p>
+            <?php endif; ?>
+          </div>
+          <div>
+            <a href="register.php?service_id=<?= (int)$fs['service_id'] ?>" class="w-full inline-block text-center py-2.5 px-4 rounded-xl text-white font-bold text-sm transition shadow-sm" style="background:linear-gradient(135deg,#f59e0b,#d97706);">
+              اطلب الخدمة المميزة ⭐
+            </a>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <!-- زر عرض / إغلاق باقي الخدمات -->
+    <div class="text-center mt-6 mb-2">
+      <button type="button" id="toggleAllServicesBtn" class="toggle-all-btn" onclick="toggleAllServices()">
+        <span id="toggleAllServicesLabel">📋 عرض باقي الخدمات (<?= count($all_services) ?>)</span>
+        <span id="toggleAllServicesArrow">⬇️</span>
+      </button>
+    </div>
+    <?php endif; ?>
+
+    <!-- باقي الخدمات (مخفية افتراضياً عند وجود مميزة — وتُفتح بالزر ويمكن إغلاقها) -->
+    <div id="allServicesWrapper" class="<?= !empty($featured_services) ? 'hidden-box' : 'shown-box' ?>" <?= !empty($featured_services) ? 'style="max-height:0;"' : '' ?>>
+
     <!-- أدوات الفلترة والبحث -->
     <div class="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 fade-up">
       <div class="flex flex-col md:flex-row items-center justify-between gap-4">
@@ -331,13 +530,30 @@ if (function_exists('getAllFeaturedAcademics')) {
       </div>
     </div>
 
-    <!-- شبكة عرض الخدمات التفاعلية -->
+    <!-- شبكة عرض الخدمات التفاعلية (باقي الخدمات — بدون المميزة) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8" id="publicServicesGrid">
       <!-- يتم ملؤها بالـ JavaScript -->
     </div>
+
+    <?php if (!empty($featured_services)): ?>
+    <!-- زر إغلاق في نهاية القائمة (حتى لا يحتاج المستخدم للعودة لأعلى) -->
+    <div class="text-center mt-10">
+      <button type="button" id="bottomCloseServicesBtn" class="close-bottom-btn" onclick="closeAllServices()">
+        <span>🔼 إغلاق باقي الخدمات</span>
+      </button>
+    </div>
+    <?php endif; ?>
+    </div><!-- /#allServicesWrapper -->
+
+    <?php if (!empty($featured_services)): ?>
+    <!-- زر عائم ثابت لإغلاق القائمة — يظهر فقط عند فتح باقي الخدمات -->
+    <button type="button" id="floatingCloseServicesBtn" class="floating-close-btn" style="display:none;" onclick="closeAllServices()">
+      <span>🔼 إغلاق القائمة</span>
+    </button>
+    <?php endif; ?>
   </section>
 
-   <!-- Academics Carousel -->
+  <!-- Academics Carousel -->
   <section id="academics" class="academics-section">
     <div class="max-w-7xl mx-auto">
 
@@ -377,10 +593,10 @@ if (function_exists('getAllFeaturedAcademics')) {
           <?php else: ?>
             <?php foreach ($all_featured as $f): ?>
               <?php
-                $f_name = e($f['name'] ?? '');
-                $f_specialty = e($f['specialty'] ?? '');
-                $f_bio = e($f['bio'] ?? '');
-                $f_image = ($f['image'] ?? '') ? 'uploads/featured/' . ltrim(basename($f['image']), '/') : '';
+              $f_name = e($f['name'] ?? '');
+              $f_specialty = e($f['specialty'] ?? '');
+              $f_bio = e($f['bio'] ?? '');
+              $f_image = ($f['image'] ?? '') ? 'uploads/featured/' . ltrim(basename($f['image']), '/') : '';
               ?>
               <div class="swiper-slide">
                 <div class="academic-card">
@@ -578,12 +794,11 @@ if (function_exists('getAllFeaturedAcademics')) {
           </div>
 
           <h4 class="font-black text-xl text-slate-900 mb-3">
-            اتفق مع الأكاديمي
+            اختيار الاكاديمي
           </h4>
 
           <p class="text-sm md:text-base text-slate-500 leading-7">
-            استقبل تسعيرة واضحة وتحدث مباشرة مع الأكاديمي لضمان فهم المطلوب.
-          </p>
+            يتم تحويل طلبك الى الاكاديمي المختص في مجال التخصص الدقيق للطلب </p>
 
         </div>
 
@@ -658,8 +873,12 @@ if (function_exists('getAllFeaturedAcademics')) {
   <script>
     // بيانات الخدمات المأخوذة من قاعدة البيانات
     const allServices = <?= $all_services_json ?>;
+    // الخدمات المميزة + معرفاتها (لاستبعادها من شبكة "باقي الخدمات")
+    const featuredIds = new Set(<?= $featured_ids_json ?>);
+    const hasFeatured = featuredIds.size > 0;
 
     let selectedCatId = 'all';
+    let allServicesOpen = !hasFeatured; // مغلق افتراضياً عند وجود مميزة، مفتوح عند عدم وجودها
 
     // استخراج الأقسام الرئيسية (Level 1) لإنشاء التبويبات
     function initCategoryTabs() {
@@ -701,18 +920,98 @@ if (function_exists('getAllFeaturedAcademics')) {
       renderPublicServices();
     }
 
-    // بناء وعرض بطاقات الخدمات (المستوى الثالث فقط)
+    // ===== عرض / إغلاق باقي الخدمات =====
+    function setAllServicesOpen(open) {
+      const wrap = document.getElementById('allServicesWrapper');
+      const btn = document.getElementById('toggleAllServicesBtn');
+      const label = document.getElementById('toggleAllServicesLabel');
+      const arrow = document.getElementById('toggleAllServicesArrow');
+      if (!wrap) return;
+
+      allServicesOpen = !!open;
+
+      if (allServicesOpen) {
+        wrap.classList.remove('hidden-box');
+        wrap.classList.add('shown-box');
+        wrap.style.display = 'block';       // إظهار فعلي مضمون
+        wrap.style.maxHeight = 'none';      // ارتفاع تلقائي — يمنع قصّ المحتوى
+        wrap.style.opacity = '1';
+        if (btn) btn.classList.add('collapse');
+        if (label) label.textContent = '🔼 إغلاق باقي الخدمات';
+        if (arrow) arrow.textContent = '⬆️';
+        updateFloatingCloseBtn();   // يظهر الزر العائم فقط إن كان السكشن ظاهراً على الشاشة
+      } else {
+        wrap.classList.add('hidden-box');
+        wrap.classList.remove('shown-box');
+        wrap.style.display = 'none';        // إخفاء فعلي مضمون
+        wrap.style.maxHeight = '0px';
+        wrap.style.opacity = '0';
+        if (btn) btn.classList.remove('collapse');
+        if (label) label.textContent = '📋 عرض باقي الخدمات';
+        if (arrow) arrow.textContent = '⬇️';
+        updateFloatingCloseBtn();
+      }
+    }
+
+    function toggleAllServices() {
+      setAllServicesOpen(!allServicesOpen);
+    }
+
+    // إغلاق القائمة (يُستخدم من الزر العائم وزر أسفل القائمة)
+    function closeAllServices() {
+      setAllServicesOpen(false);
+      // إعادة المستخدم إلى زر العرض أعلى القسم ليرى أن القائمة أُغلقت
+      const anchor = document.getElementById('toggleAllServicesBtn') || document.getElementById('features');
+      if (anchor) anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ===== الزر العائم: يظهر فقط عند فتح القائمة + وجود سكشن الخدمات على الشاشة =====
+    let featuresInView = false;
+
+    function updateFloatingCloseBtn() {
+      const floatingBtn = document.getElementById('floatingCloseServicesBtn');
+      if (!floatingBtn) return;
+      floatingBtn.style.display = (allServicesOpen && featuresInView) ? 'inline-flex' : 'none';
+    }
+
+    // مراقبة ظهور سكشن الخدمات في الشاشة (IntersectionObserver مع بديل scroll)
+    function initFeaturesVisibilityWatcher() {
+      const section = document.getElementById('features');
+      if (!section) return;
+
+      if ('IntersectionObserver' in window) {
+        const obs = new IntersectionObserver(function (entries) {
+          featuresInView = entries[0].isIntersecting;
+          updateFloatingCloseBtn();
+        }, { threshold: 0, rootMargin: '-60px 0px -60px 0px' });
+        obs.observe(section);
+      } else {
+        // بديل للمتصفحات القديمة
+        const check = function () {
+          const r = section.getBoundingClientRect();
+          const vh = window.innerHeight || document.documentElement.clientHeight;
+          featuresInView = r.bottom > 60 && r.top < (vh - 60);
+          updateFloatingCloseBtn();
+        };
+        window.addEventListener('scroll', check, { passive: true });
+        window.addEventListener('resize', check);
+        check();
+      }
+    }
+
+    // بناء وعرض بطاقات الخدمات (المستوى الثالث فقط — بدون الخدمات المميزة المعروضة أعلاه)
     function renderPublicServices() {
       const grid = document.getElementById('publicServicesGrid');
+      const wrap = document.getElementById('allServicesWrapper');
       const searchTerm = document.getElementById('publicSearchInput').value.trim().toLowerCase();
       if (!grid) return;
 
-      // تصفية خدمات المستوى الثالث فقط
-      let itemsToDisplay = allServices.filter(s => s.level === 3);
+      // تصفية خدمات المستوى الثالث فقط — مع استبعاد المميزة (معروضة في الأعلى)
+      let itemsToDisplay = allServices.filter(s => s.level === 3 && !featuredIds.has(Number(s.id)));
 
-      // إذا لم توجد خدمات بمستوى 3، نمرر الخدمات المتاحة
+      // إذا لم توجد خدمات بمستوى 3، نمرر الخدمات المتاحة (بدون المميزة)
       if (!itemsToDisplay.length && allServices.length) {
-        itemsToDisplay = allServices.filter(s => s.level !== 1);
+        itemsToDisplay = allServices.filter(s => s.level !== 1 && !featuredIds.has(Number(s.id)));
       }
 
       // الفلترة حسب القسم الرئيسي المحدد بالتبويبات
@@ -745,15 +1044,13 @@ if (function_exists('getAllFeaturedAcademics')) {
       }
 
       grid.innerHTML = itemsToDisplay.map((s, i) => {
-        const priceDisplay = s.price > 0 ? `<span class="price-tag">💵 ابتداءً من ${Number(s.price).toFixed(2)} ر.س</span>` : '';
         const parentTag = s.parent_name ? `<span class="text-xs text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-full">${s.parent_name}</span>` : '';
 
         return `
           <div class="feature-card fade-up" style="animation-delay:${(i % 6) * 0.08}s;">
             <div>
-              <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center mb-3">
                 <div class="feature-icon" style="margin-bottom:0;">${s.icon || '📚'}</div>
-                ${priceDisplay}
               </div>
               <h3 class="text-xl font-extrabold text-slate-900 mb-2">${s.name}</h3>
               <div class="mb-3">${parentTag}</div>
@@ -766,6 +1063,10 @@ if (function_exists('getAllFeaturedAcademics')) {
           </div>
         `;
       }).join('');
+      // تحديث ارتفاع الحاوية بعد إعادة العرض (حتى لا يُقص المحتوى عند الفلترة والبحث)
+      if (wrap && allServicesOpen && wrap.style.maxHeight !== 'none') {
+        wrap.style.maxHeight = wrap.scrollHeight + 'px';
+      }
     }
 
     // Swiper Carousel
@@ -804,6 +1105,10 @@ if (function_exists('getAllFeaturedAcademics')) {
     document.addEventListener('DOMContentLoaded', function() {
       initCategoryTabs();
       renderPublicServices();
+      // الحالة الافتراضية: مغلقة عند وجود خدمات مميزة، ومفتوحة عند عدم وجودها
+      setAllServicesOpen(!hasFeatured);
+      // مراقبة ظهور قسم الخدمات لإظهار/إخفاء الزر العائم تلقائياً
+      initFeaturesVisibilityWatcher();
     });
   </script>
 </body>

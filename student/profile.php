@@ -3,8 +3,11 @@ require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/functions.php';
 requireStudent();
 
+ensureUserAvatarColumn();
+
 $user = currentUser();
 $db = db();
+$appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 
 // Fetch fresh details from database
 $stmt = $db->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
@@ -25,7 +28,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $update = $db->prepare('UPDATE users SET name = ?, phone = ? WHERE id = ?');
         if ($update->execute([$name, $phone, $user['id']])) {
             $success = 'تم حفظ التغييرات بنجاح.';
-            
+
+            // رفع الصورة الشخصية (اختياري)
+            if (!empty($_FILES['avatar']['name'])) {
+                $oldAvatar = $userData['avatar_path'] ?? null;
+                $newAvatar = saveAvatarUpload($_FILES['avatar']);
+                if ($newAvatar) {
+                    $db->prepare('UPDATE users SET avatar_path = ? WHERE id = ?')
+                       ->execute([$newAvatar, $user['id']]);
+                    // حذف الصورة القديمة من القرص
+                    if ($oldAvatar && strpos($oldAvatar, 'uploads/avatars/') === 0) {
+                        @unlink(dirname(__DIR__) . '/' . $oldAvatar);
+                    }
+                    $_SESSION['user_avatar_path'] = $newAvatar;
+                    $userData['avatar_path'] = $newAvatar;
+                    $success = 'تم حفظ التغييرات وتحديث الصورة الشخصية بنجاح.';
+                } else {
+                    $error = 'فشل رفع الصورة — تأكد أن الملف صورة (JPG / PNG / WEBP / GIF) وبحجم أقل من 5MB.';
+                }
+            }
+
             // Refresh session details
             $userData['name'] = $name;
             $userData['phone'] = $phone;
@@ -81,18 +103,49 @@ require __DIR__ . '/partials/sidebar.php';
         <?php endif; ?>
 
         <div class="card" style="padding:0;overflow:hidden">
-          
+          <form method="POST" action="profile.php" enctype="multipart/form-data">
           <!-- Avatar Header -->
+          <?php $avatarPath = $userData['avatar_path'] ?? ''; ?>
           <div style="padding:40px;background:var(--bg-body);border-bottom:1px solid var(--border-color);display:flex;align-items:center;gap:24px">
-            <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg, var(--primary), var(--secondary));color:white;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:800;position:relative">
-              <span><?= e($user['avatar']) ?></span>
+            <div style="width:100px;height:100px;border-radius:50%;background:linear-gradient(135deg, var(--primary), var(--secondary));color:white;display:flex;align-items:center;justify-content:center;font-size:40px;font-weight:800;position:relative;flex-shrink:0;overflow:hidden">
+              <?php if ($avatarPath): ?>
+                <img id="avatarPreviewImg" src="<?= e($appBase . '/' . $avatarPath) ?>" alt="الصورة الشخصية" style="width:100%;height:100%;object-fit:cover;position:absolute;inset:0">
+                <span style="position:relative;display:none"><?= e($user['avatar']) ?></span>
+              <?php else: ?>
+                <span id="avatarPreviewImg" style="position:relative"><?= e($user['avatar']) ?></span>
+              <?php endif; ?>
+              <!-- زر رفع الصورة -->
+              <label for="avatarInput" title="تغيير الصورة الشخصية"
+                style="position:absolute;bottom:0;left:0;width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:2">📷</label>
+              <input type="file" id="avatarInput" name="avatar" accept=".jpg,.jpeg,.png,.gif,.webp" style="display:none"
+                onchange="previewAvatar(this)">
             </div>
             <div>
               <h2 class="h2" style="margin-bottom:4px"><?= e($userData['name']) ?></h2>
               <div style="color:var(--text-secondary);margin-bottom:12px"><?= e($userData['email']) ?></div>
               <span class="status-badge status-completed">طالب موثق</span>
+              <div style="font-size:12px;color:var(--text-muted);margin-top:8px">اضغط على أيقونة الكاميرا 📷 لرفع أو تغيير صورتك الشخصية (JPG / PNG — حتى 5MB)</div>
             </div>
           </div>
+          <script>
+            function previewAvatar(input) {
+              if (!input.files || !input.files[0]) return;
+              const img = document.getElementById('avatarPreviewImg');
+              if (img && img.tagName === 'IMG') {
+                img.src = URL.createObjectURL(input.files[0]);
+              } else {
+                // لا توجد صورة سابقة: أنشئ عنصر صورة مكان الحروف
+                const wrap = input.closest('div');
+                const newImg = document.createElement('img');
+                newImg.id = 'avatarPreviewImg';
+                newImg.style.cssText = 'width:100%;height:100%;object-fit:cover;position:absolute;inset:0';
+                newImg.src = URL.createObjectURL(input.files[0]);
+                const oldSpan = img;
+                wrap.insertBefore(newImg, oldSpan);
+                if (oldSpan && oldSpan.tagName !== 'IMG') oldSpan.style.display = 'none';
+              }
+            }
+          </script>
 
           <!-- Tabs -->
           <div class="profile-tabs" style="padding:0 24px;margin-bottom:0">
@@ -101,7 +154,6 @@ require __DIR__ . '/partials/sidebar.php';
 
           <!-- Tab Content 1 -->
           <div style="padding:32px">
-            <form method="POST" action="profile.php">
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
                 
                 <div class="form-group">
