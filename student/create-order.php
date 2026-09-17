@@ -24,14 +24,14 @@ $includedIdsJs = $remainingIncludedIds;      // غير المستهلكة → م
 $usedIncludedIdsJs = $usedIncludedIds;       // المستهلكة → طلب مجدد بسعر الخدمة
 
 // الخدمة المختارة مسبقاً (لعرض تفاصيلها داخل الصفحة)
+$servicesById = [];
+foreach ($services as $s) {
+  $servicesById[(int) $s['id']] = $s;
+}
+
 $selectedService = null;
-if ($prefillServiceId) {
-  foreach ($services as $s) {
-    if ((int) $s['id'] === $prefillServiceId) {
-      $selectedService = $s;
-      break;
-    }
-  }
+if ($prefillServiceId && isset($servicesById[$prefillServiceId])) {
+  $selectedService = $servicesById[$prefillServiceId];
 }
 
 // السعر المبدئي المعروض لملخص الطلب قبل تنفيذ JS
@@ -60,6 +60,27 @@ foreach ($services as $s) {
 }
 $servicesJson = json_encode($servicesDataMap, JSON_UNESCAPED_UNICODE);
 
+/* ─────────────────────────────────────────────
+   الكليات (التخصص الدقيق) — قائمة منسدلة للاختيار
+───────────────────────────────────────────── */
+$colleges = [
+    'العلوم الطبية والصحية',
+    'العلوم الإدارية والمالية والاقتصاد',
+    'الهندسة والتقنية',
+    'العلوم الإنسانية والاجتماعية',
+    'العلوم التربوية والنفسية',
+    'القانون والعلوم السياسية',
+    'اللغات والترجمة والدراسات اللغوية',
+    'العلوم الأساسية والتطبيقية',
+    'الإعلام وفنون الاتصال',
+    'الدراسات الإسلامية والشرعية',
+];
+
+$specialtyValue = trim($_POST['specialty'] ?? '');
+if ($specialtyValue === 'أخرى') {
+  $specialtyValue = trim($_POST['specialty_other'] ?? '');
+}
+
 // حسابات المنصة (بنوك/محافظ) لخطوة الدفع + جذر المشروع لبناء روابط الشعارات
 $paymentMethods = getActivePaymentMethods();
 $appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
@@ -69,10 +90,9 @@ $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $service_id = (int) ($_POST['service_id'] ?? 0);
-  $specialty = trim($_POST['specialty'] ?? '');
+  $specialty = $specialtyValue; // الكلية المختارة من القائمة المنسدلة (أو النص عند اختيار "أخرى")
   $academic_level = $_POST['academic_level'] ?? 'بكالوريوس';
   $language = $_POST['language'] ?? 'العربية';
-  $deadline = $_POST['deadline'] ?? '';
   $description = trim($_POST['description'] ?? '');
 
   // حساب السعر: المشمولة وغير المستهلكة → مجانية لمرة واحدة.
@@ -103,8 +123,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
-  if (!$service_id || !$specialty || !$deadline || !$description) {
+  if (!$service_id || !$specialty || !$description) {
     $error = 'يرجى ملء كافة الحقول المطلوبة بنجاح.';
+  } elseif (!in_array($specialty, $colleges, true)) {
+    $error = 'يرجى اختيار الكلية من القائمة المنسدلة (أو كتابة اسمها عند اختيار "أخرى").';
+  } elseif ($amount > 0 && empty($_FILES['payment_receipt']['name'])) {
+    $error = 'إرفاق إشعار الدفع إلزامي للطلبات المدفوعة — لن يُقبل الطلب بدونه.';
+  } elseif ($amount > 0 && !empty($_FILES['payment_receipt']['name']) && ($_FILES['payment_receipt']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+    $error = 'فشل رفع إشعار الدفع — تأكد أن الملف صورة أو PDF بحجم أقل من 10MB ثم أعد المحاولة.';
   } else {
     $order_id = createOrder([
       'student_id' => $user['id'],
@@ -113,7 +139,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'specialty' => $specialty,
       'academic_level' => $academic_level,
       'language' => $language,
-      'deadline' => $deadline,
       'description' => $description,
       'amount' => $amount,
     ]);
@@ -293,50 +318,69 @@ require __DIR__ . '/partials/sidebar.php';
 
       <form method="POST" action="create-order.php" id="multiOrderForm" enctype="multipart/form-data">
 
+        <!-- رسائل التحقق من إكمال الحقول الإلزامية في الخطوة الحالية -->
+        <div id="stepErrorBox" class="alert-error" style="display:none"></div>
+
         <!-- STEP 1 -->
         <div class="form-step" id="step1">
           <h3 class="h3" style="margin-bottom:24px">اختيار الخدمة والتخصص</h3>
 
-          <div class="form-group">
-            <label class="form-label">الخدمة المطلوبة <span style="color:var(--danger)">*</span></label>
-            <select class="form-input" id="serviceSelect" name="service_id" onchange="updatePricing()">
-              <option value="">اختر الخدمة المطلوبة...</option>
-              <?php foreach ($services as $s): ?>
-                <option value="<?= $s['id'] ?>" data-price="<?= (float) ($s['price'] ?? 0) ?>"
-                  <?= $prefillServiceId === (int) $s['id'] ? 'selected' : '' ?>>
-                  <?= e($s['icon']) ?>   <?= e($s['name']) ?> (<?= formatMoney((float) ($s['price'] ?? 0)) ?>)
-                </option>
-              <?php endforeach; ?>
-            </select>
-          </div>
+          <!-- القوائم المنسدلة المتتالية: قسم رئيسي ← قسم فرعي ← خدمة -->
+          <?php if ($selectedService): ?>
+            <input type="hidden" name="service_id" id="serviceIdInput" value="<?= (int) $selectedService['id'] ?>">
+          <?php endif; ?>
 
-          <!-- تفاصيل الخدمة المختارة (تظهر مكان زر التفاصيل المحذوف) -->
-          <div class="form-group" id="serviceDetailsBox"
-            style="display:<?= $selectedService ? 'block' : 'none' ?>;border:1px solid var(--border-color);border-radius:var(--radius-md);padding:16px;background:var(--bg-body);margin-top:4px">
-            <?php if ($selectedService): ?>
-              <div style="display:flex;align-items:flex-start;gap:10px">
-                <div style="font-size:28px;flex-shrink:0"><?= e($selectedService['icon'] ?: '📦') ?></div>
-                <div style="flex:1">
-                  <div style="font-weight:800;margin-bottom:6px" id="serviceDetailsName">
-                    <?= e($selectedService['name']) ?></div>
-                  <div style="font-size:13px;color:var(--text-secondary);line-height:1.7" id="serviceDetailsDesc">
-                    <?= e($selectedService['description'] ?: '') ?></div>
+          <!-- الخدمة المختارة — عرض ثابت (بدون أي قوائم) -->
+          <?php if ($selectedService): ?>
+            <div class="form-group" id="fixedServiceBox"
+              style="border:2px solid var(--primary);border-radius:var(--radius-md);padding:18px;background:var(--primary-light)">
+              <div style="display:flex;align-items:flex-start;gap:12px">
+                <div style="font-size:34px;flex-shrink:0;line-height:1"><?= e($selectedService['icon'] ?: '') ?></div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:4px">الخدمة المختارة</div>
+                  <div style="font-size:18px;font-weight:800;color:var(--text-primary);margin-bottom:8px" id="serviceDetailsName">
+                    <?= e($selectedService['name']) ?>
+                  </div>
+                  <?php if (!empty($selectedService['description'])): ?>
+                    <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-top:8px" id="serviceDetailsDesc">
+                      <?= e($selectedService['description']) ?>
+                    </div>
+                  <?php endif; ?>
+                  <div style="font-size:13px;font-weight:800;color:var(--primary);margin-top:10px" id="fixedServicePrice">
+                    💵 السعر: <?= $initialIncluded ? 'مشمول بالباقة 🎁' : formatMoney($initialPrice) ?>
+                  </div>
                   <div id="serviceIncludedBadge"
-                    style="display:<?= ($selectedService && $initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    style="display:<?= $initialIncluded ? 'inline-block' : 'none' ?>;margin-top:10px;background:#dcfce7;color:#166534;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
                     ✅ هذه الخدمة مشمولة في باقتك
                   </div>
                   <div id="serviceUsedBadge"
-                    style="display:<?= ($selectedService && !$initialIncluded && in_array($prefillServiceId, $usedIncludedIdsJs, true)) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    style="display:<?= (!$initialIncluded && in_array((int) $selectedService['id'], $usedIncludedIdsJs, true)) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
                     🔁 استُخدمت من باقتك سابقاً — سيُسعَّر هذا الطلب بسعر الخدمة المحدد
                   </div>
                   <div id="serviceNonIncludedBadge"
-                    style="display:<?= ($selectedService && !$initialIncluded) ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
+                    style="display:<?= !$initialIncluded ? 'inline-block' : 'none' ?>;margin-top:10px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:800;padding:5px 12px;border-radius:20px">
                     هذه الخدمة خارج باقتك وسيتم تسعيرها بشكل منفرد
                   </div>
                 </div>
               </div>
-            <?php endif; ?>
-          </div>
+              <div style="margin-top:14px;font-size:12px;color:var(--text-secondary);border-top:1px dashed var(--border-color);padding-top:10px">
+                لتغيير الخدمة: <a href="services.php" style="color:var(--primary);font-weight:800">اختر خدمة أخرى من صفحة الخدمات</a>
+              </div>
+            </div>
+          <?php else: ?>
+            <!-- لم تُحدَّد خدمة (فتح الصفحة مباشرة بدون اختيار) -->
+            <div class="form-group"
+              style="border:2px dashed var(--border-color);border-radius:var(--radius-md);padding:22px;background:var(--bg-body);text-align:center">
+              <div style="font-size:38px;margin-bottom:8px">📦</div>
+              <div style="font-weight:800;color:var(--text-primary);margin-bottom:6px">لم يتم اختيار خدمة بعد</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.7">
+                اختر الخدمة المطلوبة من صفحة الخدمات ثم اضغط «اطلب الخدمة الآن» للعودة إلى هنا.
+              </div>
+              <a href="services.php" class="btn btn-primary" style="padding:10px 22px;border-radius:12px;font-weight:700">
+                تصفح الخدمات واختر واحدة 🚀
+              </a>
+            </div>
+          <?php endif; ?>
 
           <?php if ($hasSub && !empty($activeSubs)): ?>
             <!-- الطالب مشترك في باقة أو أكثر -->
@@ -371,8 +415,26 @@ require __DIR__ . '/partials/sidebar.php';
           <?php endif; ?>
 
           <div class="form-group">
-            <label class="form-label">التخصص الدقيق <span style="color:var(--danger)">*</span></label>
-            <input type="text" name="specialty" class="form-input" placeholder="مثال: إدارة الموارد البشرية" required>
+            <label class="form-label">الكلية (التخصص الدقيق) <span style="color:var(--danger)">*</span></label>
+            <select class="form-input" id="specialtySelect" name="specialty" required onchange="onSpecialtyChange()">
+              <option value="">اختر الكلية...</option>
+              <?php foreach ($colleges as $cl): ?>
+                <option value="<?= e($cl) ?>" <?= ($specialtyValue !== '' && $specialtyValue === $cl) ? 'selected' : '' ?>>
+                  <?= e($cl) ?>
+                </option>
+              <?php endforeach; ?>
+              <option value="أخرى" <?= ($specialtyValue !== '' && !in_array($specialtyValue, $colleges, true)) ? 'selected' : '' ?>>
+                أخرى (اكتبها بنفسك)
+              </option>
+            </select>
+          </div>
+
+          <div class="form-group" id="specialtyOtherBox"
+            style="display:<?= ($specialtyValue !== '' && !in_array($specialtyValue, $colleges, true)) ? 'block' : 'none' ?>">
+            <label class="form-label">اكتب اسم الكلية <span style="color:var(--danger)">*</span></label>
+            <input type="text" class="form-input" id="specialtyOther" name="specialty_other"
+              placeholder="مثال: كلية علوم الحاسب"
+              value="<?= ($specialtyValue !== '' && !in_array($specialtyValue, $colleges, true)) ? e($specialtyValue) : '' ?>">
           </div>
 
         </div>
@@ -383,11 +445,12 @@ require __DIR__ . '/partials/sidebar.php';
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
             <div class="form-group">
-              <label class="form-label">المستوى الأكاديمي <span style="color:var(--danger)">*</span></label>
+              <label class="form-label">مستوى البحث <span style="color:var(--danger)">*</span></label>
               <select name="academic_level" class="form-input" required>
                 <option value="بكالوريوس">بكالوريوس</option>
                 <option value="ماجستير">ماجستير</option>
                 <option value="دكتوراه">دكتوراه</option>
+                <option value="أخرى">أخرى</option>
               </select>
             </div>
             <div class="form-group">
@@ -396,10 +459,6 @@ require __DIR__ . '/partials/sidebar.php';
                 <option value="العربية">العربية</option>
                 <option value="الإنجليزية">الإنجليزية</option>
               </select>
-            </div>
-            <div class="form-group" style="grid-column:1/-1">
-              <label class="form-label">موعد التسليم المرغوب <span style="color:var(--danger)">*</span></label>
-              <input type="date" name="deadline" class="form-input" required min="<?= date('Y-m-d') ?>">
             </div>
           </div>
         </div>
@@ -488,9 +547,9 @@ require __DIR__ . '/partials/sidebar.php';
             </div>
 
             <div class="form-group">
-              <label class="form-label">إرفاق إشعار الدفع (صورة أو PDF)</label>
-              <input type="file" class="form-input" name="payment_receipt" accept="image/*,.pdf">
-              <small style="color:var(--text-secondary);font-size:12px">بعد التحويل، صوّر إشعار التحويل أو إيصال الدفع وأرفقه هنا (حتى 10MB).</small>
+              <label class="form-label">إرفاق إشعار الدفع (صورة أو PDF) <span style="color:var(--danger)">*</span></label>
+              <input type="file" class="form-input" name="payment_receipt" accept="image/*,.pdf" required>
+              <small style="color:var(--text-secondary);font-size:12px">إلزامي: بعد التحويل، صوّر إشعار التحويل أو إيصال الدفع وأرفقه هنا (حتى 10MB). لن يُقبل الطلب بدون إشعار الدفع.</small>
             </div>
           </div>
         </div>
@@ -550,10 +609,8 @@ require __DIR__ . '/partials/sidebar.php';
     const nextBtn = document.getElementById('nextBtn');
     const prevBtn = document.getElementById('prevBtn');
     const submitBtn = document.getElementById('submitBtn');
-    const srvSelect = document.getElementById('serviceSelect');
-    const detailsBox = document.getElementById('serviceDetailsBox');
-    const detailsName = document.getElementById('serviceDetailsName');
-    const detailsDesc = document.getElementById('serviceDetailsDesc');
+    const srvSelect = document.getElementById('serviceIdInput'); // حقل مخفي يحمل الخدمة المختارة (عرض ثابت)
+    const fixedPriceEl = document.getElementById('fixedServicePrice');
     const includedBadgeEl = document.getElementById('serviceIncludedBadge');
     const usedBadgeEl = document.getElementById('serviceUsedBadge');
     const nonIncludedBadgeEl = document.getElementById('serviceNonIncludedBadge');
@@ -565,6 +622,25 @@ require __DIR__ . '/partials/sidebar.php';
     const includedIdsSet = new Set(<?= json_encode($includedIdsJs) ?>);      // المشمولات غير المستهلكة → مجانية
     const usedIncludedSet = new Set(<?= json_encode($usedIncludedIdsJs) ?>); // المستهلكة سابقاً → بسعر الخدمة
 
+    const specialtySelect = document.getElementById('specialtySelect');
+    const specialtyOtherBox = document.getElementById('specialtyOtherBox');
+    const specialtyOtherInput = document.getElementById('specialtyOther');
+    const stepErrorBox = document.getElementById('stepErrorBox');
+
+    /* ── القوائم المنسدلة المتتالية ── */
+    /* ── الخدمة ثابتة (لا قوائم): نحدّث الأوسمة والسعر فقط ── */
+    // إظهار/إخفاء حقل "أخرى" للكلية
+    function onSpecialtyChange() {
+      if (!specialtySelect || !specialtyOtherBox) return;
+      const isOther = specialtySelect.value === 'أخرى';
+      specialtyOtherBox.style.display = isOther ? 'block' : 'none';
+      if (specialtyOtherInput) {
+        specialtyOtherInput.required = isOther;
+        if (!isOther) specialtyOtherInput.value = '';
+        else specialtyOtherInput.focus();
+      }
+    }
+
     let currentStep = 0;
 
     function getSelectedService() {
@@ -573,23 +649,19 @@ require __DIR__ . '/partials/sidebar.php';
     }
 
     function updateServiceCard() {
-      if (!detailsBox) return;
       const svc = getSelectedService();
       if (!svc) {
-        detailsBox.style.display = 'none';
         if (includedBadgeEl) includedBadgeEl.style.display = 'none';
         if (usedBadgeEl) usedBadgeEl.style.display = 'none';
         if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = 'none';
         return;
       }
-      detailsBox.style.display = 'block';
-      if (detailsName) detailsName.textContent = (svc.icon || '📦') + ' ' + svc.name;
-      if (detailsDesc) detailsDesc.textContent = svc.description || '';
+      // الخدمة معروضة بشكل ثابت من PHP — نحدّث الأوسمة فقط حسب حالة الباقة
       const included = includedIdsSet.has(svc.id);
       const usedBefore = usedIncludedSet.has(svc.id);
       if (includedBadgeEl) includedBadgeEl.style.display = included ? 'inline-block' : 'none';
       if (usedBadgeEl) usedBadgeEl.style.display = (!included && usedBefore) ? 'inline-block' : 'none';
-      if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = (!included && !usedBefore && includedIdsSet.size !== 0) ? 'inline-block' : 'none';
+      if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = !included ? 'inline-block' : 'none';
     }
 
     function updatePricing() {
@@ -602,6 +674,10 @@ require __DIR__ . '/partials/sidebar.php';
       }
       basePriceEl.textContent = price + ' ر.س';
       totalPriceEl.textContent = included ? 'مشمول بالباقة 🎁' : price + ' ر.س';
+      // تحديث سطر السعر داخل بطاقة الخدمة الثابتة
+      if (fixedPriceEl) {
+        fixedPriceEl.textContent = '💵 السعر: ' + (included ? 'مشمول بالباقة 🎁' : price + ' ر.س');
+      }
       updateServiceCard();
     }
 
@@ -660,14 +736,112 @@ require __DIR__ . '/partials/sidebar.php';
       }
     }
 
-    nextBtn?.addEventListener('click', () => {
-      if (currentStep === 0) {
-        const hasService = srvSelect && srvSelect.value !== "";
-        if (!hasService) {
-          alert('يرجى اختيار خدمة أولاً');
-          return;
+    /* ============================================================
+       التحقق من إكمال الحقول الإلزامية في كل خطوة
+       ============================================================ */
+    function isPaymentFree() {
+      const svc = getSelectedService();
+      return !!(svc && includedIdsSet.has(svc.id));
+    }
+
+    // الحقول المطلوبة في خطوة معينة (مع تجاهل حقول الدفع عند بقاء الخدمة مشمولة بالباقة)
+    function stepFields(step) {
+      const payContent = document.getElementById('payStepContent');
+      return Array.prototype.slice.call(step.querySelectorAll('input, select, textarea')).filter(function (f) {
+        if (f.disabled || f.type === 'hidden' || f.type === 'file') return false;
+        if (payContent && payContent.style.display === 'none' && payContent.contains(f)) return false;
+        return true;
+      });
+    }
+
+    // اسم الحقل من التسمية المجاورة (لرسالة واضحة)
+    function fieldLabelOf(f) {
+      const group = f.closest ? f.closest('.form-group') : null;
+      const lbl = group ? group.querySelector('.form-label') : null;
+      if (!lbl) return 'حقل مطلوب';
+      return lbl.textContent.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    function markInvalid(f, on) {
+      if (!f) return;
+      if (on) {
+        f.style.borderColor = 'var(--danger)';
+        f.style.boxShadow = '0 0 0 3px rgba(239,68,68,.12)';
+      } else {
+        f.style.borderColor = '';
+        f.style.boxShadow = '';
+      }
+    }
+
+    function showStepError(msg) {
+      if (!stepErrorBox) return;
+      if (msg) {
+        stepErrorBox.textContent = '⚠️ ' + msg;
+        stepErrorBox.style.display = 'block';
+      } else {
+        stepErrorBox.style.display = 'none';
+        stepErrorBox.textContent = '';
+      }
+    }
+
+    // يعيد { ok, missing[], first } مع تحديد الحقول الناقصة بإطار أحمر
+    function validateStep(idx) {
+      const step = steps[idx];
+      if (!step) return { ok: true, missing: [], first: null };
+
+      const missing = [];
+      let firstEl = null;
+
+      stepFields(step).forEach(function (f) {
+        // أزرار الاختيار (طريقة الدفع) تُفحص كمجموعة في القاعدة الخاصة أدناه
+        if (f.type === 'radio') return;
+        if (!f.required) { markInvalid(f, false); return; }
+        const val = (f.value || '').trim();
+        if (!val) {
+          markInvalid(f, true);
+          if (!firstEl) firstEl = f;
+          missing.push(fieldLabelOf(f));
+        } else {
+          markInvalid(f, false);
+        }
+      });
+
+      // قاعدة خاصة: يجب وجود خدمة مختارة (حقل مخفي بعرض ثابت)
+      if (idx === 0 && (!srvSelect || !srvSelect.value)) {
+        missing.push('الخدمة المطلوبة');
+      }
+
+      // قاعدة خاصة: طريقة الدفع + إشعار الدفع مطلوبة في الخطوة الأخيرة للطلبات المدفوعة
+      if (idx === steps.length - 1 && !isPaymentFree()) {
+        const radios = step.querySelectorAll('input[type="radio"][name="payment_method_id"]');
+        if (radios.length) {
+          const anyChecked = Array.prototype.some.call(radios, function (r) { return r.checked; });
+          if (!anyChecked) {
+            missing.push('حساب المنصة الذي حوّلت إليه');
+            if (!firstEl) firstEl = radios[0];
+          }
+        }
+        const rcpt = step.querySelector('input[type="file"][name="payment_receipt"]');
+        if (rcpt && (!rcpt.files || !rcpt.files.length)) {
+          missing.push('إشعار الدفع (صورة أو PDF)');
+          if (!firstEl) firstEl = rcpt;
         }
       }
+
+      return { ok: missing.length === 0, missing: missing, first: firstEl };
+    }
+
+    nextBtn?.addEventListener('click', () => {
+      const res = validateStep(currentStep);
+      if (!res.ok) {
+        showStepError('لا يمكن الانتقال للخطوة التالية قبل إكمال الحقول الإلزامية: ' + res.missing.join(' ، '));
+        if (res.first) {
+          res.first.focus();
+          res.first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        return;
+      }
+      showStepError('');
       if (currentStep < steps.length - 1) {
         currentStep++;
         renderStep();
@@ -677,15 +851,34 @@ require __DIR__ . '/partials/sidebar.php';
     prevBtn?.addEventListener('click', () => {
       if (currentStep > 0) {
         currentStep--;
+        showStepError('');
         renderStep();
       }
     });
 
-    document.getElementById('multiOrderForm').addEventListener('submit', () => {
+    document.getElementById('multiOrderForm').addEventListener('submit', (e) => {
+      // التحقق من كل الخطوات قبل الإرسال (الخطوات المخفية لا تُفحص تلقائياً)
+      for (let i = 0; i < steps.length; i++) {
+        const res = validateStep(i);
+        if (!res.ok) {
+          e.preventDefault();
+          currentStep = i;
+          renderStep();
+          showStepError('يرجى إكمال الحقول الإلزامية في خطوة "' + (indicators[i] ? indicators[i].querySelector('.step-label').textContent.trim() : (i + 1)) + '": ' + res.missing.join(' ، '));
+          if (res.first) {
+            res.first.focus();
+            res.first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          return;
+        }
+      }
+      showStepError('');
       submitBtn.textContent = 'جاري الإرسال...';
       submitBtn.disabled = true;
     });
 
+    // تحديث الأوسمة والسعر للخدمة الثابتة + عرض الخطوة الحالية
+    onSpecialtyChange();
     updatePricing();
     renderStep();
   </script>
