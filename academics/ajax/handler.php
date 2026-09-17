@@ -216,6 +216,22 @@ if ($action === 'update_profile') {
         $params[] = $academicId;
 
         $db->prepare($sql)->execute($params);
+
+        // حفظ الخدمات المحددة (شجرة الخدمات): استبدال القائمة القديمة بالمحددات الجديدة
+        // ملاحظة: PHP مع FormData: عند إرسال services[] واحد فقط قد يصل كنص، لذا نوحّد الصيغة
+        $servicesRaw = $_POST['services'] ?? [];
+        if (is_string($servicesRaw)) {
+            $servicesRaw = $servicesRaw !== '' ? [$servicesRaw] : [];
+        }
+        $serviceIds = array_values(array_unique(array_filter(array_map('intval', (array)$servicesRaw))));
+        $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
+        if (!empty($serviceIds)) {
+            $srvStmt = $db->prepare("INSERT IGNORE INTO academic_services (academic_id, service_id, custom_price) VALUES (?, ?, NULL)");
+            foreach ($serviceIds as $srvId) {
+                $srvStmt->execute([$academicId, $srvId]);
+            }
+        }
+
         sendJSONResponse(true, 'تم حفظ البيانات الشخصية بنجاح.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل حفظ البيانات: ' . $e->getMessage());

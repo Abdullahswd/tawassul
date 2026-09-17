@@ -74,6 +74,9 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
     .svc-check { width: 17px; height: 17px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
     .svc-node-icon { font-size: 18px; flex-shrink: 0; }
     .svc-node-name { font-size: 13.5px; font-weight: 700; color: var(--text-primary); overflow-wrap: anywhere; }
+    /* اسم العقدة الأب قابل للنقر لفتح/إغلاق القائمة */
+    .svc-node-head > .svc-node-name { flex: 1; cursor: pointer; }
+    .svc-node-head .svc-check-label { flex: 0 0 auto; cursor: pointer; }
     .svc-arrow { color: var(--text-secondary); font-size: 14px; flex-shrink: 0; transition: transform .2s; }
     .svc-children {
       padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 8px;
@@ -219,8 +222,8 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
                             <label class="svc-check-label" onclick="event.stopPropagation()">
                               <input type="checkbox" class="svc-check svc-parent" data-node="<?= $sid ?>" data-level="<?= $level ?>" onchange="svcParentChanged(this)" />
                               <span class="svc-node-icon"><?= $icon ?></span>
-                              <span class="svc-node-name"><?= $name ?></span>
                             </label>
+                            <span class="svc-node-name"><?= $name ?></span>
                             <span class="svc-arrow">▾</span>
                           </div>
                           <div class="svc-children" style="display:none">
@@ -471,7 +474,69 @@ function showSection(id, btn) {
   document.querySelectorAll('.s-menu-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('sec-' + id).style.display = 'block';
   btn.classList.add('active');
+  // حفظ القسم الحالي لاستعادته بعد تحديث الصفحة (مثلاً بعد الحفظ)
+  try { sessionStorage.setItem('academicSettingsSection', id); } catch (e) {}
 }
+
+// استعادة القسم الأخير عند فتح الصفحة (بعد الحفظ أو التحديث)
+document.addEventListener('DOMContentLoaded', () => {
+  let savedSection = null;
+  try { savedSection = sessionStorage.getItem('academicSettingsSection'); } catch (e) {}
+  if (savedSection) {
+    const btn = document.querySelector('.s-menu-btn[onclick*="showSection(\'' + savedSection + '\'"]');
+    if (btn) { showSection(savedSection, btn); return; }
+  }
+});
+/* ── شجرة الخدمات: طي/فتح + مزامنة الأب مع الأبناء ── */
+function svcToggleCollapse(headEl) {
+  const node = headEl.parentElement;
+  const children = node.querySelector(':scope > .svc-children');
+  if (!children) return;
+  const isOpen = children.style.display !== 'none';
+  children.style.display = isOpen ? 'none' : 'block';
+  const arrow = headEl.querySelector('.svc-arrow');
+  if (arrow) arrow.textContent = isOpen ? '▾' : '▴';
+}
+
+function svcSetDescendantLeaves(node, checked) {
+  node.querySelectorAll(':scope > .svc-children input[type="checkbox"]').forEach(chk => {
+    chk.checked = checked;
+    if (chk.classList.contains('svc-parent')) {
+      const childNode = chk.closest('.svc-node');
+      if (childNode) svcSetDescendantLeaves(childNode, checked);
+    }
+  });
+}
+
+function svcUpdateParentStates(root) {
+  root = root || document.getElementById('servicesEditTree');
+  if (!root) return;
+  // من الأسفل للأعلى: حالة كل أب تُحسب من أبنائه
+  root.querySelectorAll('.svc-parent').forEach(pChk => {
+    const node = pChk.closest('.svc-node');
+    const leaves = node.querySelectorAll('.svc-leaf-check');
+    if (!leaves.length) return;
+    const checkedCount = Array.from(leaves).filter(c => c.checked).length;
+    pChk.checked = checkedCount === leaves.length;
+    pChk.indeterminate = checkedCount > 0 && checkedCount < leaves.length;
+  });
+}
+
+function svcParentChanged(chk) {
+  const node = chk.closest('.svc-node');
+  if (node) svcSetDescendantLeaves(node, chk.checked);
+  svcUpdateParentStates();
+}
+
+function svcLeafChanged() {
+  svcUpdateParentStates();
+}
+
+// مزامنة أولية: حالة الأب عند التحميل حسب الخدمات المحفوظة مسبقاً
+// (القوائم تبدأ كلها مغلقة افتراضياً)
+document.addEventListener('DOMContentLoaded', () => {
+  svcUpdateParentStates();
+});
 
 function changePassword() {
   const current = document.getElementById('currentPass').value;
