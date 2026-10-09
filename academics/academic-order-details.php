@@ -160,6 +160,16 @@ $attachments = $attStmt->fetchAll();
         </div>
       </div>
 
+      <?php if ($order['status'] === 'cancellation_requested'): ?>
+        <div class="card anim-up" style="padding:16px;background:rgba(245,158,11,0.1);border:1.5px solid #f59e0b;margin-bottom:24px;border-radius:14px">
+          <div style="color:#b45309;font-weight:700;font-size:14px">⚠️ تنبيه: لقد قام الطالب بتقديم طلب لإلغاء هذا الطلب. نرجو التوقف عن العمل حتى يتم تقييم ومراجعة الطلب من قبل الإدارة.</div>
+        </div>
+      <?php elseif ($order['status'] === 'cancelled'): ?>
+        <div class="card anim-up" style="padding:16px;background:rgba(239,68,68,0.1);border:1.5px solid #ef4444;margin-bottom:24px;border-radius:14px">
+          <div style="color:#ef4444;font-weight:700;font-size:14px">🚫 تنبيه: تم إلغاء هذا الطلب، لا يمكنك الاستمرار بالعمل عليه أو تغيير حالته.</div>
+        </div>
+      <?php endif; ?>
+
       <!-- Accept / Reject Banner (If assigned and pending response) -->
       <?php if ($myAssignmentStatus === 'assigned'): ?>
         <div class="card anim-up" style="padding:22px;background:linear-gradient(135deg, rgba(99,102,241,0.08), rgba(59,130,246,0.08));border:2px solid var(--primary);margin-bottom:24px;border-radius:16px">
@@ -337,13 +347,19 @@ $attachments = $attStmt->fetchAll();
 
             <div style="margin-top:20px">
               <label class="form-label">تحديث حالة التنفيذ</label>
-              <select class="form-input form-select" id="orderStatus" style="padding-left:36px">
-                <option value="accepted" <?= $order['status']=='accepted'?'selected':'' ?>>مقبول وجاري العمل</option>
-                <option value="in_progress" <?= $order['status']=='in_progress'?'selected':'' ?>>قيد التنفيذ</option>
-                <option value="revision" <?= $order['status']=='revision'?'selected':'' ?>>تحت المراجعة</option>
-                <option value="completed" <?= $order['status']=='completed'?'selected':'' ?>>مكتمل</option>
-              </select>
-              <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="updateOrderStatus()">تحديث الحالة</button>
+              <?php if (in_array($order['status'], ['cancellation_requested', 'cancelled'])): ?>
+                <div style="padding:10px;background:#f3f4f6;border-radius:8px;color:#6b7280;font-size:13px;text-align:center;border:1px dashed #d1d5db">
+                  لا يمكنك تغيير حالة الطلب حالياً.
+                </div>
+              <?php else: ?>
+                <select class="form-input form-select" id="orderStatus" style="padding-left:36px">
+                  <option value="accepted" <?= $order['status']=='accepted'?'selected':'' ?>>مقبول وجاري العمل</option>
+                  <option value="in_progress" <?= $order['status']=='in_progress'?'selected':'' ?>>قيد التنفيذ</option>
+                  <option value="revision" <?= $order['status']=='revision'?'selected':'' ?>>تحت المراجعة</option>
+                  <option value="completed" <?= $order['status']=='completed'?'selected':'' ?>>مكتمل</option>
+                </select>
+                <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="updateOrderStatus()">تحديث الحالة</button>
+              <?php endif; ?>
             </div>
           </div>
 
@@ -369,6 +385,7 @@ const orderId = <?= $orderId ?>;
 const orderNumberJs = <?= json_encode($orderNumber) ?>;
 const myAcademicId = <?= (int)$academicId ?>;
 const APP_BASE = <?= json_encode($appBase) ?>;
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
 const convIdJs = <?= (int)($conversationId ?: 0) ?>;
 let lastMsgId = <?= (int)$lastMsgIdPhp ?>;
 let chatSending = false;
@@ -476,38 +493,58 @@ function respondOrder(actionName) {
   if (!confirm(confirmMsg)) return;
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('order_id', orderId);
+  formData.append('csrf_token', csrfTokenJs);
 
   fetch('ajax/handler.php?action=' + actionName, {
     method: 'POST',
     body: formData
   })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) {
-      Toast.show(data.message, 'success');
-      setTimeout(() => location.reload(), 1200);
-    } else {
-      Toast.show(data.message, 'error');
+  .then(res => res.text())
+  .then(text => {
+    try {
+      const data = JSON.parse(text);
+      if(data.success) {
+        Toast.show(data.message, 'success');
+        setTimeout(() => location.reload(), 1200);
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    } catch (e) {
+      alert("استجابة غير متوقعة من السيرفر (انظر الكونسول):\n" + text.substring(0, 500));
+      console.error("RAW RESPONSE:", text);
     }
+  })
+  .catch(err => {
+    alert("فشل الاتصال بالسيرفر: " + err.message);
   });
 }
 
 function updateOrderStatus() {
   const newStatus = document.getElementById('orderStatus').value;
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('order_id', orderId);
   formData.append('status', newStatus);
+  formData.append('csrf_token', csrfTokenJs);
 
   fetch('ajax/handler.php?action=update_order_status', {
     method: 'POST',
     body: formData
   })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) Toast.show(data.message, 'success');
-    else Toast.show(data.message, 'error');
-  });
+  .then(res => res.text())
+  .then(text => {
+    try {
+      const data = JSON.parse(text);
+      if(data.success) Toast.show(data.message, 'success');
+      else Toast.show(data.message, 'error');
+    } catch (e) {
+      alert("استجابة غير متوقعة:\n" + text.substring(0, 500));
+      console.error(text);
+    }
+  })
+  .catch(err => alert("فشل الاتصال: " + err.message));
 }
 
 function sendMessage() {
@@ -518,9 +555,11 @@ function sendMessage() {
   if((!txt && !hasFile) || chatSending) return;
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('order_id', orderId);
   formData.append('content', txt);
   if (hasFile) formData.append('file', fileInput.files[0]);
+  formData.append('csrf_token', csrfTokenJs);
 
   input.disabled = true;
   chatSending = true;
@@ -529,22 +568,31 @@ function sendMessage() {
     method: 'POST',
     body: formData
   })
-  .then(res => res.json())
-  .then(data => {
+  .then(res => res.text())
+  .then(text => {
     input.disabled = false;
     chatSending = false;
-    if (data.success) {
-      input.value = '';
-      if (fileInput) fileInput.value = '';
-      const fn = document.getElementById('chatFileName');
-      if (fn) fn.style.display = 'none';
-      input.focus();
-      pollChat(); // جلب الرسالة المرسلة (وجميع الرسائل الجديدة) وعرضها فوراً
-    } else {
-      Toast.show(data.message, 'error');
+    try {
+      const data = JSON.parse(text);
+      if (data.success) {
+        input.value = '';
+        if (fileInput) fileInput.value = '';
+        const fn = document.getElementById('chatFileName');
+        if (fn) fn.style.display = 'none';
+        input.focus();
+        pollChat();
+      } else {
+        Toast.show(data.message, 'error');
+      }
+    } catch (e) {
+      alert("استجابة غير متوقعة:\n" + text.substring(0, 500));
+      console.error(text);
     }
   })
-  .catch(() => { input.disabled = false; chatSending = false; Toast.show('تعذر إرسال الرسالة، حاول مجدداً.', 'error'); });
+  .catch(err => {
+    input.disabled = false; chatSending = false;
+    alert("تعذر إرسال الرسالة: " + err.message);
+  });
 }
 
 // إظهار اسم الملف المحدد للإرسال
@@ -566,22 +614,31 @@ function uploadFile() {
   Toast.show('جاري الرفع...', 'info');
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('order_id', orderId);
   formData.append('file', file);
+  formData.append('csrf_token', csrfTokenJs);
 
   fetch('ajax/handler.php?action=upload_attachment', {
     method: 'POST',
     body: formData
   })
-  .then(res => res.json())
-  .then(data => {
-    if(data.success) {
-      Toast.show('تم رفع الملف بنجاح', 'success');
-      setTimeout(() => location.reload(), 1500);
-    } else {
-      Toast.show(data.message || 'حدث خطأ أثناء الرفع', 'error');
+  .then(res => res.text())
+  .then(text => {
+    try {
+      const data = JSON.parse(text);
+      if(data.success) {
+        Toast.show('تم رفع الملف بنجاح', 'success');
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        Toast.show(data.message || 'حدث خطأ أثناء الرفع', 'error');
+      }
+    } catch (e) {
+      alert("استجابة غير متوقعة:\n" + text.substring(0, 500));
+      console.error(text);
     }
-  });
+  })
+  .catch(err => alert("فشل الاتصال: " + err.message));
 }
 </script>
 </body>

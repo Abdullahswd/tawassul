@@ -99,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   // المشمولة لكن المستهلكة سابقاً (أو خارج الباقة) → بسعر الخدمة المحدد.
   $usedIncludedIds = $hasSub ? usedPackageServiceIds((int) $user['id']) : [];
   $amount = 150.0;
+  $student_payable = 150.0;
   $package_id = null;
   $isIncludedSvc = false;
   if ($service_id) {
@@ -109,17 +110,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (in_array($service_id, activeSubscriptionServiceIds($s), true)) { $coveringSub = $s; break; }
       }
     }
+    
+    // جلب سعر الخدمة الأصلي
+    $stmtSrv = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
+    $stmtSrv->execute([$service_id]);
+    $srvPrice = (float) $stmtSrv->fetchColumn();
+    $amount = $srvPrice > 0 ? $srvPrice : 150.0;
+    
     if ($coveringSub && !in_array($service_id, $usedIncludedIds, true)) {
       $isIncludedSvc = true;
-      $amount = 0.0;
+      $student_payable = 0.0;
       $package_id = (int) $coveringSub['package_id'];
-    } else {
-      $stmt = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
-      $stmt->execute([$service_id]);
-      $srvPrice = $stmt->fetchColumn();
-      if ($srvPrice && $srvPrice > 0) {
-        $amount = (float) $srvPrice;
+      
+      // حساب القيمة الحقيقية بعد تخفيض الباقة
+      $pkgStmt = $db->prepare('SELECT price, service_ids FROM packages WHERE id = ? LIMIT 1');
+      $pkgStmt->execute([$package_id]);
+      $pkg = $pkgStmt->fetch(PDO::FETCH_ASSOC);
+      if ($pkg) {
+          $pkgPrice = (float) $pkg['price'];
+          $pkgServiceIds = json_decode($pkg['service_ids'] ?? '[]', true);
+          if (is_array($pkgServiceIds) && count($pkgServiceIds) > 0) {
+              $pkgServiceIdsPlaceholders = implode(',', array_fill(0, count($pkgServiceIds), '?'));
+              $sumStmt = $db->prepare("SELECT SUM(price) FROM services WHERE id IN ($pkgServiceIdsPlaceholders)");
+              $sumStmt->execute($pkgServiceIds);
+              $totalOriginalServicesPrice = (float) $sumStmt->fetchColumn();
+              
+              if ($totalOriginalServicesPrice > 0) {
+                  // نسبة الخصم للباقة (سعر الباقة / مجموع أسعار خدماتها)
+                  $discountMultiplier = $pkgPrice / $totalOriginalServicesPrice;
+                  // القيمة الحقيقية لهذه الخدمة تحديداً ضمن الباقة
+                  $amount = round($amount * $discountMultiplier, 2);
+              }
+          }
       }
+    } else {
+      $student_payable = $amount;
     }
   }
 
@@ -127,9 +152,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $error = 'يرجى ملء كافة الحقول المطلوبة بنجاح.';
   } elseif (!in_array($specialty, $colleges, true)) {
     $error = 'يرجى اختيار الكلية من القائمة المنسدلة (أو كتابة اسمها عند اختيار "أخرى").';
-  } elseif ($amount > 0 && empty($_FILES['payment_receipt']['name'])) {
+  } elseif ($student_payable > 0 && empty($_FILES['payment_receipt']['name'])) {
     $error = 'إرفاق إشعار الدفع إلزامي للطلبات المدفوعة — لن يُقبل الطلب بدونه.';
-  } elseif ($amount > 0 && !empty($_FILES['payment_receipt']['name']) && ($_FILES['payment_receipt']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+  } elseif ($student_payable > 0 && !empty($_FILES['payment_receipt']['name']) && ($_FILES['payment_receipt']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
     $error = 'فشل رفع إشعار الدفع — تأكد أن الملف صورة أو PDF بحجم أقل من 10MB ثم أعد المحاولة.';
   } else {
     $order_id = createOrder([
@@ -164,27 +189,69 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'student/orders.php'
       );
 
-      // سجل دفع (يُتخطَّى للخدمات المشمولة في الباقة لأنها مجانية)
-      if ($amount > 0) {
+      // جلب نسبة المنصة للخدمة المطلوبة
+      $stmtPct = $db->prepare('SELECT platform_percent FROM services WHERE id = ? LIMIT 1');
+      $stmtPct->execute([$service_id]);
+      $platformPercent = (float) $stmtPct->fetchColumn();
+
+      // سجل دفع
+      if ($student_payable > 0) {
+        $methodId = (int) ($_POST['payment_method_id'] ?? 0);
+        $methodType = 'bank_transfer'; // افتراضي
+        if ($methodId) {
+            foreach ($paymentMethods as $pm) {
+                if ((int)$pm['id'] === $methodId) {
+                    $acName = strtolower($pm['account_name'] ?? '');
+                    if (strpos($acName, 'stc') !== false) {
+                        $methodType = 'stc_pay';
+                    } elseif (strpos($acName, 'apple') !== false) {
+                        $methodType = 'apple_pay';
+                    } else {
+                        $methodType = ($pm['account_type'] ?? 'bank') === 'wallet' ? 'wallet' : 'bank_transfer';
+                    }
+                    break;
+                }
+            }
+        }
+        
+        createPayment([
+          'order_id' => $order_id,
+          'student_id' => $user['id'],
+          'amount' => $student_payable,
+          'method' => $methodType,
+          'platform_percent' => $platformPercent,
+          'status' => 'pending'
+        ]);
+      } elseif ($amount > 0 && $isIncludedSvc) {
+        // دفع عن طريق الباقة (يتم تسجيله كمدفوع مباشرة لضمان أرباح الأكاديمي)
         createPayment([
           'order_id' => $order_id,
           'student_id' => $user['id'],
           'amount' => $amount,
-          'method' => 'credit_card'
+          'method' => 'wallet',
+          'platform_percent' => $platformPercent,
+          'status' => 'paid'
         ]);
       }
 
       // تسجيل إشعار الدفع المرفق (خطوة الدفع) للطلبات المدفوعة
-      if ($amount > 0) {
+      if ($student_payable > 0) {
         $rcptPath = saveReceiptUpload($_FILES['payment_receipt'] ?? null);
         if ($rcptPath) {
           $methodId = (int) ($_POST['payment_method_id'] ?? 0) ?: null;
+          $methodLabel = 'تحويل بنكي';
+          foreach ($paymentMethods as $pm) {
+              if ((int)$pm['id'] === $methodId) {
+                  $methodLabel = $pm['account_name'];
+                  break;
+              }
+          }
           savePaymentReceipt([
             'order_id'     => $order_id,
             'student_id'   => $user['id'],
             'method_id'    => $methodId,
-            'method_label' => getPaymentMethodLabel($methodId),
-            'amount'       => $amount,
+            'method_label' => $methodLabel,
+            'amount'       => $student_payable,
             'receipt_path' => $rcptPath,
           ]);
           createNotification(
@@ -193,7 +260,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'إشعار دفع جديد 🧾',
             'أرفق الطالب ' . $user['name'] . ' إشعار دفع مع الطلب ' . generateOrderNumber() . '.',
             '🧾',
-            'admin/pages/payments.php'
+            'admin/pages/payments.php#tab-students'
           );
         }
       }
@@ -548,7 +615,7 @@ require __DIR__ . '/partials/sidebar.php';
 
             <div class="form-group">
               <label class="form-label">إرفاق إشعار الدفع (صورة أو PDF) <span style="color:var(--danger)">*</span></label>
-              <input type="file" class="form-input" name="payment_receipt" accept="image/*,.pdf" required>
+              <input type="file" class="form-input" name="payment_receipt" accept="image/*,.pdf">
               <small style="color:var(--text-secondary);font-size:12px">إلزامي: بعد التحويل، صوّر إشعار التحويل أو إيصال الدفع وأرفقه هنا (حتى 10MB). لن يُقبل الطلب بدون إشعار الدفع.</small>
             </div>
           </div>

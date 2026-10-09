@@ -46,9 +46,9 @@ if ($action === 'send_reply') {
     createNotification(
         $uid,
         $utype,
-        'رد فريق الدعم 🛟',
+        'رد فريق الدعم 💬',
         'لقد رد فريق الدعم على تذكرتك: ' . mb_substr($conv['subject'], 0, 60, 'UTF-8'),
-        '🛟',
+        '💬',
         $utype === 'student' ? 'student/support.php?conv=' . $convId : 'academics/academic-support.php?conv=' . $convId
     );
 

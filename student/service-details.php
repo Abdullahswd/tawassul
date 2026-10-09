@@ -96,7 +96,7 @@ require __DIR__ . '/partials/sidebar.php';
 
             <div style="display:flex;gap:12px;margin-top:10px">
               <a href="create-order.php?service_id=<?= $service['id'] ?>" class="btn btn-primary">اطلب الخدمة الآن 🚀</a>
-              <a href="chat.php" class="btn btn-outline" style="color:var(--text-secondary);border-color:var(--border-color)">💬 استفسار قبل الطلب</a>
+              <a href="support.php" class="btn btn-outline" style="color:var(--text-secondary);border-color:var(--border-color)">💬 استفسار قبل الطلب</a>
             </div>
 
             <?php if (!empty($featureList)): ?>

@@ -128,6 +128,8 @@ $new_students_month = (int) $db->query("SELECT COUNT(*) FROM users WHERE role = 
 
 <script src="../assets/js/main.js"></script>
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 // بيانات الطلاب من الخادم
 let studentsData = <?= json_encode($students) ?>;
 let filteredData = [...studentsData];
@@ -209,6 +211,7 @@ document.getElementById('saveUserBtn').onclick = function() {
     if (isAdd && !password) { Toast.show('كلمة المرور مطلوبة للإضافة', 'warning'); return; }
 
     const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
     formData.append('action', isAdd ? 'add' : 'edit');
     if (!isAdd) formData.append('id', id);
     formData.append('name', name);
@@ -248,7 +251,8 @@ function deleteUser(id) {
   const u = studentsData.find(s=>s.id===id);
   if(!u) return;
   Modal.confirm('حذف الطالب', `هل تريد حذف "${u.name}" نهائياً؟`, () => {
-    const fd = new FormData(); fd.append('action','delete'); fd.append('id',id);
+    const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs); fd.append('action','delete'); fd.append('id',id);
     fetch('../ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
       .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
       .catch(()=>Toast.show('خطأ في الاتصال','error'));
@@ -259,7 +263,8 @@ function toggleUserStatus(id, curr) {
   const actionText = newStatus==='active'?'تفعيل':'تعليق';
   const u = studentsData.find(s=>s.id===id);
   Modal.confirm(`${actionText} الحساب`, `هل تريد ${actionText} حساب "${u.name}"؟`, () => {
-    const fd = new FormData(); fd.append('action','update_status'); fd.append('id',id); fd.append('status',newStatus);
+    const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs); fd.append('action','update_status'); fd.append('id',id); fd.append('status',newStatus);
     fetch('../ajax/manage_user.php', { method:'POST', body:fd, credentials:'same-origin' })
       .then(r=>r.json()).then(res=>{ if(res.success) { Toast.show(res.message,'success'); setTimeout(()=>location.reload(),800); } else Toast.show(res.message,'error'); })
       .catch(()=>Toast.show('خطأ في الاتصال','error'));

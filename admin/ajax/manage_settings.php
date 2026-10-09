@@ -22,6 +22,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 }
 
 require_once __DIR__ . '/../../config/functions.php';
+require_once __DIR__ . '/../../config/auth.php';
 if (!function_exists('db')) sendError('دالة db غير موجودة', 500);
 $db = db();
 if (!$db) sendError('فشل الاتصال بقاعدة البيانات', 500);
@@ -120,6 +121,54 @@ if ($action === 'change_password') {
     $update->execute([$hashed, $_SESSION['user_id']]);
     echo json_encode(['success' => true, 'message' => 'تم تغيير كلمة المرور بنجاح']);
     exit;
+}
+
+// ========== 5. رفع صورة الملف الشخصي ==========
+if ($action === 'upload_avatar') {
+    if (!isset($_FILES['avatar']) || $_FILES['avatar']['error'] !== UPLOAD_ERR_OK) {
+        sendError('الرجاء اختيار صورة صالحة');
+    }
+    
+    $file = $_FILES['avatar'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    $allowedExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+    
+    if (!in_array($ext, $allowedExt)) {
+        sendError('صيغة الملف غير مدعومة');
+    }
+    
+    // Check size limit (e.g., 2MB)
+    if ($file['size'] > 2 * 1024 * 1024) {
+        sendError('حجم الصورة كبير جداً، يجب ألا يتجاوز 2 ميجابايت');
+    }
+    
+    // Ensure uploads directory exists
+    $uploadDir = __DIR__ . '/../../uploads/avatars';
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+    }
+    
+    $fileName = 'admin_' . $_SESSION['user_id'] . '_' . time() . '.' . $ext;
+    $targetPath = $uploadDir . '/' . $fileName;
+    
+    if (move_uploaded_file($file['tmp_name'], $targetPath)) {
+        $avatarDbPath = 'uploads/avatars/' . $fileName;
+        
+        // Update database
+        $stmt = $db->prepare("UPDATE users SET avatar_path = ? WHERE id = ?");
+        $stmt->execute([$avatarDbPath, $_SESSION['user_id']]);
+        
+        $_SESSION['user_avatar_path'] = $avatarDbPath;
+        
+        echo json_encode([
+            'success' => true, 
+            'message' => 'تم تحديث الصورة الشخصية بنجاح',
+            'avatar_url' => rootUrl() . '/' . $avatarDbPath
+        ]);
+        exit;
+    } else {
+        sendError('فشل في رفع الصورة');
+    }
 }
 
 sendError('إجراء غير معروف');

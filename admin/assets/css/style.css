@@ -1,4 +1,4 @@
-/* ============================================
+﻿/* ============================================
    Admin Dashboard - Global Styles
    Eduroad Academic Platform
    ============================================ */
@@ -891,8 +891,8 @@ body {
 /* ---- Responsive Media Queries ---- */
 @media (max-width: 1024px) {
   /* ======================================
-     إخفاء القائمة الجانبية بالكامل في الجوال
-     لمنع أي تمدد بحجم الصفحة
+     Ø¥Ø®ÙØ§Ø¡ Ø§Ù„Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„Ø¬Ø§Ù†Ø¨ÙŠØ© Ø¨Ø§Ù„ÙƒØ§Ù…Ù„ ÙÙŠ Ø§Ù„Ø¬ÙˆØ§Ù„
+     Ù„Ù…Ù†Ø¹ Ø£ÙŠ ØªÙ…Ø¯Ø¯ Ø¨Ø­Ø¬Ù… Ø§Ù„ØµÙØ­Ø©
      ====================================== */
   .sidebar {
     display: none !important;
@@ -904,7 +904,7 @@ body {
     overflow-y: auto !important;
     transform: none !important;
   }
-  /* عند الفتح تظهر من اليمين */
+  /* Ø¹Ù†Ø¯ Ø§Ù„ÙØªØ­ ØªØ¸Ù‡Ø± Ù…Ù† Ø§Ù„ÙŠÙ…ÙŠÙ† */
   .sidebar.mobile-open {
     display: flex !important;
     box-shadow: -8px 0 32px rgba(0,0,0,0.5);
@@ -914,7 +914,7 @@ body {
     from { opacity: 0; transform: translateX(30px); }
     to   { opacity: 1; transform: translateX(0); }
   }
-  /* إظهار زر الإغلاق في الجوال */
+  /* Ø¥Ø¸Ù‡Ø§Ø± Ø²Ø± Ø§Ù„Ø¥ØºÙ„Ø§Ù‚ ÙÙŠ Ø§Ù„Ø¬ÙˆØ§Ù„ */
   .sidebar-mobile-close {
     display: flex !important;
   }
@@ -1143,6 +1143,31 @@ body {
 .tab-panel { display: none; }
 .tab-panel.active { display: block; animation: fadeIn 0.3s ease; }
 
+.tabs-loader {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+.tabs-loader .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(99, 102, 241, 0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 12px;
+}
+.tabs-loader .loader-text {
+  font-size: 14px;
+  font-weight: 500;
+  animation: pulse 1.5s infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: 0.5; } }
+
 /* ---- Progress Bar ---- */
 .progress-bar {
   height: 6px;
@@ -1170,3 +1195,5 @@ body {
 .alert-success { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2); color: #10b981; }
 .alert-danger { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); color: #ef4444; }
 .alert-warning { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b; }
+.navbar [data-tooltip]::after { bottom: auto; top: calc(100% + 8px); }
+

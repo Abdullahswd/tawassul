@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/pusher.php';
 
 /* ─────────────────────────────────────────────
    USERS
@@ -317,11 +318,15 @@ function generateOrderNumber(): string {
 
 function createOrder(array $data): int {
     $number = generateOrderNumber();
+    $amount = (float)($data['amount'] ?? 0);
+    $package_id = $data['package_id'] ?? null;
+    $status = ($amount == 0 || !empty($package_id)) ? 'pending_assignment' : 'awaiting_payment';
+    
     $stmt   = db()->prepare(
         'INSERT INTO orders
            (order_number, student_id, service_id, package_id, specialty,
             academic_level, language, description, deadline, amount, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,"pending_assignment")'
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
         $number,
@@ -333,7 +338,8 @@ function createOrder(array $data): int {
         $data['language']       ?? 'العربية',
         $data['description']    ?? null,
         $data['deadline']       ?? null,
-        $data['amount']         ?? 0,
+        $amount,
+        $status
     ]);
     return (int) db()->lastInsertId();
 }
@@ -386,8 +392,52 @@ function getOrderById(int $orderId): ?array {
 }
 
 function updateOrderStatus(int $orderId, string $status): bool {
-    $stmt = db()->prepare('UPDATE orders SET status = ? WHERE id = ?');
-    return $stmt->execute([$status, $orderId]);
+    $db = db();
+    
+    // Get current order state
+    $stmt = $db->prepare('SELECT status, academic_id, order_number FROM orders WHERE id = ?');
+    $stmt->execute([$orderId]);
+    $order = $stmt->fetch();
+    
+    if (!$order) {
+        return false;
+    }
+    
+    $old_status = $order['status'];
+    
+    // Update order status
+    $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
+    $success = $stmt->execute([$status, $orderId]);
+    
+    // If order was just marked as completed, pay the academic
+    if ($success && $status === 'completed' && $old_status !== 'completed' && !empty($order['academic_id'])) {
+        // Find the pending payment for this order
+        $payStmt = $db->prepare("SELECT id, academic_net FROM payments WHERE order_id = ? AND status = 'pending' LIMIT 1");
+        $payStmt->execute([$orderId]);
+        $payment = $payStmt->fetch();
+        
+        if ($payment) {
+            // Mark payment as paid
+            $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = ?")
+               ->execute([$payment['id']]);
+               
+            // Increase academic balance
+            $db->prepare("UPDATE academics SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?")
+               ->execute([$payment['academic_net'], $payment['academic_net'], $order['academic_id']]);
+               
+            // Send notification to academic
+            createNotification(
+                (int)$order['academic_id'],
+                'academic',
+                'أرباح جديدة تمت إضافتها 💰',
+                'تم اكتمال طلبك رقم ' . $order['order_number'] . ' وإضافة ' . $payment['academic_net'] . ' ر.س إلى رصيدك.',
+                '💰',
+                'academic-earnings.php'
+            );
+        }
+    }
+    
+    return $success;
 }
 
 function getAssignedAcademics(int $orderId): array {
@@ -418,15 +468,17 @@ function generatePaymentNumber(): string {
 }
 
 function createPayment(array $data): int {
-    $fee    = round($data['amount'] * 0.15, 2);
+    $platform_percent = (float)($data['platform_percent'] ?? 15.0);
+    $fee    = round($data['amount'] * ($platform_percent / 100), 2);
     $net    = round($data['amount'] - $fee, 2);
     $number = generatePaymentNumber();
+    $status = $data['status'] ?? 'pending';
 
     $stmt = db()->prepare(
         'INSERT INTO payments
            (payment_number, order_id, student_id, amount, platform_fee,
             academic_net, method, status)
-         VALUES (?,?,?,?,?,?,?,"pending")'
+         VALUES (?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
         $number,
@@ -436,6 +488,7 @@ function createPayment(array $data): int {
         $fee,
         $net,
         $data['method'] ?? 'credit_card',
+        $status
     ]);
     return (int) db()->lastInsertId();
 }
@@ -562,7 +615,36 @@ function sendMessage(int $conversationId, int $senderId, string $senderType, str
         $fileInfo['type'] ?? null,
         $fileInfo['size'] ?? null,
     ]);
-    return (int) db()->lastInsertId();
+    
+    $msgId = (int) db()->lastInsertId();
+    
+    // Fetch sender name for real-time notification
+    $senderName = 'Unknown';
+    if ($senderType === 'student' || $senderType === 'admin') {
+        $uStmt = db()->prepare('SELECT name FROM users WHERE id = ?');
+        $uStmt->execute([$senderId]);
+        $senderName = $uStmt->fetchColumn() ?: 'Unknown';
+    } else {
+        $aStmt = db()->prepare('SELECT name FROM academics WHERE id = ?');
+        $aStmt->execute([$senderId]);
+        $senderName = $aStmt->fetchColumn() ?: 'Unknown';
+    }
+
+    $msgData = [
+        'id' => $msgId,
+        'conversation_id' => $conversationId,
+        'sender_id' => $senderId,
+        'sender_type' => $senderType,
+        'sender_name' => $senderName,
+        'content' => $content,
+        'file_path' => $fileInfo['path'] ?? null,
+        'file_name' => $fileInfo['name'] ?? null,
+        'sent_at' => date('Y-m-d H:i:s')
+    ];
+    
+    triggerPusherEvent("chat-{$conversationId}", "new-message", $msgData);
+    
+    return $msgId;
 }
 
 /* ─────────────────────────────────────────────
@@ -597,6 +679,17 @@ function createNotification(int $userId, string $userType, string $title, string
          VALUES (?,?,?,?,?,?)'
     );
     $stmt->execute([$userId, $userType, $title, $message, $icon, $link]);
+    
+    // Trigger real-time push event
+    $notifId = (int) db()->lastInsertId();
+    triggerPusherEvent("user-{$userType}-{$userId}", "new-notification", [
+        'id' => $notifId,
+        'title' => $title,
+        'message' => $message,
+        'icon' => $icon,
+        'link' => $link,
+        'created_at' => date('Y-m-d H:i:s')
+    ]);
 }
 
 function getNotifications(int $userId, string $userType, bool $unreadOnly = false): array {
@@ -673,6 +766,7 @@ function formatMoney(float $amount): string {
  */
 function orderStatusLabel(string $status): array {
     return match($status) {
+        'awaiting_payment'   => ['label' => 'بانتظار تأكيد الدفع', 'class' => 'badge-warning'],
         'pending_assignment' => ['label' => 'بانتظار تعيين الإدارة', 'class' => 'badge-info'],
         'assigned'           => ['label' => 'أُرسل إلى الأكاديمي', 'class' => 'badge-primary'],
         'new'         => ['label' => 'جديد',         'class' => 'badge-info'],
@@ -681,6 +775,7 @@ function orderStatusLabel(string $status): array {
         'revision'    => ['label' => 'تحت المراجعة',  'class' => 'badge-warning'],
         'completed'   => ['label' => 'مكتمل',         'class' => 'badge-success'],
         'cancelled'   => ['label' => 'ملغي',          'class' => 'badge-danger'],
+        'cancellation_requested' => ['label' => 'مطلوب إلغاؤه', 'class' => 'badge-danger'],
         default       => ['label' => $status,          'class' => 'badge-secondary'],
     };
 }
@@ -846,6 +941,23 @@ function saveOrderAttachmentUploads(?array $files, int $orderId): int {
         if ($origName === '' || !in_array($ext, $allowed, true)) continue;
 
         $tmpPath   = $files['tmp_name'][$i];
+        
+        // Security checks
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $ok = false;
+            if (class_exists('finfo')) {
+                $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)$tmpPath);
+                $ok = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
+            } else {
+                $info = @getimagesize($tmpPath);
+                $ok = is_array($info) && !empty($info['mime']);
+            }
+            if (!$ok) continue;
+        } elseif ($ext === 'pdf') {
+            $head = (string) @file_get_contents($tmpPath, false, null, 0, 5);
+            if (strpos($head, '%PDF-') !== 0) continue;
+        }
+
         $safeName  = preg_replace('/[^A-Za-z0-9.\-_]/', '_', $origName);
         $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . '_' . $safeName;
         $destPath  = $uploadDir . '/' . $uniqueName;
@@ -904,10 +1016,10 @@ function getReceiptForSubscription(int $subId): ?array {
     return $stmt->fetch() ?: null;
 }
 
-function updatePaymentReceiptStatus(int $receiptId, string $status): bool {
+function updatePaymentReceiptStatus(int $receiptId, string $status, ?string $reason = null): bool {
     if (!in_array($status, ['approved', 'rejected', 'pending'], true)) return false;
-    $stmt = db()->prepare('UPDATE payment_receipts SET status = ? WHERE id = ?');
-    return $stmt->execute([$status, $receiptId]);
+    $stmt = db()->prepare('UPDATE payment_receipts SET status = ?, rejection_reason = ? WHERE id = ?');
+    return $stmt->execute([$status, $reason, $receiptId]);
 }
 
 /** All payment receipts (for the admin review screen), newest first. */

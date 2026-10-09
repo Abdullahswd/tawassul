@@ -40,12 +40,63 @@ $orderAttachments = $attStmt->fetchAll();
 // مسار التطبيق الأساسي لبناء روابط الملفات
 $adminAppBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 
+// جلب المحادثة بين الطالب والأكاديمي إن وجدت
+$chatMessages = [];
+$convStmt = $db->prepare("SELECT * FROM conversations WHERE order_id = ? LIMIT 1");
+$convStmt->execute([(int) $order['id']]);
+$conversation = $convStmt->fetch();
+
+if ($conversation) {
+    $msgStmt = $db->prepare("SELECT * FROM messages WHERE conversation_id = ? ORDER BY sent_at ASC");
+    $msgStmt->execute([(int) $conversation['id']]);
+    $chatMessages = $msgStmt->fetchAll();
+}
+
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
     $new_status = $_POST['status'] ?? '';
-    if (in_array($new_status, ['pending_assignment', 'assigned', 'new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled'])) {
+    if (in_array($new_status, ['pending_assignment', 'assigned', 'new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled', 'cancellation_requested'])) {
         updateOrderStatus($order['id'], $new_status);
         
+        if ($new_status === 'cancelled') {
+            $deducted = isset($_POST['deducted_amount']) ? (float)$_POST['deducted_amount'] : 0.0;
+            $total_paid = (float)($order['price'] ?? $order['amount']);
+            if ($deducted < 0) $deducted = 0.0;
+            if ($deducted > $total_paid) $deducted = $total_paid;
+            
+            $refund_amount = $total_paid - $deducted;
+            
+            // Check if there was any payment
+            $rcStmt = $db->prepare("SELECT id FROM payment_receipts WHERE order_id = ? AND status IN ('pending', 'approved') LIMIT 1");
+            $rcStmt->execute([$order['id']]);
+            if ($rcStmt->fetchColumn()) {
+                $chkRef = $db->prepare("SELECT id FROM refund_requests WHERE order_id = ? LIMIT 1");
+                $chkRef->execute([$order['id']]);
+                if (!$chkRef->fetchColumn() && $refund_amount > 0) {
+                    $db->prepare("INSERT INTO refund_requests (order_id, student_id, amount, status) VALUES (?, ?, ?, 'pending')")
+                       ->execute([$order['id'], $order['student_id'], $refund_amount]);
+                }
+                
+                if ($deducted > 0 && !empty($order['academic_id'])) {
+                    $platform_fee = $deducted * 0.15;
+                    $academic_net = $deducted - $platform_fee;
+                    // Update payments table to pay academic
+                    $db->prepare("UPDATE payments SET amount = ?, platform_fee = ?, academic_net = ?, status = 'paid', paid_at = NOW() WHERE order_id = ? AND status = 'pending'")
+                       ->execute([$deducted, $platform_fee, $academic_net, $order['id']]);
+                    // Add balance
+                    $db->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$academic_net, $order['academic_id']]);
+                }
+            }
+        }
+        
+        // Notify Academics if order is cancelled
+        if ($new_status === 'cancelled') {
+            $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL");
+            $academics->execute([$order['id'], $order['id']]);
+            foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
+                createNotification($acid, 'academic', 'إلغاء الطلب نهائياً 🚫', 'قامت الإدارة بإلغاء الطلب #' . $order['order_number'] . ' بشكل نهائي.', '🚫', 'academics/academic-order-details.php?id=' . $order['order_number']);
+            }
+        }
         // Add a notification for the student
         createNotification(
             $order['student_id'],
@@ -281,6 +332,61 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
             </div>
           </div>
 
+          <!-- Chat Viewer -->
+          <div class="stat-card animate-fadeInUp delay-4" style="padding:20px; display:flex; flex-direction:column; max-height:500px">
+            <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px">💬 المحادثة المرفقة (طالب ↔ أكاديمي)</h3>
+            <div style="flex:1; overflow-y:auto; background:var(--bg-main); border-radius:12px; padding:16px; border:1px solid var(--border-color); display:flex; flex-direction:column; gap:16px">
+              <?php if (empty($chatMessages)): ?>
+                <div style="text-align:center; padding:30px 0; color:var(--text-secondary); font-size:13px">
+                  لا توجد رسائل أو ملفات متبادلة بعد في هذه المحادثة.
+                </div>
+              <?php else: ?>
+                <?php foreach ($chatMessages as $msg): 
+                  $isStudent = $msg['sender_type'] === 'student';
+                  $msgColor = $isStudent ? 'var(--primary)' : '#10b981';
+                  $bgColor = $isStudent ? 'rgba(99,102,241,0.1)' : 'rgba(16,185,129,0.1)';
+                  $senderName = $isStudent ? $order['student_name'] : $order['academic_name'];
+                  $senderAvatar = $isStudent ? '👨‍🎓' : '👨‍🏫';
+                  
+                  // Format file if attached
+                  $msgHasFile = !empty($msg['file_path']);
+                  $msgExt = $msgHasFile ? strtolower(pathinfo($msg['file_name'], PATHINFO_EXTENSION)) : '';
+                  $msgIconMap = [
+                    'pdf' => '📕', 'doc' => '📄', 'docx' => '📄',
+                    'xls' => '📊', 'xlsx' => '📊',
+                    'jpg' => '🖼️', 'jpeg' => '🖼️', 'png' => '🖼️', 'webp' => '🖼️',
+                  ];
+                  $msgFileIcon = $msgIconMap[$msgExt] ?? '📎';
+                  $msgFilePath = $msgHasFile ? $adminAppBase . '/' . $msg['file_path'] : '#';
+                ?>
+                  <div style="display:flex; gap:12px; <?= $isStudent ? 'flex-direction:row;' : 'flex-direction:row-reverse;' ?>">
+                    <div style="width:36px; height:36px; border-radius:10px; background:<?= $bgColor ?>; color:<?= $msgColor ?>; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0;">
+                      <?= $senderAvatar ?>
+                    </div>
+                    <div style="max-width:85%; display:flex; flex-direction:column; gap:4px; <?= $isStudent ? 'align-items:flex-start;' : 'align-items:flex-end;' ?>">
+                      <div style="font-size:11px; color:var(--text-secondary); font-weight:600">
+                        <?= e($senderName) ?> · <?= formatDate($msg['sent_at']) ?>
+                      </div>
+                      <div style="background:<?= $isStudent ? 'white' : '#f0fdf4' ?>; border:1px solid <?= $isStudent ? 'var(--border-color)' : '#bbf7d0' ?>; padding:10px 14px; border-radius:12px; <?= $isStudent ? 'border-top-right-radius:2px;' : 'border-top-left-radius:2px;' ?> font-size:13.5px; color:#111827; line-height:1.6">
+                        <?php if (!empty($msg['content'])): ?>
+                          <div style="white-space:pre-wrap"><?= e($msg['content']) ?></div>
+                        <?php endif; ?>
+                        
+                        <?php if ($msgHasFile): ?>
+                          <a href="<?= e($msgFilePath) ?>" target="_blank" style="display:flex; align-items:center; gap:8px; margin-top:8px; padding:8px 12px; background:<?= $isStudent ? 'var(--bg-main)' : '#dcfce7' ?>; border:1px solid <?= $isStudent ? 'var(--border-color)' : '#86efac' ?>; border-radius:8px; text-decoration:none; color:#111827; transition:border-color 0.2s" onmouseover="this.style.borderColor='<?= $msgColor ?>'" onmouseout="this.style.borderColor='<?= $isStudent ? 'var(--border-color)' : '#86efac' ?>'">
+                            <span style="font-size:18px"><?= $msgFileIcon ?></span>
+                            <span style="font-size:12px; font-weight:600; flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px" title="<?= e($msg['file_name']) ?>"><?= e($msg['file_name']) ?></span>
+                            <span style="font-size:11px; color:<?= $msgColor ?>; font-weight:700">تنزيل</span>
+                          </a>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </div>
+          </div>
+
         </div>
 
         <!-- Right Column -->
@@ -318,6 +424,13 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
             <?php else: ?>
               <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">لم يتم قبول الطلب من أكاديمي بعد.</p>
               
+              <?php if ($order['status'] === 'awaiting_payment'): ?>
+                <div style="border-top:1px dashed var(--border-color);padding-top:16px;text-align:center">
+                  <div style="background:#fffbeb;color:#b45309;padding:12px;border-radius:8px;font-size:13px;border:1px solid #fde68a">
+                    ⚠️ يجب اعتماد إيصال الدفع من قسم المدفوعات أولاً قبل إمكانية تعيين الأكاديميين.
+                  </div>
+                </div>
+              <?php else: ?>
               <!-- إسناد الطلب للأكاديميين المرشحين -->
               <div style="border-top:1px dashed var(--border-color);padding-top:16px">
                 <h4 style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:8px">📋 إسناد الطلب لأكاديمي أو أكثر</h4>
@@ -338,8 +451,15 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                         <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-main);border-radius:8px;cursor:pointer;font-size:13px">
                           <input type="checkbox" name="academic_ids[]" value="<?= $ac['id'] ?>" <?= $checked ?> style="width:16px;height:16px;accent-color:var(--primary)" />
                           <div style="flex:1">
-                            <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
-                            <span style="font-size:10px;color:var(--text-secondary);display:block"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?></span>
+                            <div style="display:flex;align-items:center;gap:6px">
+                              <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
+                              <?php if (($ac['availability'] ?? 'available') === 'available'): ?>
+                                <span class="badge" style="background:rgba(16,185,129,.1);color:#059669;font-size:10px;padding:2px 6px">متاح</span>
+                              <?php else: ?>
+                                <span class="badge" style="background:rgba(239,68,68,.1);color:#ef4444;font-size:10px;padding:2px 6px">غير متاح</span>
+                              <?php endif; ?>
+                            </div>
+                            <span style="font-size:10px;color:var(--text-secondary);display:block;margin-top:4px"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?> · ⭐ <?= number_format((float)$ac['rating'], 1) ?></span>
                           </div>
                         </label>
                       <?php endforeach; ?>
@@ -367,9 +487,16 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                         <label style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-main);border-radius:8px;cursor:pointer;font-size:13px;<?= $isMatch ? 'border:1px solid var(--primary);' : '' ?>">
                           <input type="checkbox" name="academic_ids[]" value="<?= $ac['id'] ?>" <?= $checked ?> style="width:16px;height:16px;accent-color:var(--primary)" />
                           <div style="flex:1">
-                            <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
-                            <?php if ($isMatch): ?><span style="font-size:10px;color:var(--primary);font-weight:700"> ✓ يقدم هذه الخدمة</span><?php endif; ?>
-                            <span style="font-size:10px;color:var(--text-secondary);display:block"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?> · ⭐ <?= number_format((float)$ac['rating'], 1) ?></span>
+                            <div style="display:flex;align-items:center;gap:6px">
+                              <span style="font-weight:600;color:var(--text-primary)"><?= e($ac['name']) ?></span>
+                              <?php if (($ac['availability'] ?? 'available') === 'available'): ?>
+                                <span class="badge" style="background:rgba(16,185,129,.1);color:#059669;font-size:10px;padding:2px 6px">متاح</span>
+                              <?php else: ?>
+                                <span class="badge" style="background:rgba(239,68,68,.1);color:#ef4444;font-size:10px;padding:2px 6px">غير متاح</span>
+                              <?php endif; ?>
+                              <?php if ($isMatch): ?><span style="font-size:10px;color:var(--primary);font-weight:700"> ✓ يقدم هذه الخدمة</span><?php endif; ?>
+                            </div>
+                            <span style="font-size:10px;color:var(--text-secondary);display:block;margin-top:4px"><?= e($ac['specialty']) ?> · <?= e($ac['degree']) ?> · ⭐ <?= number_format((float)$ac['rating'], 1) ?></span>
                           </div>
                         </label>
                       <?php endforeach; ?>
@@ -379,6 +506,7 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                   <button type="submit" class="btn btn-primary btn-block btn-sm" style="justify-content:center;width:100%">💾 حفظ وإرسال الإسناد</button>
                 </form>
               </div>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
 
@@ -393,7 +521,46 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                 <button type="submit" name="status" value="in_progress" class="btn btn-warning" style="justify-content:center">⟳ قيد التنفيذ</button>
                 <button type="submit" name="status" value="completed" class="btn btn-success" style="justify-content:center">✓ مكتمل</button>
                 <hr class="divider" />
-                <button type="submit" name="status" value="cancelled" class="btn btn-danger" style="justify-content:center">✕ إلغاء الطلب</button>
+                <?php if ($order['status'] === 'cancellation_requested'): ?>
+                  <div style="background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;margin-bottom:12px">
+                    <div style="font-size:12px;color:#991b1b;font-weight:700;margin-bottom:4px">⚠️ طلب إلغاء من الطالب</div>
+                    <div style="font-size:13px;color:#7f1d1d;margin-bottom:6px"><strong>السبب:</strong> <?= e($order['cancellation_reason'] ?? 'غير محدد') ?></div>
+                    <div style="font-size:13px;color:#7f1d1d"><strong>حالة الطلب وقت الإلغاء (عند الأكاديمي):</strong> <?= e(orderStatusLabel($order['previous_status'] ?? '')['label'] ?? 'غير معروف') ?></div>
+                  </div>
+                <?php elseif ($order['status'] === 'cancelled' && !empty($order['cancellation_reason'])): ?>
+                  <div style="background:#fef2f2;border:1px solid #fecaca;padding:12px;border-radius:8px;margin-bottom:12px">
+                    <div style="font-size:12px;color:#991b1b;font-weight:700;margin-bottom:4px">🚫 تم إلغاء هذا الطلب</div>
+                    <div style="font-size:13px;color:#7f1d1d;margin-bottom:6px"><strong>سبب الإلغاء:</strong> <?= e($order['cancellation_reason']) ?></div>
+                    <?php if (!empty($order['previous_status'])): ?>
+                      <div style="font-size:13px;color:#7f1d1d"><strong>الحالة قبل الإلغاء:</strong> <?= e(orderStatusLabel($order['previous_status'])['label'] ?? 'غير معروف') ?></div>
+                    <?php endif; ?>
+                  </div>
+                <?php endif; ?>
+
+                <?php if ($order['status'] === 'cancellation_requested'): ?>
+                  <script>
+                  function handlePartialRefund(form) {
+                      var maxAmount = <?= (float)$order['amount'] ?>;
+                      var val = prompt("الرجاء إدخال المبلغ المراد خصمه كتعويض للأكاديمي (باقي المبلغ سيتم استرداده للطالب):\nأدخل 0 لاسترداد كامل المبلغ للطالب.", "0");
+                      if (val === null) return false;
+                      var deducted = parseFloat(val);
+                      if (isNaN(deducted) || deducted < 0 || deducted > maxAmount) {
+                          alert("قيمة غير صحيحة. يجب أن يكون الخصم بين 0 و " + maxAmount);
+                          return false;
+                      }
+                      var rInput = document.createElement("input");
+                      rInput.type = "hidden";
+                      rInput.name = "deducted_amount";
+                      rInput.value = deducted;
+                      form.appendChild(rInput);
+                      return true;
+                  }
+                  </script>
+                  <button type="submit" name="status" value="cancelled" onclick="return handlePartialRefund(this.form);" class="btn btn-danger" style="justify-content:center;background:#991b1b">⚠️ قبول الإلغاء وتحديد الاسترجاع</button>
+                  <button type="submit" name="status" value="<?= e($order['previous_status'] ?? 'in_progress') ?>" class="btn btn-outline" style="justify-content:center;color:#991b1b;border-color:#991b1b">✕ رفض وإعادة للحالة السابقة</button>
+                <?php else: ?>
+                  <button type="submit" name="status" value="cancelled" class="btn btn-danger" style="justify-content:center">✕ إلغاء الطلب مباشرة</button>
+                <?php endif; ?>
               </div>
             </form>
           </div>

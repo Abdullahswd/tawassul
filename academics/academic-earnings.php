@@ -9,9 +9,47 @@ $academicData = getAcademicById($academicId);
 
 $db = db();
 
+// --- TEMPORARY DB MODIFICATIONS ---
+try {
+    $db->exec("CREATE TABLE IF NOT EXISTS payout_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payout_id INT NOT NULL,
+        sender_type ENUM('admin', 'academic') NOT NULL,
+        sender_id INT NOT NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+} catch(Exception $e) {}
+// --- END TEMPORARY DB MODIFICATIONS ---
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_payout_message') {
+    $payoutId = intval($_POST['payout_id'] ?? 0);
+    $message = trim($_POST['message'] ?? '');
+    if ($payoutId > 0 && !empty($message)) {
+        // Verify payout belongs to academic
+        $verify = $db->prepare("SELECT id FROM payouts WHERE id = ? AND academic_id = ?");
+        $verify->execute([$payoutId, $academicId]);
+        if ($verify->fetch()) {
+            $stmt = $db->prepare("INSERT INTO payout_messages (payout_id, sender_type, sender_id, message) VALUES (?, 'academic', ?, ?)");
+            $stmt->execute([$payoutId, $academicId, $message]);
+        }
+    }
+    header("Location: academic-earnings.php");
+    exit;
+}
 // Real financial figures
 $balance = (float)$academicData['balance'];
 $totalEarned = (float)$academicData['total_earned'];
+
+// Fetch payout policy settings
+$settings = [];
+$stmt = $db->query("SELECT setting_key, setting_value FROM settings");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $settings[$row['setting_key']] = $row['setting_value'];
+}
+$min_withdrawal = (float)($settings['min_withdrawal'] ?? 200);
+$withdrawal_eligibility_days = (int)($settings['withdrawal_eligibility_days'] ?? 14);
+$payout_processing_time = (int)($settings['payout_processing_time'] ?? 3);
 
 // Let's check total earned from payments paid to make it consistent if total_earned column is 0
 $checkEarned = (float)$db->query("
@@ -29,6 +67,20 @@ if ($checkEarned > $totalEarned) {
 $totalWithdrawn = $totalEarned - $balance;
 if ($totalWithdrawn < 0) $totalWithdrawn = 0;
 
+// Calculate eligible balance (only from payments older than withdrawal_eligibility_days)
+$totalEligibleEarned = (float)$db->query("
+    SELECT SUM(p.academic_net)
+    FROM payments p
+    JOIN orders o ON p.order_id = o.id
+    WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
+")->fetchColumn();
+$eligibleBalance = $totalEligibleEarned - $totalWithdrawn;
+if ($eligibleBalance < 0) $eligibleBalance = 0;
+// Make sure it doesn't exceed total balance
+if ($eligibleBalance > $balance) $eligibleBalance = $balance;
+$pendingEligibility = $balance - $eligibleBalance;
+if ($pendingEligibility < 0) $pendingEligibility = 0;
+
 // Earnings this month
 $thisMonthEarnings = (float)$db->query("
     SELECT COALESCE(SUM(p.academic_net), 0)
@@ -36,6 +88,11 @@ $thisMonthEarnings = (float)$db->query("
     JOIN orders o ON p.order_id = o.id
     WHERE o.academic_id = $academicId AND p.status = 'paid' AND MONTH(p.paid_at) = MONTH(NOW()) AND YEAR(p.paid_at) = YEAR(NOW())
 ")->fetchColumn();
+
+// Fetch academic's saved bank accounts
+$stmt = $db->prepare("SELECT * FROM academic_bank_accounts WHERE academic_id = ? ORDER BY id ASC");
+$stmt->execute([$academicId]);
+$bankAccounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Load financial transactions (payments)
 $payStmt = $db->prepare("
@@ -83,6 +140,23 @@ while ($row = $earningsStmt->fetch()) {
     $mIndex = (int)$row['m'] - 1;
     if ($mIndex >= 0 && $mIndex < 12) {
         $monthlyEarnings[$mIndex] = (float)$row['total'];
+    }
+}
+
+// Fetch Payout Requests
+$payoutsStmt = $db->prepare("SELECT * FROM payouts WHERE academic_id = ? ORDER BY created_at DESC");
+$payoutsStmt->execute([$academicId]);
+$payoutRequests = $payoutsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$payoutMessages = [];
+if (!empty($payoutRequests)) {
+    $payoutIds = array_column($payoutRequests, 'id');
+    $inQuery = implode(',', array_fill(0, count($payoutIds), '?'));
+    $msgStmt = $db->prepare("SELECT * FROM payout_messages WHERE payout_id IN ($inQuery) ORDER BY created_at ASC");
+    $msgStmt->execute($payoutIds);
+    $msgs = $msgStmt->fetchAll(PDO::FETCH_ASSOC);
+    foreach($msgs as $msg) {
+        $payoutMessages[$msg['payout_id']][] = $msg;
     }
 }
 ?>
@@ -135,9 +209,15 @@ while ($row = $earningsStmt->fetch()) {
         </div>
         <div class="stat-card anim-up delay-3" style="border-top:3px solid #f59e0b;padding:22px">
           <div class="stat-icon" style="background:rgba(245,158,11,.1)">⏳</div>
-          <div class="stat-value" data-counter="<?= round($balance) ?>" data-suffix=" ر.س">0</div>
-          <div class="stat-label">المتاح للسحب</div>
-          <div class="stat-trend" style="color:var(--text-secondary)">قابل للصرف حالياً</div>
+          <div class="stat-value" data-counter="<?= round($eligibleBalance) ?>" data-suffix=" ر.س">0</div>
+          <div class="stat-label">المتاح للسحب (مؤهل)</div>
+          <div class="stat-trend" style="color:var(--text-secondary)">
+            <?php if ($pendingEligibility > 0): ?>
+              +<?= round($pendingEligibility) ?> ر.س معلق لفترة <?= $withdrawal_eligibility_days ?> يوم
+            <?php else: ?>
+              كل الرصيد قابل للصرف
+            <?php endif; ?>
+          </div>
         </div>
         <div class="stat-card anim-up delay-4" style="border-top:3px solid var(--primary);padding:22px">
           <div class="stat-icon" style="background:rgba(99,102,241,.1)">🏦</div>
@@ -156,6 +236,57 @@ while ($row = $earningsStmt->fetch()) {
           </div>
         </div>
         <canvas id="revenueChart" style="width:100%;height:240px"></canvas>
+      </div>
+
+      <!-- Withdrawal Requests -->
+      <div class="tbl-container anim-up delay-2" style="margin-bottom:24px">
+        <div class="tbl-header">
+          <h3 class="tbl-title">💸 طلبات السحب</h3>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>رقم الطلب</th>
+                <th>المبلغ</th>
+                <th>تاريخ الطلب</th>
+                <th>الحالة</th>
+                <th>الإجراء</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if(empty($payoutRequests)): ?>
+                <tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text-secondary);">لا توجد طلبات سحب</td></tr>
+              <?php else: ?>
+                <?php foreach($payoutRequests as $pr): ?>
+                <tr>
+                  <td><span style="font-family:monospace;font-size:12px;background:var(--bg-main);padding:3px 8px;border-radius:6px"><?= e($pr['payout_number']) ?></span></td>
+                  <td><strong><?= formatMoney($pr['amount']) ?> ر.س</strong></td>
+                  <td style="font-size:13px;color:var(--text-secondary)"><?= date('Y-m-d H:i', strtotime($pr['created_at'])) ?></td>
+                  <td>
+                    <?php if($pr['status'] == 'pending'): ?>
+                      <span class="badge badge-warning">قيد المراجعة</span>
+                    <?php elseif($pr['status'] == 'approved'): ?>
+                      <span class="badge badge-success">تمت الموافقة</span>
+                    <?php elseif($pr['status'] == 'rejected'): ?>
+                      <span class="badge badge-danger">مرفوض</span>
+                    <?php else: ?>
+                      <span class="badge badge-info"><?= e($pr['status']) ?></span>
+                    <?php endif; ?>
+                  </td>
+                  <td>
+                    <button class="btn btn-outline" style="padding:4px 12px;font-size:13px;" onclick="openPayoutMessages(<?= $pr['id'] ?>)">المراسلات 
+                    <?php if(isset($payoutMessages[$pr['id']])): ?>
+                      (<span style="color:var(--primary);font-weight:bold;"><?= count($payoutMessages[$pr['id']]) ?></span>)
+                    <?php endif; ?>
+                    </button>
+                  </td>
+                </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Transactions -->
@@ -211,28 +342,26 @@ while ($row = $earningsStmt->fetch()) {
   <div class="modal-box" style="max-width:500px">
     <div class="modal-header"><h3 class="modal-title">💸 طلب سحب الأرباح</h3><button class="modal-close" data-modal-close>✕</button></div>
     <div class="modal-body">
-      <div class="alert alert-info"><span>ℹ️</span><span>رصيدك المتاح للسحب: <strong><?= formatMoney($balance) ?></strong></span></div>
+      <div class="alert alert-info"><span>ℹ️</span><span>رصيدك المؤهل للسحب: <strong><?= formatMoney($eligibleBalance) ?></strong></span></div>
       <div class="form-group">
         <label class="form-label">مبلغ السحب (ر.س)</label>
-        <input class="form-input" id="withdrawAmount" type="number" placeholder="الحد الأدنى 200 ر.س" min="200" max="<?= intval($balance) ?>"/>
+        <input class="form-input" id="withdrawAmount" type="number" placeholder="الحد الأدنى <?= $min_withdrawal ?> ر.س" min="<?= $min_withdrawal ?>" max="<?= intval($eligibleBalance) ?>"/>
       </div>
       <div class="form-group">
-        <label class="form-label">طريقة الاستلام</label>
-        <select class="form-input form-select" id="withdrawMethod" style="padding-left:36px">
-          <option value="تحويل بنكي">تحويل بنكي</option>
-          <option value="محفظة STC Pay">محفظة STC Pay</option>
-          <option value="Apple Pay">Apple Pay</option>
+        <label class="form-label">اختر حساب الاستلام</label>
+        <select class="form-input form-select" id="withdrawBankId" style="padding-left:36px">
+          <?php if (empty($bankAccounts)): ?>
+            <option value="">لا توجد حسابات مضافة (يرجى إضافتها من الملف الشخصي)</option>
+          <?php else: ?>
+            <?php foreach ($bankAccounts as $acc): ?>
+              <option value="<?= (int)$acc['id'] ?>">
+                <?= ($acc['account_type'] === 'wallet' ? '📱 محفظة ' : '🏦 بنك ') . e($acc['account_name']) ?> - <?= e($acc['account_number']) ?>
+              </option>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">رقم الحساب البنكي / IBAN أو رقم الجوال للمحفظة</label>
-        <input class="form-input" id="withdrawIban" placeholder="SA00 0000 0000 0000 0000 0000" dir="ltr"/>
-      </div>
-      <div class="form-group">
-        <label class="form-label">اسم صاحب الحساب</label>
-        <input class="form-input" id="withdrawName" value="<?= e($academicName) ?>" placeholder="الاسم الكامل"/>
-      </div>
-      <div class="alert alert-warning"><span>⚠️</span><span>تُعالج طلبات السحب خلال 3-5 أيام عمل</span></div>
+      <div class="alert alert-warning"><span>⚠️</span><span>تُعالج طلبات السحب خلال <?= $payout_processing_time ?> أيام عمل كحد أقصى. الحد الأدنى للسحب هو <?= $min_withdrawal ?> ر.س.</span></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" data-modal-close>إلغاء</button>
@@ -246,8 +375,58 @@ while ($row = $earningsStmt->fetch()) {
   <div class="modal-box" style="max-width:420px"><div class="modal-header"><h3 class="modal-title" id="confirmTitle">تأكيد</h3><button class="modal-close" data-modal-close>✕</button></div><div class="modal-body" style="text-align:center;padding:32px 24px"><div style="font-size:56px;margin-bottom:12px">⚠️</div><p id="confirmMsg"></p></div><div class="modal-footer"><button class="btn btn-outline" data-modal-close>إلغاء</button><button class="btn btn-danger" id="confirmOkBtn">تأكيد</button></div></div>
 </div>
 
+<!-- Payout Messages Modal -->
+<div class="modal-overlay" id="payoutMessagesModal">
+  <div class="modal-box" style="max-width:600px; padding:0;">
+    <div class="modal-header" style="padding:15px 20px; border-bottom:1px solid var(--border-color);"><h3 class="modal-title">مراسلات طلب السحب</h3><button class="modal-close" data-modal-close>✕</button></div>
+    <div class="modal-body" style="background:#f9fafb; padding:20px; height:350px; overflow-y:auto;" id="payoutMessagesContainer">
+      <!-- Messages injected here via JS -->
+    </div>
+    <div class="modal-footer" style="background:#fff; border-top:1px solid var(--border-color); padding:15px 20px; justify-content:flex-start;">
+      <form method="POST" action="academic-earnings.php" style="width:100%; display:flex; gap:10px; margin:0;">
+        <input type="hidden" name="action" value="send_payout_message">
+        <input type="hidden" name="payout_id" id="replyPayoutId" value="">
+        <input type="text" name="message" class="form-input" placeholder="اكتب ردك هنا واستفسر من الإدارة..." required style="flex:1;">
+        <button type="submit" class="btn btn-primary">إرسال</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <script src="assets/js/main.js"></script>
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
+const payoutMessagesData = <?= json_encode($payoutMessages) ?>;
+function openPayoutMessages(payoutId) {
+    document.getElementById('replyPayoutId').value = payoutId;
+    const container = document.getElementById('payoutMessagesContainer');
+    container.innerHTML = '';
+    const msgs = payoutMessagesData[payoutId] || [];
+    
+    if(msgs.length === 0) {
+        container.innerHTML = '<div style="text-align:center; padding:40px; color:#888;">لا توجد رسائل سابقة. يمكنك إرسال استفسارك للإدارة من هنا.</div>';
+    } else {
+        msgs.forEach(msg => {
+            const isAdmin = msg.sender_type === 'admin';
+            const align = isAdmin ? 'left' : 'right';
+            const bg = isAdmin ? '#e0e7ff' : '#dcfce7';
+            const title = isAdmin ? 'الإدارة' : 'أنت';
+            container.innerHTML += `
+              <div style="margin-bottom:12px; text-align:${align}">
+                <div style="display:inline-block; max-width:85%; background:${bg}; padding:10px 14px; border-radius:12px; text-align:right; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                  <div style="font-size:11px; color:#666; margin-bottom:4px; font-weight:bold;">${title} <span style="font-weight:normal;font-size:10px;margin-right:5px;">${msg.created_at}</span></div>
+                  <div style="font-size:14px; color:#111; line-height:1.5;">${msg.message.replace(/\\n/g, '<br>')}</div>
+                </div>
+              </div>
+            `;
+        });
+        // Scroll to bottom
+        setTimeout(() => { container.scrollTop = container.scrollHeight; }, 50);
+    }
+    Modal.open('payoutMessagesModal');
+}
+
 // Feed database earnings data
 window.ACADEMICS_DATA.earnings.transactions = <?= json_encode($txnList, JSON_UNESCAPED_UNICODE) ?>;
 window.ACADEMICS_DATA.earnings.monthly = <?= json_encode($monthlyEarnings) ?>;
@@ -280,23 +459,23 @@ function renderTransactions() {
 
 function submitWithdraw() {
   const amount = document.getElementById('withdrawAmount').value;
-  const method = document.getElementById('withdrawMethod').value;
-  const iban = document.getElementById('withdrawIban').value;
-  const name = document.getElementById('withdrawName').value;
+  const bankId = document.getElementById('withdrawBankId').value;
 
-  if (!amount || +amount < 200) { Toast.show('المبلغ يجب أن يكون 200 ر.س على الأقل', 'error'); return; }
-  if (+amount > <?= $balance ?>) { Toast.show('المبلغ يتجاوز الرصيد المتاح', 'error'); return; }
-  if (!iban) { Toast.show('يرجى إدخال رقم الحساب البنكي أو المحفظة', 'error'); return; }
+  if (!amount || +amount < <?= $min_withdrawal ?>) { Toast.show('المبلغ يجب أن يكون <?= $min_withdrawal ?> ر.س على الأقل', 'error'); return; }
+  if (+amount > <?= $eligibleBalance ?>) { Toast.show('المبلغ يتجاوز الرصيد المؤهل للسحب', 'error'); return; }
+  if (!bankId) { Toast.show('الرجاء اختيار أو إضافة حساب استلام من ملفك الشخصي', 'error'); return; }
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('amount', amount);
-  formData.append('method', method);
-  formData.append('iban', iban);
-  formData.append('name', name);
+  formData.append('bank_account_id', bankId);
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  formData.append('csrf_token', csrf);
 
   fetch('ajax/handler.php?action=submit_withdraw', {
     method: 'POST',
-    body: formData
+    body: formData,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
   })
   .then(res => res.json())
   .then(data => {
@@ -305,7 +484,7 @@ function submitWithdraw() {
       Toast.show(data.message, 'success');
       setTimeout(() => location.reload(), 1500);
     } else {
-      Toast.show(data.message, 'error');
+      Toast.show(data.message || data.error, 'error');
     }
   });
 }

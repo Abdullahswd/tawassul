@@ -28,6 +28,17 @@ if (!function_exists('db')) sendError('دالة db غير موجودة', 500);
 $db = db();
 if (!$db) sendError('فشل الاتصال بقاعدة البيانات', 500);
 
+try {
+    $db->exec("CREATE TABLE IF NOT EXISTS payout_messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        payout_id INT NOT NULL,
+        sender_type ENUM('admin', 'academic') NOT NULL,
+        sender_id INT NOT NULL,
+        message TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+} catch (Exception $e) {}
+
 $action = trim($_POST['action'] ?? '');
 
 /* ─────────────────────────────────────────────
@@ -60,9 +71,21 @@ if ($action === 'get_data') {
         FROM payouts p
         LEFT JOIN academics a ON p.academic_id = a.id
         LEFT JOIN academic_bank_accounts b ON p.bank_account_id = b.id
-        ORDER BY p.paid_at DESC, p.id DESC
+        ORDER BY CASE WHEN p.status = 'pending' THEN 0 ELSE 1 END, p.created_at DESC
     ");
     $payouts = $payStmt->fetchAll();
+
+    // Fetch messages for these payouts
+    $payoutIds = array_column($payouts, 'id');
+    $messages = [];
+    if (!empty($payoutIds)) {
+        $inQuery = implode(',', array_fill(0, count($payoutIds), '?'));
+        $msgStmt = $db->prepare("SELECT * FROM payout_messages WHERE payout_id IN ($inQuery) ORDER BY created_at ASC");
+        $msgStmt->execute($payoutIds);
+        foreach ($msgStmt->fetchAll() as $msg) {
+            $messages[$msg['payout_id']][] = $msg;
+        }
+    }
 
     // Statistics
     $stats = [
@@ -74,7 +97,7 @@ if ($action === 'get_data') {
         'academics_count' => (int)$db->query("SELECT COUNT(*) FROM academics WHERE status='approved'")->fetchColumn(),
     ];
 
-    echo json_encode(['success' => true, 'academics' => $academics, 'payouts' => $payouts, 'stats' => $stats], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['success' => true, 'academics' => $academics, 'payouts' => $payouts, 'stats' => $stats, 'messages' => $messages], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -129,6 +152,46 @@ if ($action === 'add_payout') {
         if ($db->inTransaction()) $db->rollBack();
         sendError('فشل تسجيل الدفعة: ' . $e->getMessage());
     }
+}
+
+/* ─────────────────────────────────────────────
+   UPDATE PAYOUT STATUS
+   ───────────────────────────────────────────── */
+if ($action === 'update_payout_status') {
+    $payoutId = intval($_POST['payout_id'] ?? 0);
+    $status = trim($_POST['status'] ?? ''); 
+    if ($payoutId > 0 && in_array($status, ['approved', 'rejected'])) {
+        $db->prepare("UPDATE payouts SET status = ?, paid_at = IF(?='approved', NOW(), paid_at) WHERE id = ?")->execute([$status, $status, $payoutId]);
+        
+        // If rejected, refund the balance back to academic
+        if ($status === 'rejected') {
+            $stmt = $db->prepare("SELECT academic_id, amount FROM payouts WHERE id = ?");
+            $stmt->execute([$payoutId]);
+            $po = $stmt->fetch();
+            if ($po) {
+                $db->prepare("UPDATE academics SET balance = balance + ? WHERE id = ?")->execute([$po['amount'], $po['academic_id']]);
+            }
+        }
+        
+        echo json_encode(['success' => true, 'message' => 'تم تحديث حالة الطلب']);
+        exit;
+    }
+    sendError('بيانات غير صالحة');
+}
+
+/* ─────────────────────────────────────────────
+   SEND MESSAGE
+   ───────────────────────────────────────────── */
+if ($action === 'send_message') {
+    $payoutId = intval($_POST['payout_id'] ?? 0);
+    $message = trim($_POST['message'] ?? '');
+    if ($payoutId > 0 && !empty($message)) {
+        $stmt = $db->prepare("INSERT INTO payout_messages (payout_id, sender_type, sender_id, message) VALUES (?, 'admin', ?, ?)");
+        $stmt->execute([$payoutId, $_SESSION['user_id'], $message]);
+        echo json_encode(['success' => true]);
+        exit;
+    }
+    sendError('بيانات غير صالحة');
 }
 
 sendError('إجراء غير معروف');

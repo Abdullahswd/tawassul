@@ -15,8 +15,8 @@ $academicAvailability = $academicData['availability'] ?? 'available';
 $statusText = 'متاح';
 $statusColor = '#22c55e';
 if ($academicAvailability === 'busy') {
-    $statusText = 'مشغول';
-    $statusColor = '#f59e0b';
+    $statusText = 'غير متاح';
+    $statusColor = '#ef4444';
 } elseif ($academicAvailability === 'vacation') {
     $statusText = 'في إجازة';
     $statusColor = '#ef4444';
@@ -83,7 +83,7 @@ if ($currentAcademicId) {
     </a>
 
     <a href="academic-support.php" class="nav-item" id="nav-support">
-      <span class="nav-icon">🛟</span>
+      <span class="nav-icon">💬</span>
       <span class="nav-text">الدعم الفني</span>
       <?php
       require_once __DIR__ . '/../../config/support_functions.php';
@@ -96,6 +96,11 @@ if ($currentAcademicId) {
     <a href="academic-profile.php?id=<?= $currentAcademicId ?>" target="_blank" class="nav-item" id="nav-profile">
       <span class="nav-icon">👤</span>
       <span class="nav-text">عرض ملفي للطلاب</span>
+    </a>
+
+    <a href="policy.php" class="nav-item" id="nav-policy">
+      <span class="nav-icon">📜</span>
+      <span class="nav-text">سياسة الاستخدام</span>
     </a>
 
   </nav>

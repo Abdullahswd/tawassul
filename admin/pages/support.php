@@ -8,7 +8,7 @@ ensureSupportTables();
 
 $db = db();
 $scriptName = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
-$appBase = rtrim(preg_replace('#/admin/[^/]+$#', '', $scriptName), '/');
+$appBase = rtrim(preg_replace('#/admin/.*$#', '', $scriptName), '/');
 
 $tab = $_GET['tab'] ?? 'students';
 if (!in_array($tab, ['students', 'academics', 'faqs', 'channels'], true)) $tab = 'students';
@@ -84,7 +84,7 @@ $convStatuses = [
       <div class="page-header animate-fadeInUp">
         <div>
           <div class="breadcrumb"><a href="dashboard.php">الرئيسية</a><span>›</span><span>الدعم الفني والشكاوى</span></div>
-          <h1 class="page-header-title">الدعم الفني والشكاوى 🛟</h1>
+          <h1 class="page-header-title">الدعم الفني والشكاوى 💬</h1>
           <p class="page-header-subtitle">إدارة تذاكر الدعم، الأسئلة الشائعة، وقنوات التواصل</p>
         </div>
       </div>
@@ -199,7 +199,7 @@ $convStatuses = [
                 <input type="file" id="supReplyFile" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
                 <span id="supFileName" style="display:none;font-size:11px;color:var(--text-secondary);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
                 <textarea id="supReplyInput" rows="2" class="form-input" style="resize:none;flex:1" placeholder="اكتب ردك..."></textarea>
-                <span style="cursor:pointer;font-size:20px;padding:8px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('supFileInput').click()" title="إرفاق ملف">📎</span>
+                <span style="cursor:pointer;font-size:20px;padding:8px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('supReplyFile').click()" title="إرفاق ملف">📎</span>
                 <button class="btn btn-primary" style="padding:0 22px;height:auto" onclick="sendSupReply()">إرسال ✈️</button>
               </div>
             <?php endif; ?>
@@ -336,7 +336,8 @@ $convStatuses = [
   window.ADMIN_FAQS = <?= json_encode($faqsAll, JSON_UNESCAPED_UNICODE) ?>;
   window.ADMIN_CHANNELS = <?= json_encode($channelsAll, JSON_UNESCAPED_UNICODE) ?>;
   window.ADMIN_TYPES = <?= json_encode($faqTypes, JSON_UNESCAPED_UNICODE) ?>;
+  window.CSRF_TOKEN = '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
 </script>
-<script src="../assets/js/support-admin.js?v=5"></script>
+<script src="../assets/js/support-admin.js?v=<?= time() ?>"></script>
 </body>
 </html>

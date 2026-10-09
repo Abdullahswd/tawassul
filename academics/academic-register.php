@@ -399,6 +399,8 @@ foreach ($services as $s) {
 
 <script src="assets/js/main.js"></script>
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 // Load dynamic services list
 window.ACADEMICS_DATA.services = <?= json_encode($servicesJson, JSON_UNESCAPED_UNICODE) ?>;
 
@@ -478,6 +480,7 @@ StepForm.submit = function() {
 
   const form = document.getElementById('registerForm');
   const formData = new FormData(form);
+  formData.append('csrf_token', csrfTokenJs);
 
   if (document.getElementById('hasBachelor').checked) formData.append('hasBachelor', '1');
   if (document.getElementById('hasMasters').checked) formData.append('hasMasters', '1');

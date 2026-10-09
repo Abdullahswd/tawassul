@@ -33,7 +33,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['send_support'
             $fileInfo = saveChatAttachmentUpload($_FILES['support_file'] ?? null);
             sendSupportMessage($convId, 'user', (int) $user['id'], $content, $fileInfo);
             setSupportConversationStatus($convId, 'pending');
-            createNotification(1, 'admin', 'رسالة دعم جديدة 🛟', 'أرسل الطالب ' . $user['name'] . ' رسالة في تذكرة الدعم.', '🛟', 'admin/pages/support.php');
+            createNotification(1, 'admin', 'رسالة دعم جديدة 💬', 'أرسل الطالب ' . $user['name'] . ' رسالة في تذكرة الدعم.', '💬', 'admin/pages/support.php');
             $sent = true;
         }
     }
@@ -97,7 +97,7 @@ require __DIR__ . '/partials/sidebar.php';
 
         <!-- Hero -->
         <div class="mb-8 bg-gradient-to-l from-indigo-900 to-slate-900 text-white rounded-3xl p-8 shadow-md">
-          <div style="display:flex;align-items:center;gap:4px;font-size:20px;font-weight:900;margin-bottom:6px">🛟 الدعم الفني والشكاوى</div>
+          <div style="display:flex;align-items:center;gap:4px;font-size:20px;font-weight:900;margin-bottom:6px">💬 الدعم الفني والشكاوى</div>
           <p style="opacity:0.85;font-size:14px">نساعدك في أي استفسار أو مشكلة — اختر السؤال الشائع أو تواصل مع فريق الدعم مباشرة.</p>
         </div>
 
@@ -184,7 +184,7 @@ require __DIR__ . '/partials/sidebar.php';
                     $isUser = ($msg['sender_type'] === 'user'); ?>
                     <div class="msg <?= $isUser ? 'msg-sent' : 'msg-received' ?>" data-msg-id="<?= (int) $msg['id'] ?>">
                       <?php if (!$isUser): ?>
-                        <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px">فريق الدعم 🛟</div>
+                        <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px">فريق الدعم 💬</div>
                       <?php endif; ?>
                       <?php if (!empty($msg['file_path'])): ?>
                         <div style="display:flex;justify-content:<?= $isUser ? 'flex-end' : 'flex-start' ?>;margin-bottom:<?= !empty($msg['content']) ? '6px' : '0' ?>">
@@ -240,12 +240,13 @@ require __DIR__ . '/partials/sidebar.php';
       </div>
 
       <script>
+  window.CSRF_TOKEN = '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
         window.SUPPORT_APP_BASE = <?= json_encode($appBase) ?>;
         window.SUPPORT_CONV = <?= (int) $activeConvId ?>;
         window.SUPPORT_LASTID = <?= (int) $lastMsgIdPhp ?>;
         window.SUPPORT_TYPE = 'student';
       </script>
-      <script src="support-app.js?v=4"></script>
+      <script src="support-app.js?v=<?= time() ?>"></script>
       <script>
         /* السكربت المضمّن القديم استُبدل بملف support-app.js */
       </script>

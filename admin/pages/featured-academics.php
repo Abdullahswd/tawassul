@@ -139,6 +139,8 @@ $featured = array_map(function($f){
 
 <script src="../assets/js/main.js"></script>
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 const featuredData = <?= json_encode($featured) ?>;
 let editId = null;
 let currentImage = '';
@@ -221,6 +223,7 @@ function editFeatured(id) {
 document.getElementById('fImage').addEventListener('change', function() {
     if (!this.files || !this.files[0]) return;
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'upload');
     fd.append('image', this.files[0]);
     Toast.show('جاري رفع الصورة...', 'info');
@@ -254,6 +257,7 @@ function saveFeatured() {
     if (!name) { Toast.show('يرجى إدخال اسم الأكاديمي', 'error'); return; }
 
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'save');
     fd.append('id', editId || 0);
     fd.append('name', name);
@@ -280,6 +284,7 @@ function toggleFeatured(id) {
     const f = featuredData.find(x => x.id === id);
     if (!f) return;
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'toggle');
     fd.append('id', id);
     fetch('../ajax/manage_featured_academic.php', { method: 'POST', body: fd })
@@ -297,6 +302,7 @@ function toggleFeatured(id) {
 function deleteFeatured(id, name) {
     Modal.confirm('حذف الأكاديمي', `هل تريد حذف "${name}"؟`, () => {
         const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
         fd.append('action', 'delete');
         fd.append('id', id);
         fetch('../ajax/manage_featured_academic.php', { method: 'POST', body: fd })

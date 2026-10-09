@@ -35,7 +35,8 @@
   function supEscape(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function supScroll() { if (supBox) supBox.scrollTo({ top: supBox.scrollHeight }); }
 
-  function supAppend(m) {
+  function supAppend(m, isTemp = false) {
+    if (!isTemp) { document.querySelectorAll('.temp-msg').forEach(function(e){ e.remove(); }); }
     const ph = document.getElementById('supportPlaceholder');
     if (ph) ph.remove();
     const isUser = m.sender_type === 'user';
@@ -43,11 +44,13 @@
     wrap.className = (supBox.classList.contains('sup-box') ? 'sup-msg ' : 'msg ') + (isUser
       ? (supBox.classList.contains('sup-box') ? 'sup-user' : 'msg-sent')
       : (supBox.classList.contains('sup-box') ? 'sup-admin' : 'msg-received'));
+    if (isTemp) wrap.classList.add('temp-msg');
+    if (isTemp) wrap.style.opacity = '0.7';
 
     if (!isUser) {
       const nm = document.createElement('div');
       nm.style.cssText = 'font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px';
-      nm.textContent = 'فريق الدعم 🛟';
+      nm.textContent = 'فريق الدعم 💬';
       wrap.appendChild(nm);
     }
     if (m.file_path) {
@@ -97,9 +100,12 @@
       const content = (input.value || '').trim();
       const hasFile = supFile && supFile.files.length > 0;
       if (!content && !hasFile) return;
+      supAppend({sender_type: 'user', content: content || 'ملف مرفق...', created_at: new Date().toISOString()}, true);
+      supScroll();
       supportSending = true;
       try {
         const fd = new FormData(supForm);
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
         const res = await fetch(supForm.getAttribute('action'), { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } });
         if (res.ok) {
           input.value = '';
@@ -110,6 +116,15 @@
         }
       } catch (err) { supForm.submit(); }
       finally { supportSending = false; }
+    });
+  }
+  const supportInput = document.getElementById('supportInput');
+  if (supportInput && supForm) {
+    supportInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        supForm.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+      }
     });
   }
 })();

@@ -52,26 +52,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['subscribe_package_id'
     $pkgStmt->execute([$pid]);
     $subPkg = $pkgStmt->fetch(PDO::FETCH_ASSOC);
     if ($subPkg) {
-        // السماح بالاشتراك في أكثر من باقة:
-        // إن وُجد اشتراك نشط لنفس الباقة يُعاد استخدامه، وإلا يُنشأ اشتراك جديد
-        $subId = subscribeStudentToPackage((int) $user['id'], $pid);
-
-        // تسجيل إشعار الدفع (إن وُجد)
+        // التحقق من إرفاق إشعار الدفع (إلزامي)
         $rcptPath = saveReceiptUpload($_FILES['payment_receipt'] ?? null);
         if ($rcptPath) {
+            // السماح بالاشتراك في أكثر من باقة:
+            // إن وُجد اشتراك نشط لنفس الباقة يُعاد استخدامه، وإلا يُنشأ اشتراك جديد
+            $subId = subscribeStudentToPackage((int) $user['id'], $pid);
+
             $methodId = (int) ($_POST['payment_method_id'] ?? 0) ?: null;
+            
+            // محاولة جلب اسم طريقة الدفع
+            $methodLabel = 'تحويل بنكي';
+            foreach ($paymentMethods as $pm) {
+                if ((int)$pm['id'] === $methodId) {
+                    $methodLabel = $pm['account_name'];
+                    break;
+                }
+            }
+
             savePaymentReceipt([
                 'subscription_id' => $subId,
                 'student_id'      => $user['id'],
                 'method_id'       => $methodId,
-                'method_label'    => getPaymentMethodLabel($methodId),
+                'method_label'    => $methodLabel,
                 'amount'          => (float) ($subPkg['price'] ?? 0),
                 'receipt_path'    => $rcptPath,
             ]);
-            createNotification(1, 'admin', 'إشعار دفع باقة 🧾', 'أرفق الطالب ' . $user['name'] . ' إشعار دفع لاشتراك في باقة ' . $subPkg['name'] . '.', '🧾', 'admin/pages/payments.php');
+            createNotification(1, 'admin', 'إشعار دفع باقة 🧾', 'أرفق الطالب ' . $user['name'] . ' إشعار دفع لاشتراك في باقة ' . $subPkg['name'] . '.', '🧾', 'admin/pages/payments.php#tab-students');
+            header('Location: packages.php?subscribed=' . $pid);
+            exit;
+        } else {
+            $uploadError = 'إرفاق إشعار الدفع الزامي لإتمام الاشتراك!';
         }
-        header('Location: packages.php?subscribed=' . $pid);
-        exit;
     }
 }
 
@@ -82,7 +94,9 @@ foreach (getAllActivePackageSubscriptions((int) $user['id']) as $s) {
     $r = getReceiptForSubscription((int) $s['sub_id']);
     $s['receipt_status'] = $r['status'] ?? 'approved'; // بدون إشعار = مفعّل مباشرة
     $activeSubsByPkg[(int) $s['package_id']] = $s;
-    $activeSubNames[] = $s['package_name'];
+    if ($s['receipt_status'] === 'approved') {
+        $activeSubNames[] = $s['package_name'];
+    }
 }
 $subJustMadeId = isset($_GET['subscribed']) ? (int) $_GET['subscribed'] : 0;
 ?>
@@ -175,6 +189,15 @@ require __DIR__ . '/partials/sidebar.php';
       <!-- Page Content -->
       <div class="content-wrap" style="padding:24px;max-width:1200px;margin:0 auto">
 
+        <?php if (!empty($uploadError)): ?>
+          <div class="mb-6 rounded-2xl p-5 border" style="background:#fef2f2;border-color:#fecaca;color:#991b1b;box-shadow:0 4px 14px rgba(0,0,0,0.04)">
+            <div class="flex items-center gap-3">
+              <div style="font-size:30px">❌</div>
+              <div style="font-weight:800;font-size:16px"><?= e($uploadError) ?></div>
+            </div>
+          </div>
+        <?php endif; ?>
+
         <div class="mb-8 bg-gradient-to-l from-indigo-900 to-slate-900 text-white rounded-3xl p-8 shadow-md">
           <div class="max-w-2xl">
             <span class="inline-block bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full text-xs font-bold mb-3">وفر حتى 30% من التكلفة</span>
@@ -186,14 +209,13 @@ require __DIR__ . '/partials/sidebar.php';
         </div>
 
         <?php if ($subJustMadeId && isset($activeSubsByPkg[$subJustMadeId])): ?>
-          <div class="mb-6 rounded-2xl p-5 border" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534;box-shadow:0 4px 14px rgba(0,0,0,0.04)">
+          <div class="mb-6 rounded-2xl p-5 border" style="background:#fef9c3;border-color:#fef08a;color:#854d0e;box-shadow:0 4px 14px rgba(0,0,0,0.04)">
             <div class="flex items-center gap-3">
-              <div style="font-size:30px">✅</div>
+              <div style="font-size:30px">⏳</div>
               <div>
-                <div style="font-weight:800;font-size:16px">تم اشتراكك في باقة «<?= e($activeSubsByPkg[$subJustMadeId]['package_name']) ?>» بنجاح</div>
+                <div style="font-weight:800;font-size:16px">تم إرسال طلب اشتراكك في باقة «<?= e($activeSubsByPkg[$subJustMadeId]['package_name']) ?>» بنجاح</div>
                 <div style="font-size:13px;opacity:0.9;margin-top:3px">
-                  الباقة سارية بشكل غير محدد (بدون تاريخ انتهاء).
-                  تواصل للاستفادة من الخدمات المشمولة دون دفع إضافي.
+                  لقد استلمنا إشعار الدفع الخاص بك وهو الآن قيد المراجعة من قبل الإدارة. سيتم تفعيل الباقة فور الاعتماد.
                 </div>
               </div>
             </div>
@@ -206,7 +228,7 @@ require __DIR__ . '/partials/sidebar.php';
             <?php foreach ($activeSubNames as $i => $nm): ?>
               <span style="color:var(--primary)"><?= e($nm) ?></span><?= $i < count($activeSubNames) - 1 ? '، ' : '' ?>
             <?php endforeach; ?>
-            — سارية بشكل غير محدد (بدون تاريخ انتهاء)، ويمكنك الاشتراك في أكثر من باقة.
+            — الباقات مفعلة وجاهزة للاستخدام (صالحة حتى استنفاد كافة الخدمات المشمولة).
           </div>
         <?php endif; ?>
 
@@ -276,8 +298,11 @@ require __DIR__ . '/partials/sidebar.php';
               <?php $pkgSubStatus = $activeSubsByPkg[(int)$pkg['id']]['receipt_status'] ?? null; ?>
                 <?php if ($pkgSubStatus === 'approved'): ?>
                   <div class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-sm" style="background:#dcfce7;color:#166534;border:1px solid #86efac">
-                    ✓ أنت مشترك — الاشتراك مفعّل (غير محددة بتاريخ)
+                    ✓ أنت مشترك — الباقة مفعلة حتى استنفاد خدماتها
                   </div>
+                  <a href="services.php" class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-sm shadow-sm transition hover:scale-[1.02] mt-2" style="background:var(--bg-body);color:var(--text-primary);border:1px solid var(--border-color);">
+                    طلب الخدمات المشمولة 🚀
+                  </a>
                 <?php elseif ($pkgSubStatus === 'pending'): ?>
                   <div class="w-full inline-block text-center py-2.5 px-4 rounded-xl font-bold text-sm" style="background:#fef9c3;color:#854d0e;border:1px solid #fde047">
                     ⏳ طلب الاشتراك قيد المراجعة — بانتظار اعتماد إشعار الدفع من الإدارة
@@ -325,7 +350,7 @@ require __DIR__ . '/partials/sidebar.php';
             <div style="display:grid;gap:10px;margin-bottom:18px">
               <?php foreach ($paymentMethods as $pm): ?>
                 <label style="display:flex;align-items:center;gap:12px;border:2px solid var(--border-color);border-radius:14px;padding:12px;cursor:pointer">
-                  <input type="radio" name="payment_method_id" value="<?= (int)$pm['id'] ?>" style="accent-color:#4f46e5;width:18px;height:18px;flex-shrink:0">
+                  <input type="radio" name="payment_method_id" value="<?= (int)$pm['id'] ?>" style="accent-color:#4f46e5;width:18px;height:18px;flex-shrink:0" required>
                   <?php if (!empty($pm['logo'])): ?>
                     <img src="<?= e($appBase . '/' . $pm['logo']) ?>" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:8px;border:1px solid var(--border-color);flex-shrink:0">
                   <?php else: ?>
@@ -344,7 +369,7 @@ require __DIR__ . '/partials/sidebar.php';
           <?php endif; ?>
 
           <label style="display:block;font-size:13px;font-weight:800;margin-bottom:8px">إرفاق إشعار الدفع (صورة أو PDF)</label>
-          <input type="file" name="payment_receipt" class="form-input" accept="image/*,.pdf" style="margin-bottom:8px">
+          <input type="file" name="payment_receipt" class="form-input" accept="image/*,.pdf" style="margin-bottom:8px" required>
           <p style="font-size:12px;color:var(--text-secondary);line-height:1.6;margin-bottom:0">
             حوّل مبلغ الباقة إلى أحد حسابات المنصة أعلاه، ثم أرفق صورة/ملف إشعار التحويل. سيراجع فريق الإدارة الإشعار ويفعّل باقتك.
           </p>

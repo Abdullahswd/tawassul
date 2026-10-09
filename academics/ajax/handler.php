@@ -158,7 +158,7 @@ if ($action === 'update_profile') {
     $email     = trim($_POST['email'] ?? '');
     $phone     = trim($_POST['phone'] ?? '');
     $bio       = trim($_POST['bio'] ?? '');
-    $available = isset($_POST['availability']) ? 'available' : 'unavailable';
+    $available = (isset($_POST['availability']) && $_POST['availability'] === 'available') ? 'available' : 'busy';
 
     if (!$name || !$email || !$phone) {
         sendJSONResponse(false, 'يرجى ملء الاسم، البريد الوإيميل، ورقم الهاتف.');
@@ -620,26 +620,59 @@ if ($action === 'change_password') {
 // ─────────────────────────────────────────────────────────────
 if ($action === 'submit_withdraw') {
     $amount = floatval($_POST['amount'] ?? 0);
-    $method = trim($_POST['method'] ?? 'تحويل بنكي');
-    $iban = trim($_POST['iban'] ?? '');
-
-    if ($amount < 200) {
-        sendJSONResponse(false, 'الحد الأدنى للسحب هو 200 ر.س.');
-    }
+    $bankAccountId = intval($_POST['bank_account_id'] ?? 0);
+    $note = trim($_POST['note'] ?? '');
 
     try {
         $db = db();
-        $stmt = $db->prepare("SELECT balance FROM academics WHERE id = ?");
-        $stmt->execute([$academicId]);
-        $balance = floatval($stmt->fetchColumn());
+        
+        // Fetch payout policy settings
+        $settings = [];
+        $stmtSettings = $db->query("SELECT setting_key, setting_value FROM settings");
+        while ($row = $stmtSettings->fetch(PDO::FETCH_ASSOC)) {
+            $settings[$row['setting_key']] = $row['setting_value'];
+        }
+        $min_withdrawal = (float)($settings['min_withdrawal'] ?? 200);
+        $withdrawal_eligibility_days = (int)($settings['withdrawal_eligibility_days'] ?? 14);
 
-        if ($amount > $balance) {
-            sendJSONResponse(false, 'الرصيد غير كافٍ لإجراء هذه العملية.');
+        if ($amount < $min_withdrawal) {
+            sendJSONResponse(false, 'الحد الأدنى للسحب هو ' . $min_withdrawal . ' ر.س.');
+        }
+        if ($bankAccountId <= 0) {
+            sendJSONResponse(false, 'الرجاء اختيار حساب استلام صحيح.');
         }
 
-        // Deduct balance and update database
+        $stmt = $db->prepare("SELECT balance, total_earned FROM academics WHERE id = ?");
+        $stmt->execute([$academicId]);
+        $row = $stmt->fetch();
+        $balance = floatval($row['balance']);
+        $totalEarned = floatval($row['total_earned']);
+        $totalWithdrawn = max(0, $totalEarned - $balance);
+
+        $totalEligibleEarned = (float)$db->query("
+            SELECT SUM(p.academic_net)
+            FROM payments p
+            JOIN orders o ON p.order_id = o.id
+            WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
+        ")->fetchColumn();
+        
+        $eligibleBalance = max(0, $totalEligibleEarned - $totalWithdrawn);
+        if ($eligibleBalance > $balance) $eligibleBalance = $balance;
+
+        if ($amount > $eligibleBalance) {
+            sendJSONResponse(false, 'المبلغ يتجاوز الرصيد المؤهل للسحب.');
+        }
+
+        // Deduct balance
         $newBalance = $balance - $amount;
         $db->prepare("UPDATE academics SET balance = ? WHERE id = ?")->execute([$newBalance, $academicId]);
+
+        // Insert pending payout
+        $nextNum = (int)$db->query("SELECT COALESCE(MAX(id),0)+1 FROM payouts")->fetchColumn();
+        $payoutNum = 'WD-' . date('Ym') . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
+        
+        $insStmt = $db->prepare("INSERT INTO payouts (payout_number, academic_id, bank_account_id, amount, note, status, created_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)");
+        $insStmt->execute([$payoutNum, $academicId, $bankAccountId, $amount, $note, $academicId]);
 
         sendJSONResponse(true, 'تم إرسال طلب السحب بنجاح. سيتم تحويل المبلغ إلى حسابك البنكي قريباً.');
     } catch (Exception $e) {

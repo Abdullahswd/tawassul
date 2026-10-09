@@ -93,6 +93,11 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
       <span class="nav-label">المدفوعات</span>
     </a>
 
+    <a href="../pages/payout-policy.php" class="nav-item" id="nav-payout-policy">
+      <span class="nav-icon">📜</span>
+      <span class="nav-label">سياسة دفع الأكاديميين</span>
+    </a>
+
     <a href="../pages/reports.php" class="nav-item" id="nav-reports">
       <span class="nav-icon">📈</span>
       <span class="nav-label">التقارير</span>
@@ -102,7 +107,7 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
     <p class="nav-section-title">النظام</p>
 
     <a href="../pages/support.php" class="nav-item" id="nav-support">
-      <span class="nav-icon">🛟</span>
+      <span class="nav-icon">💬</span>
       <span class="nav-label">الدعم الفني والشكاوى</span>
       <?php
       require_once __DIR__ . '/../../config/support_functions.php';
@@ -115,6 +120,11 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
     <a href="../pages/settings.php" class="nav-item" id="nav-settings">
       <span class="nav-icon">🔧</span>
       <span class="nav-label">الإعدادات</span>
+    </a>
+
+    <a href="../pages/policies.php" class="nav-item" id="nav-policies">
+      <span class="nav-icon">📜</span>
+      <span class="nav-label">السياسات والخصوصية</span>
     </a>
 
   </nav>

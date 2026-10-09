@@ -495,6 +495,8 @@ $services_tree = buildServicesTree($services_flat, null);
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 const Toast = {
   show: function(msg, type = 'success') {
     const container = document.getElementById('toastContainer');
@@ -790,6 +792,7 @@ function savePackage() {
   }
 
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', 'save');
   fd.append('id', id || 0);
   fd.append('name', name);
@@ -819,6 +822,7 @@ function togglePackage(id) {
   const p = packagesData.find(x => x.id === id);
   if (!p) return;
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', 'toggle');
   fd.append('id', id);
   fetch('../ajax/manage_package.php', { method: 'POST', body: fd })
@@ -840,6 +844,7 @@ function deletePackage(id, name) {
   Modal.open('confirmModal');
   document.getElementById('confirmBtn').onclick = function() {
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'delete');
     fd.append('id', id);
     fetch('../ajax/manage_package.php', { method: 'POST', body: fd })

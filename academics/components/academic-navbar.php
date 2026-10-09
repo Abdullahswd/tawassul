@@ -60,6 +60,18 @@ if ($currentAcademicId) {
     <!-- Dark mode -->
     <button class="nav-btn dark-toggle" title="تبديل المظهر" aria-label="تبديل المظهر الداكن">🌙</button>
 
+    <!-- Support / FAQs -->
+    <a href="academic-support.php" class="nav-btn" aria-label="الدعم الفني والأسئلة الشائعة" title="الدعم الفني والأسئلة الشائعة" style="text-decoration:none; position:relative;">
+      💬
+      <?php 
+        require_once __DIR__ . '/../../config/support_functions.php';
+        $_unreadSupportAc = countUnreadSupportForUser($_SESSION['academic_id'] ?? 0, 'academic');
+        if ($_unreadSupportAc > 0): 
+      ?>
+        <span class="n-badge"><?= $_unreadSupportAc ?></span>
+      <?php endif; ?>
+    </a>
+
     <!-- Notifications dropdown -->
     <div class="dropdown" id="notifDropdown">
       <button class="nav-btn" data-toggle aria-label="الإشعارات" style="position:relative">

@@ -469,6 +469,8 @@ $academicAvatar = $academicData['avatar_initials'] ?? mb_substr($academicName, 0
 
 <script src="assets/js/main.js"></script>
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 function showSection(id, btn) {
   document.querySelectorAll('.s-section').forEach(s => s.style.display = 'none');
   document.querySelectorAll('.s-menu-btn').forEach(b => b.classList.remove('active'));
@@ -548,6 +550,7 @@ function changePassword() {
   if (p1.length < 6) { Toast.show('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 'error'); return; }
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('current', current);
   formData.append('new', p1);
   formData.append('confirm', p2);
@@ -575,6 +578,7 @@ function saveSettings() {
   btn.disabled = true;
 
   const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
   formData.append('name', document.getElementById('settingsName').value);
   formData.append('email', document.getElementById('settingsEmail').value);
   formData.append('phone', document.getElementById('settingsPhone').value);
@@ -669,9 +673,14 @@ function renderQualificationCard(q) {
     ? '<a href="../' + escapeBankHtml(q.document_file) + '" target="_blank" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:8px;color:var(--primary);font-size:12px;font-weight:700;text-decoration:none;transition:all .2s" onmouseover="this.style.background=\'rgba(99,102,241,0.15)\'" onmouseout="this.style.background=\'rgba(99,102,241,0.08)\'"><span>📎</span><span>عرض وثيقة الإثبات المرفقة</span><span style="font-size:10px">↗</span></a>'
     : '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:8px;color:#ef4444;font-size:12px;font-weight:600"><span>⚠️</span><span>لم يتم إرفاق وثيقة إثبات</span></span>';
 
-  const statusBadge = q.verified == 1
-    ? '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:20px;color:#059669;font-size:11px;font-weight:700">✓ موثّق</span>'
-    : '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:20px;color:#d97706;font-size:11px;font-weight:700">⏳ قيد المراجعة</span>';
+  let statusBadge = '';
+  if (q.verified == 1) {
+    statusBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.25);border-radius:20px;color:#059669;font-size:11px;font-weight:700">✓ موثّق</span>';
+  } else if (q.verified == 2) {
+    statusBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:20px;color:#ef4444;font-size:11px;font-weight:700">❌ مرفوضة</span>';
+  } else {
+    statusBadge = '<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.25);border-radius:20px;color:#d97706;font-size:11px;font-weight:700">⏳ قيد المراجعة</span>';
+  }
 
   return '<div class="qual-card" data-id="' + q.id + '" style="background:var(--bg-card);border:1.5px solid var(--border-color);border-radius:16px;padding:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;transition:all 0.25s ease;box-shadow:0 4px 12px rgba(0,0,0,0.02)">'
     + '<div style="display:flex;align-items:flex-start;gap:16px;flex:1;min-width:260px">'
@@ -745,6 +754,7 @@ function saveQualification() {
 
   const action = id ? 'update_qualification' : 'add_qualification';
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', action);
   fd.append('id', id || 0);
   fd.append('level', level);
@@ -773,6 +783,7 @@ function saveQualification() {
 function deleteQualification(id, title) {
   Modal.confirm('حذف المؤهل', 'هل تريد حذف مؤهل "' + (title || '') + '" نهائياً؟', () => {
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'delete_qualification');
     fd.append('id', id);
     fetch('ajax/handler.php?action=delete_qualification', { method: 'POST', body: fd })
@@ -827,6 +838,7 @@ function handleBankLogoUpload(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', 'upload_bank_logo');
   fd.append('image', file);
   Toast.show('جارٍ رفع الشعار...', 'info');
@@ -960,6 +972,7 @@ function saveBankAccount() {
 
   const action = id ? 'update_bank_account' : 'add_bank_account';
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', action);
   fd.append('id', id || 0);
   fd.append('account_type', account_type);
@@ -986,6 +999,7 @@ function saveBankAccount() {
 function deleteBankAccount(id, name) {
   Modal.confirm('حذف الحساب', 'هل تريد حذف "' + (name || '') + '" نهائياً؟', () => {
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'delete_bank_account');
     fd.append('id', id);
     fetch('ajax/handler.php?action=delete_bank_account', { method: 'POST', body: fd })
@@ -1061,6 +1075,7 @@ function handleAvatarUpload(input) {
   const file = input.files && input.files[0];
   if (!file) return;
   const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
   fd.append('action', 'upload_avatar');
   fd.append('image', file);
   Toast.show('جارٍ رفع الصورة...', 'info');

@@ -16,6 +16,8 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+require_once __DIR__ . '/middleware.php';
+
 // Prevent browser caching for authenticated pages
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Cache-Control: post-check=0, pre-check=0", false);
@@ -109,6 +111,7 @@ function currentUser(): ?array {
         'email'  => $_SESSION['user_email'],
         'role'   => $_SESSION['user_role'],
         'avatar' => $_SESSION['user_avatar'],
+        'avatar_path' => $_SESSION['user_avatar_path'] ?? null,
     ];
 }
 

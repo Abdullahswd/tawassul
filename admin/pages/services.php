@@ -693,6 +693,7 @@ $cntL3 = count(array_filter($services_flat, fn($x) => $x['level'] === 3));
       border: 2px solid #fcd34d;
       border-radius: 20px;
       padding: 22px 24px;
+      margin-top: 32px;
       margin-bottom: 24px;
       box-shadow: 0 4px 20px rgba(245,158,11,0.10);
     }
@@ -707,7 +708,7 @@ $cntL3 = count(array_filter($services_flat, fn($x) => $x['level'] === 3));
       box-shadow: 0 4px 12px rgba(245,158,11,0.35);
     }
     .btn-add-featured:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(245,158,11,0.45); }
-    .featured-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+    .featured-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
     .featured-card {
       background: white; border: 1px solid #fde68a; border-radius: 14px;
       padding: 14px 16px; display: flex; gap: 12px; align-items: center;
@@ -721,7 +722,7 @@ $cntL3 = count(array_filter($services_flat, fn($x) => $x['level'] === 3));
       display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;
     }
     .featured-info { flex: 1; min-width: 0; }
-    .featured-name { font-weight: 800; font-size: 14px; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .featured-name { font-weight: 800; font-size: 14px; color: #0f172a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
     .featured-meta { font-size: 12px; color: #92400e; margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
     .featured-badge { background: #fef3c7; border: 1px solid #fcd34d; color: #92400e; border-radius: 20px; padding: 1px 10px; font-size: 11px; font-weight: 700; }
     .featured-price { font-weight: 800; color: #059669; }
@@ -1000,6 +1001,8 @@ $cntL3 = count(array_filter($services_flat, fn($x) => $x['level'] === 3));
 <div class="toast-container" id="toastContainer"></div>
 
 <script>
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
+
 const Toast = {
   show: function(msg, type = 'success') {
     const container = document.getElementById('toastContainer');
@@ -1385,6 +1388,7 @@ function handleIconUpload(input) {
     if (!file) return;
 
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'upload_icon');
     fd.append('image', file);
 
@@ -1468,6 +1472,7 @@ function saveService() {
     const needsMultipleAcademics = document.getElementById('serviceMultipleAcademics').checked ? 1 : 0;
 
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'save');
     fd.append('id', editId || 0);
     fd.append('name', name);
@@ -1500,6 +1505,7 @@ function toggleService(id) {
     const s = flatData.find(x => x.id === id);
     if (!s) return;
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'toggle');
     fd.append('id', id);
     fetch('../ajax/manage_service.php', { method: 'POST', body: fd })
@@ -1519,6 +1525,7 @@ function toggleService(id) {
 // ترتيب يدوي: تحريك العنصر لأعلى/أسفل بنفس المستوى
 function moveService(id, direction) {
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'move');
     fd.append('id', id);
     fd.append('direction', direction);
@@ -1545,6 +1552,7 @@ function deleteService(id, name) {
     Modal.open('confirmModal');
     document.getElementById('confirmBtn').onclick = function() {
         const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
         fd.append('action', 'delete');
         fd.append('id', deleteTargetId);
         fetch('../ajax/manage_service.php', { method: 'POST', body: fd })
@@ -1571,6 +1579,7 @@ function addDemoData() {
     const l1 = { name: '1. التأسيس والبناء الأكاديمي (مرحلة الإعداد والتصميم)', icon: '🏛️', parent_id: '', price: 0 };
     
     const fd1 = new FormData();
+  fd1.append('csrf_token', csrfTokenJs);
     fd1.append('action', 'save');
     fd1.append('id', 0);
     fd1.append('name', l1.name);
@@ -1586,6 +1595,7 @@ function addDemoData() {
         // المستوى 2
         const l2 = { name: '1.1 خدمات التأسيس الأكاديمي (قبل بدء البحث)', icon: '📂', parent_id: l1Id, price: 0 };
         const fd2 = new FormData();
+  fd2.append('csrf_token', csrfTokenJs);
         fd2.append('action', 'save');
         fd2.append('id', 0);
         fd2.append('name', l2.name);
@@ -1608,6 +1618,7 @@ function addDemoData() {
 
             const promises = l3Items.map(item => {
               const fd3 = new FormData();
+  fd3.append('csrf_token', csrfTokenJs);
               fd3.append('action', 'save');
               fd3.append('id', 0);
               fd3.append('name', item.name);
@@ -1677,6 +1688,7 @@ function saveFeatured() {
     const active = document.getElementById('featuredActive').checked ? 1 : 0;
     if (!service_id) { window._featSaving = false; Toast.show('اختر الخدمة اولا', 'error'); return; }
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'save');
     fd.append('service_id', service_id);
     fd.append('badge', badge);
@@ -1709,6 +1721,7 @@ function toggleFeatured(id) {
     if (window._featToggling) return;
     window._featToggling = true;
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'toggle');
     fd.append('id', id);
     fetch('../ajax/manage_featured_service.php', { method: 'POST', body: fd })
@@ -1732,6 +1745,7 @@ function moveFeatured(id, direction) {
     if (window._featMoving) return;
     window._featMoving = true;
     const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
     fd.append('action', 'move');
     fd.append('id', id);
     fd.append('direction', direction);
@@ -1759,6 +1773,7 @@ function deleteFeatured(id, name) {
         if (window._featDeleting) return;
         window._featDeleting = true;
         const fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
         fd.append('action', 'delete');
         fd.append('id', deleteTargetId);
         fetch('../ajax/manage_featured_service.php', { method: 'POST', body: fd })
@@ -1909,6 +1924,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var active = document.getElementById('featuredActive').checked ? 1 : 0;
                 if (!sid) { alert('اختر الخدمة أولاً'); window._featSavingFallback = false; return false; }
                 var fd = new FormData();
+  fd.append('csrf_token', csrfTokenJs);
                 fd.append('action', 'save');
                 fd.append('service_id', sid);
                 fd.append('badge', badge || '');

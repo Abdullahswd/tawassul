@@ -33,7 +33,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && isset($_POST['send_support'
             $fileInfo = saveChatAttachmentUpload($_FILES['support_file'] ?? null);
             sendSupportMessage($convId, 'user', $academicId, $content, $fileInfo);
             setSupportConversationStatus($convId, 'pending');
-            createNotification(1, 'admin', 'رسالة دعم جديدة 🛟', 'أرسل أكاديمي رسالة في تذكرة الدعم.', '🛟', 'admin/pages/support.php');
+            createNotification(1, 'admin', 'رسالة دعم جديدة 💬', 'أرسل أكاديمي رسالة في تذكرة الدعم.', '💬', 'admin/pages/support.php');
             $sent = true;
         }
     }
@@ -105,7 +105,7 @@ $statusLabels = [
       <div class="page-header anim-up">
         <div>
           <div class="breadcrumb"><a href="academic-dashboard.php">الرئيسية</a><span>›</span><span>الدعم الفني</span></div>
-          <h1 class="page-title">الدعم الفني والشكاوى 🛟</h1>
+          <h1 class="page-title">الدعم الفني والشكاوى 💬</h1>
           <p style="font-size:14px;color:var(--text-secondary);margin-top:6px">استفسارات، أسئلة شائعة، وقنوات تواصل مع فريق المنصة.</p>
         </div>
       </div>
@@ -192,7 +192,7 @@ $statusLabels = [
                   $isUser = ($msg['sender_type'] === 'user'); ?>
                   <div class="sup-msg <?= $isUser ? 'sup-user' : 'sup-admin' ?>" data-msg-id="<?= (int) $msg['id'] ?>">
                     <?php if (!$isUser): ?>
-                      <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px">فريق الدعم 🛟</div>
+                      <div style="font-size:11px;font-weight:700;color:var(--primary);margin-bottom:3px">فريق الدعم 💬</div>
                     <?php endif; ?>
                     <?php if (!empty($msg['file_path'])): ?>
                       <div style="margin-bottom:<?= !empty($msg['content']) ? '6px' : '0' ?>;text-align:<?= $isUser ? 'right' : 'left' ?>">
@@ -248,10 +248,11 @@ $statusLabels = [
 
 <script src="assets/js/main.js"></script>
 <script id="supportAppJs">
+  window.CSRF_TOKEN = '<?= htmlspecialchars($_SESSION["csrf_token"] ?? "") ?>';
   window.SUPPORT_APP_BASE = <?= json_encode($appBase) ?>;
   window.SUPPORT_CONV = <?= (int) $activeConvId ?>;
   window.SUPPORT_LASTID = <?= (int) $lastMsgIdPhp ?>;
 </script>
-<script src="support-app.js?v=4"></script>
+<script src="support-app.js?v=<?= time() ?>"></script>
 </body>
 </html>

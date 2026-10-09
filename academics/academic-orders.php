@@ -9,7 +9,7 @@ $db = db();
 
 // Load orders for this academic
 $ordersStmt = $db->prepare("
-    SELECT o.*, s.name AS service_name, s.icon AS service_icon, p.name AS package_name, u.name AS student_name
+    SELECT o.*, s.name AS service_name, s.icon AS service_icon, s.platform_percent, p.name AS package_name, u.name AS student_name
     FROM orders o
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN packages p ON o.package_id = p.id
@@ -23,13 +23,20 @@ $orders = $ordersStmt->fetchAll();
 // Map orders to JS array
 $ordersJson = [];
 foreach ($orders as $o) {
+    $platform_pct = isset($o['platform_percent']) ? (float)$o['platform_percent'] : 0.00;
+    $amount = (float)$o['amount'];
+    $platform_fee = round($amount * $platform_pct / 100, 2);
+    $academic_net = round($amount - $platform_fee, 2);
+
     $ordersJson[] = [
         'id' => $o['order_number'],
         'db_id' => (int)$o['id'],
         'student' => $o['student_name'] ?? 'طالب غير معروف',
         'service' => $o['service_name'] ?? 'خدمة عامة',
-        'package' => $o['package_name'] ?? 'الباقة العادية',
-        'amount' => (float)$o['amount'],
+        'package' => $o['package_name'] ?? 'باقة فردية',
+        'amount' => $amount,
+        'academic_net' => $academic_net,
+        'platform_pct' => $platform_pct,
         'status' => $o['status'],
         'date' => date('Y-m-d', strtotime($o['created_at'])),
         'deadline' => $o['deadline'] ? date('Y-m-d', strtotime($o['deadline'])) : '-'
@@ -126,7 +133,8 @@ foreach ($ordersJson as $o) {
                 <th>الطالب</th>
                 <th>الخدمة</th>
                 <th>الباقة</th>
-                <th>المبلغ</th>
+                <th>سعر الخدمة</th>
+                <th>أرباحك (الصافي)</th>
                 <th>الحالة</th>
                 <th>الموعد النهائي</th>
                 <th>الإجراءات</th>
@@ -169,6 +177,7 @@ foreach ($ordersJson as $o) {
 <script>
 // Feed database orders into ACADEMICS_DATA
 window.ACADEMICS_DATA.orders = <?= json_encode($ordersJson, JSON_UNESCAPED_UNICODE) ?>;
+const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
 
 function renderOrders(data) {
   const tbody = document.getElementById('ordersTableBody');
@@ -189,7 +198,11 @@ function renderOrders(data) {
       </td>
       <td style="font-size:13px;color:var(--text-secondary)">${o.service}</td>
       <td><span class="badge badge-primary">${o.package}</span></td>
-      <td><strong style="font-size:15px;color:var(--primary)">${o.amount} ر.س</strong></td>
+      <td><div style="font-size:13px;text-decoration:line-through;color:var(--text-secondary)">${o.amount} ر.س</div></td>
+        <td>
+          <div style="font-size:15px;font-weight:700;color:#10b981">${o.academic_net} ر.س</div>
+          <div style="font-size:11px;color:var(--text-secondary)">عمولة المنصة ${o.platform_pct}%</div>
+        </td>
       <td>${getStatusBadge(o.status)}</td>
       <td style="color:${o.status !== 'completed' ? '#ef4444' : 'var(--text-secondary)'};font-size:13px">📅 ${o.deadline}</td>
       <td>
@@ -252,22 +265,29 @@ function viewOrder(id) {
   document.getElementById('orderUpdateBtn').onclick = () => {
     const newStatus = document.getElementById('newStatusSelect').value;
     const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
     formData.append('order_id', o.db_id);
     formData.append('status', newStatus);
+    formData.append('csrf_token', csrfTokenJs);
 
     fetch('ajax/handler.php?action=update_order_status', {
       method: 'POST',
       body: formData
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        o.status = newStatus;
-        Modal.close('orderDetailModal');
-        Toast.show(data.message, 'success');
-        filterOrders();
-      } else {
-        Toast.show(data.message, 'error');
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (data.success) {
+          o.status = newStatus;
+          Modal.close('orderDetailModal');
+          Toast.show(data.message, 'success');
+          filterOrders();
+        } else {
+          Toast.show(data.message, 'error');
+        }
+      } catch(e) {
+        alert("استجابة غير متوقعة:\n" + text.substring(0,200));
       }
     });
   };
@@ -279,21 +299,28 @@ function acceptOrder(id) {
   if (!o) return;
   Modal.confirm('قبول الطلب', `هل تريد قبول الطلب ${id} والبدء في التنفيذ؟`, () => {
     const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
     formData.append('order_id', o.db_id);
     formData.append('status', 'accepted');
+    formData.append('csrf_token', csrfTokenJs);
 
     fetch('ajax/handler.php?action=update_order_status', {
       method: 'POST',
       body: formData
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        o.status = 'accepted';
-        Toast.show(data.message, 'success');
-        filterOrders();
-      } else {
-        Toast.show(data.message, 'error');
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (data.success) {
+          o.status = 'accepted';
+          Toast.show(data.message, 'success');
+          filterOrders();
+        } else {
+          Toast.show(data.message, 'error');
+        }
+      } catch(e) {
+        alert("استجابة غير متوقعة:\n" + text.substring(0,200));
       }
     });
   });
@@ -304,21 +331,28 @@ function completeOrder(id) {
   if (!o) return;
   Modal.confirm('إتمام الطلب', `هل تريد تعليم الطلب ${id} كمكتمل؟`, () => {
     const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
     formData.append('order_id', o.db_id);
     formData.append('status', 'completed');
+    formData.append('csrf_token', csrfTokenJs);
 
     fetch('ajax/handler.php?action=update_order_status', {
       method: 'POST',
       body: formData
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        o.status = 'completed';
-        Toast.show(data.message, 'success');
-        filterOrders();
-      } else {
-        Toast.show(data.message, 'error');
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (data.success) {
+          o.status = 'completed';
+          Toast.show(data.message, 'success');
+          filterOrders();
+        } else {
+          Toast.show(data.message, 'error');
+        }
+      } catch(e) {
+        alert("استجابة غير متوقعة:\n" + text.substring(0,200));
       }
     });
   });
@@ -329,21 +363,28 @@ function cancelOrder(id) {
   if (!o) return;
   Modal.confirm('إلغاء الطلب', `هل تريد إلغاء الطلب ${id}؟ لا يمكن التراجع عن هذا الإجراء.`, () => {
     const formData = new FormData();
+  formData.append('csrf_token', csrfTokenJs);
     formData.append('order_id', o.db_id);
     formData.append('status', 'cancelled');
+    formData.append('csrf_token', csrfTokenJs);
 
     fetch('ajax/handler.php?action=update_order_status', {
       method: 'POST',
       body: formData
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
-        o.status = 'cancelled';
-        Toast.show(data.message, 'error');
-        filterOrders();
-      } else {
-        Toast.show(data.message, 'error');
+    .then(res => res.text())
+    .then(text => {
+      try {
+        const data = JSON.parse(text);
+        if (data.success) {
+          o.status = 'cancelled';
+          Toast.show(data.message, 'error'); // using error color per original code
+          filterOrders();
+        } else {
+          Toast.show(data.message, 'error');
+        }
+      } catch(e) {
+        alert("استجابة غير متوقعة:\n" + text.substring(0,200));
       }
     });
   });

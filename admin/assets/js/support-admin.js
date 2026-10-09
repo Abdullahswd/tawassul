@@ -11,6 +11,16 @@
   var chatBox = document.getElementById('supChatBox');
     var STATUSES = window.ADMIN_STATUSES || {open:['مفتوحة','#16a34a','#dcfce7'],pending:['قيد المراجعة','#d97706','#fef3c7'],closed:['مغلقة','#64748b','#e2e8f0']};
 
+  var flInput = document.getElementById('supReplyFile');
+  if (flInput) {
+    flInput.addEventListener('change', function() {
+      var fn = document.getElementById('supFileName');
+      if (!fn) return;
+      if (this.files.length) { fn.textContent = '📄 ' + this.files[0].name; fn.style.display = 'block'; }
+      else fn.style.display = 'none';
+    });
+  }
+
   function esc(s) {
     var d = document.createElement('div');
     d.textContent = (s == null ? '' : String(s));
@@ -25,14 +35,17 @@
   }
 
   /* ── إضافة رسالة إلى صندوق الدردشة ── */
-  function appendMsg(m) {
+  function appendMsg(m, isTemp = false) {
     if (!chatBox) return;
+    if (!isTemp) { document.querySelectorAll('.temp-msg').forEach(function(e){ e.remove(); }); }
     var ph = document.getElementById('supPlaceholder');
     if (ph) ph.remove();
     var isAdmin = (m.sender_type === 'admin');
     var wrap = document.createElement('div');
     wrap.className = 'sup-msg ' + (isAdmin ? 'sup-admin-msg' : 'sup-user-msg');
     wrap.setAttribute('data-msg-id', m.id);
+    if (isTemp) wrap.classList.add('temp-msg');
+    if (isTemp) wrap.style.opacity = '0.7';
 
     var nm = document.createElement('div');
     nm.style.cssText = 'font-size:11px;font-weight:700;margin-bottom:3px;';
@@ -111,6 +124,8 @@
 
     if (!CONV) { toast('❌ اختر تذكرة أولاً', 'error'); return; }
     if (!txt && !hasFile) { toast('❌ اكتب ردك أو أرفق ملفاً', 'error'); return; }
+    appendMsg({sender_type: 'admin', content: txt || 'ملف مرفق...', created_at: new Date().toISOString()}, true);
+    scrollToBottom();
 
     sending = true;
     var btn = document.querySelector('button[onclick="sendSupReply()"]');
@@ -118,6 +133,7 @@
 
     try {
       var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
       fd.append('action', 'send_reply');
       fd.append('conv_id', CONV);
       fd.append('content', txt);
@@ -140,7 +156,7 @@
         if (fn) fn.style.display = 'none';
         await poll();
         toast('✅ تم الإرسال', 'success');
-        setTimeout(function () { location.reload(); }, 800);
+        // location.reload() removed to prevent flicker
       } else if (d && d.error) {
         toast('❌ ' + d.error, 'error');
       } else if (raw !== '') {
@@ -167,6 +183,7 @@
   async function updateStatus(id, status) {
     try {
       var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
       fd.append('action', 'set_status');
       fd.append('conv_id', id);
       fd.append('status', status);
@@ -186,10 +203,14 @@
     var title = document.getElementById('faqModalTitle');
     if (title) title.textContent = id ? 'تعديل سؤال' : 'إضافة سؤال شائع';
     var m = document.getElementById('faqModal');
-    if (m) m.style.display = 'flex';
+    if (m) {
+      if (window.Modal) window.Modal.open('faqModal');
+      else m.classList.add('active');
+    }
   };
   window.saveFaq = async function () {
     var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
     fd.append('action', 'save_faq');
     fd.append('id', document.getElementById('faqId').value);
     fd.append('audience', document.getElementById('faqAudience').value);
@@ -199,7 +220,8 @@
     fd.append('is_active', document.getElementById('faqActive').value);
     var d = await postJson(fd);
     if (d && d.ok) {
-      document.getElementById('faqModal').style.display = 'none';
+      if (window.Modal) window.Modal.close('faqModal');
+      else document.getElementById('faqModal').classList.remove('active');
       location.reload();
     } else if (d) {
       toast('❌ ' + (d.error || 'خطأ'), 'error');
@@ -208,6 +230,7 @@
   window.deleteFaq = async function (id) {
     if (!confirm('🗑️ حذف هذا السؤال؟')) return;
     var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
     fd.append('action', 'delete_faq');
     fd.append('id', id);
     var d = await postJson(fd);
@@ -222,10 +245,14 @@
     var title = document.getElementById('channelModalTitle');
     if (title) title.textContent = id ? 'تعديل قناة' : 'إضافة قناة تواصل';
     var m = document.getElementById('channelModal');
-    if (m) m.style.display = 'flex';
+    if (m) {
+      if (window.Modal) window.Modal.open('channelModal');
+      else m.classList.add('active');
+    }
   };
   window.saveChannel = async function () {
     var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
     fd.append('action', 'save_channel');
     fd.append('id', document.getElementById('channelId').value);
     fd.append('type', document.getElementById('channelType').value);
@@ -235,7 +262,8 @@
     fd.append('is_active', document.getElementById('channelActive').value);
     var d = await postJson(fd);
     if (d && d.ok) {
-      document.getElementById('channelModal').style.display = 'none';
+      if (window.Modal) window.Modal.close('channelModal');
+      else document.getElementById('channelModal').classList.remove('active');
       location.reload();
     } else if (d) {
       toast('❌ ' + (d.error || 'خطأ'), 'error');
@@ -244,6 +272,7 @@
   window.deleteChannel = async function (id) {
     if (!confirm('🗑️ حذف هذه القناة؟')) return;
     var fd = new FormData();
+      if(window.CSRF_TOKEN) { fd.append('csrf_token', window.CSRF_TOKEN); }
     fd.append('action', 'delete_channel');
     fd.append('id', id);
     var d = await postJson(fd);
@@ -262,4 +291,13 @@
     }
   }
   scrollToBottom();
+  var supReplyInput = document.getElementById('supReplyInput');
+  if (supReplyInput) {
+    supReplyInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (typeof window.sendSupReply === 'function') window.sendSupReply();
+      }
+    });
+  }
 })();

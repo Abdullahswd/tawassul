@@ -20,9 +20,9 @@ $_navItems = [
     ['key' => 'services',  'href' => 'services.php',          'icon' => '📦', 'label' => 'الخدمات الأكاديمية'],
     ['key' => 'packages',  'href' => 'packages.php',          'icon' => '🎁', 'label' => 'الباقات المخصصة'],
     ['key' => 'orders',    'href' => 'orders.php',            'icon' => '📋', 'label' => 'طلباتي'],
-    ['key' => 'chat',      'href' => 'chat.php',              'icon' => '💬', 'label' => 'المحادثات'],
     ['key' => 'payments',  'href' => 'payments.php',          'icon' => '💳', 'label' => 'المدفوعات'],
-    ['key' => 'support',   'href' => 'support.php',           'icon' => '🛟', 'label' => 'الدعم الفني'],
+    ['key' => 'support',   'href' => 'support.php',           'icon' => '💬', 'label' => 'الدعم الفني'],
+    ['key' => 'policy',    'href' => 'policy.php',            'icon' => '📜', 'label' => 'سياسة الاستخدام'],
 ];
 
 $_unread = countUnreadNotifications($user['id'], 'student');
@@ -87,6 +87,13 @@ $_unreadSupport = countUnreadSupportForUser($user['id'], 'student');
 
       <div class="navbar-actions">
         <button class="icon-btn dark-toggle" aria-label="تبديل المظهر" id="darkToggle">🌙</button>
+
+        <a href="support.php" class="icon-btn" aria-label="الدعم الفني والأسئلة الشائعة" title="الدعم الفني والأسئلة الشائعة" style="text-decoration:none; position:relative">
+          💬
+          <?php if (isset($_unreadSupport) && $_unreadSupport > 0): ?>
+            <span class="badge-dot" style="display:flex;align-items:center;justify-content:center;font-size:10px;padding:2px"><?= $_unreadSupport ?></span>
+          <?php endif; ?>
+        </a>
 
         <button class="icon-btn" aria-label="الإشعارات" id="notifBtn">
           🔔
