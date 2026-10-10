@@ -5,6 +5,11 @@
 require_once __DIR__ . '/config/auth.php';
 require_once __DIR__ . '/config/functions.php';
 
+// Clear any dangling google_temp_user session
+if (isset($_SESSION['google_temp_user'])) {
+    unset($_SESSION['google_temp_user']);
+}
+
 // Already logged in
 if (isset($_SESSION['user_id'])) {
     header('Location: student/student-dashboard.php');
@@ -217,6 +222,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
         </div>
       </div>
       <button class="btn btn-primary" style="width:100%;padding:16px;font-size:16px;font-weight:800;border-radius:40px" onclick="nextStep()">المتابعة ←</button>
+
+      <div style="text-align:center;margin:16px 0;position:relative;">
+        <hr style="border:none;border-top:1px solid var(--border-color);">
+        <span style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--bg-card);padding:0 10px;color:var(--text-muted);font-size:14px;font-weight:600;">أو التسجيل السريع</span>
+      </div>
+
+      <a href="google-auth.php" class="btn" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:40px;background:#fff;color:#333;border:2px solid #e5e7eb;text-decoration:none;transition:all 0.3s;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" style="width:20px;height:20px;">
+        إنشاء حساب بواسطة Google
+      </a>
     </div>
 
     <!-- Step 2: نموذج تسجيل الطالب -->

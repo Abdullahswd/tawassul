@@ -55,24 +55,26 @@ if (!$action) {
 
 // ── إضافة تلقائية للأعمدة (logo + الصورة الشخصية) إن لم تكن موجودة ──
 // تعمل عند أي استدعاء، وتعود بنتيجة لمعرفة إن نجحت أم لا
-function columnExists($conn, $table, $column) {
+function columnExists($conn, $table, $column)
+{
     try {
         // استخدام information_schema بدلاً من SHOW COLUMNS ... LIKE ?
         // لأن SHOW لا يدعم المعاملات في وضع الـ native prepared statements
         // فيعود استثناء دائماً حتى لو كان العمود موجوداً.
         $stmt = $conn->prepare(
             "SELECT COUNT(*) FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
         );
         $stmt->execute([$table, $column]);
-        return (int)$stmt->fetchColumn() > 0;
+        return (int) $stmt->fetchColumn() > 0;
     } catch (Exception $e) {
         error_log("columnExists failed for $table.$column: " . $e->getMessage());
         return false;
     }
 }
 
-function ensureColumn($conn, $table, $column, $definition) {
+function ensureColumn($conn, $table, $column, $definition)
+{
     try {
         if (!columnExists($conn, $table, $column)) {
             $conn->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
@@ -114,7 +116,7 @@ if ($action === 'upload_avatar') {
     $isRealImage = false;
     if (class_exists('finfo')) {
         $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file((string)$file['tmp_name']);
+        $mime = $finfo->file((string) $file['tmp_name']);
         $isRealImage = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
     } else {
         $info = @getimagesize($file['tmp_name']);
@@ -126,7 +128,8 @@ if ($action === 'upload_avatar') {
     }
 
     $uploadDir = dirname(__DIR__) . '/../uploads/avatars';
-    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+    if (!is_dir($uploadDir))
+        @mkdir($uploadDir, 0755, true);
     if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
         sendJSONResponse(false, 'مجلد رفع الصور (uploads/avatars) غير قابل للكتابة.');
     }
@@ -147,17 +150,17 @@ if ($action === 'update_profile') {
     if (empty($_SESSION['academic_id'])) {
         sendJSONResponse(false, 'الجلسة منتهية، يرجى تسجيل الدخول مرة أخرى.');
     }
-        $academicId = (int) $_SESSION['academic_id'];
+    $academicId = (int) $_SESSION['academic_id'];
     $dbGet = db();
     $stmtGet = $dbGet->prepare("SELECT * FROM academics WHERE id = ?");
     $stmtGet->execute([$academicId]);
     $academic = $stmtGet->fetch() ?: [];
 
 
-    $name      = trim($_POST['name'] ?? '');
-    $email     = trim($_POST['email'] ?? '');
-    $phone     = trim($_POST['phone'] ?? '');
-    $bio       = trim($_POST['bio'] ?? '');
+    $name = trim($_POST['name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $phone = trim($_POST['phone'] ?? '');
+    $bio = trim($_POST['bio'] ?? '');
     $available = (isset($_POST['availability']) && $_POST['availability'] === 'available') ? 'available' : 'busy';
 
     if (!$name || !$email || !$phone) {
@@ -165,7 +168,7 @@ if ($action === 'update_profile') {
     }
 
     // Validate email uniqueness (excluding current academic)
-        try {
+    try {
         $db = db();
         $chk = $db->prepare("SELECT id FROM academics WHERE email = ? AND id != ?");
         $chk->execute([$email, $academicId]);
@@ -223,7 +226,7 @@ if ($action === 'update_profile') {
         if (is_string($servicesRaw)) {
             $servicesRaw = $servicesRaw !== '' ? [$servicesRaw] : [];
         }
-        $serviceIds = array_values(array_unique(array_filter(array_map('intval', (array)$servicesRaw))));
+        $serviceIds = array_values(array_unique(array_filter(array_map('intval', (array) $servicesRaw))));
         $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
         if (!empty($serviceIds)) {
             $srvStmt = $db->prepare("INSERT IGNORE INTO academic_services (academic_id, service_id, custom_price) VALUES (?, ?, NULL)");
@@ -259,6 +262,7 @@ if ($action === 'register') {
 
     // Credentials
     $password = $_POST['password'] ?? 'Academic@123'; // Default fallback if not provided
+    $googleId = $_POST['google_id'] ?? null;
 
     // Qualifications checkbox indicators
     $hasBachelor = isset($_POST['hasBachelor']) || !empty($_POST['bsUniversity']);
@@ -311,13 +315,14 @@ if ($action === 'register') {
 
         // Insert into academics
         $stmt = $db->prepare(
-            "INSERT INTO academics (name, email, password, phone, specialty, degree, university, bio, avatar_initials, starting_price, status, availability, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'available', NOW())"
+            "INSERT INTO academics (name, email, password, google_id, phone, specialty, degree, university, bio, avatar_initials, starting_price, status, availability, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'available', NOW())"
         );
         $stmt->execute([
             $name,
             $email,
             password_hash($password, PASSWORD_DEFAULT),
+            $googleId,
             $phone,
             $mainSpecialty,
             $mainDegree,
@@ -358,6 +363,10 @@ if ($action === 'register') {
         $newAcademic = getAcademicById($academicId);
         loginAcademic($newAcademic);
 
+        if (isset($_SESSION['google_temp_user'])) {
+            unset($_SESSION['google_temp_user']);
+        }
+
         sendJSONResponse(true, 'تم تسجيل حسابك بنجاح وقيد المراجعة الآن من الإدارة!');
 
     } catch (Exception $e) {
@@ -388,7 +397,7 @@ if ($action === 'create_order') {
 if ($action === 'accept_assignment' || $action === 'reject_assignment' || $action === 'update_order_status') {
     $orderId = intval($_POST['order_id'] ?? 0);
     $status = trim($_POST['status'] ?? '');
-    
+
     if ($action === 'accept_assignment') {
         $status = 'accepted';
     } elseif ($action === 'reject_assignment') {
@@ -429,7 +438,7 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
         if ($status === 'accepted') {
             // Update this academic's assignment status
             $db->prepare("UPDATE order_assignments SET status = 'accepted', response_at = NOW() WHERE order_id = ? AND academic_id = ?")
-               ->execute([$orderId, $academicId]);
+                ->execute([$orderId, $academicId]);
 
             // If main academic_id is not set, set it to this academic
             if (empty($order['academic_id'])) {
@@ -444,7 +453,7 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
             $convStmt->execute([$orderId]);
             if (!$convStmt->fetchColumn()) {
                 $db->prepare("INSERT INTO conversations (order_id, student_id, academic_id) VALUES (?, ?, ?)")
-                   ->execute([$orderId, $order['student_id'], $academicId]);
+                    ->execute([$orderId, $order['student_id'], $academicId]);
             }
 
             // Fetch academic name
@@ -464,19 +473,19 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
         } elseif ($status === 'rejected') {
             // Mark as rejected in order_assignments
             $db->prepare("UPDATE order_assignments SET status = 'rejected', response_at = NOW() WHERE order_id = ? AND academic_id = ?")
-               ->execute([$orderId, $academicId]);
+                ->execute([$orderId, $academicId]);
 
             // Check if there are other accepted or pending academics
             $remStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status != 'rejected'");
             $remStmt->execute([$orderId]);
-            $remaining = (int)$remStmt->fetchColumn();
+            $remaining = (int) $remStmt->fetchColumn();
 
             if ($remaining === 0) {
                 // No one left, revert order status to pending_assignment
                 $db->prepare("UPDATE orders SET status = 'pending_assignment', academic_id = NULL WHERE id = ?")->execute([$orderId]);
-                
+
                 // Notify admin
-                $adminId = (int)$db->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1")->fetchColumn();
+                $adminId = (int) $db->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1")->fetchColumn();
                 if ($adminId) {
                     createNotification(
                         $adminId,
@@ -492,14 +501,13 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
             sendJSONResponse(true, 'تم تسجيل اعتذارك عن هذه المهمة بنجاح.');
         } else {
             // Other status updates (in_progress, revision, completed, etc.)
-            $updateStmt = $db->prepare("UPDATE orders SET status = ? WHERE id = ?");
-            $updateStmt->execute([$status, $orderId]);
+            updateOrderStatus($orderId, $status);
 
             $statusLabels = [
                 'in_progress' => 'طلبك الآن قيد التنفيذ.',
-                'revision'    => 'طلبك حالياً تحت المراجعة والتدقيق.',
-                'completed'   => 'اكتمل تنفيذ طلبك بنجاح.',
-                'cancelled'   => 'تم إلغاء الطلب.'
+                'revision' => 'طلبك حالياً تحت المراجعة والتدقيق.',
+                'completed' => 'اكتمل تنفيذ طلبك بنجاح.',
+                'cancelled' => 'تم إلغاء الطلب.'
             ];
             $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
 
@@ -625,15 +633,15 @@ if ($action === 'submit_withdraw') {
 
     try {
         $db = db();
-        
+
         // Fetch payout policy settings
         $settings = [];
         $stmtSettings = $db->query("SELECT setting_key, setting_value FROM settings");
         while ($row = $stmtSettings->fetch(PDO::FETCH_ASSOC)) {
             $settings[$row['setting_key']] = $row['setting_value'];
         }
-        $min_withdrawal = (float)($settings['min_withdrawal'] ?? 200);
-        $withdrawal_eligibility_days = (int)($settings['withdrawal_eligibility_days'] ?? 14);
+        $min_withdrawal = (float) ($settings['min_withdrawal'] ?? 200);
+        $withdrawal_eligibility_days = (int) ($settings['withdrawal_eligibility_days'] ?? 14);
 
         if ($amount < $min_withdrawal) {
             sendJSONResponse(false, 'الحد الأدنى للسحب هو ' . $min_withdrawal . ' ر.س.');
@@ -649,15 +657,16 @@ if ($action === 'submit_withdraw') {
         $totalEarned = floatval($row['total_earned']);
         $totalWithdrawn = max(0, $totalEarned - $balance);
 
-        $totalEligibleEarned = (float)$db->query("
-            SELECT SUM(p.academic_net)
-            FROM payments p
-            JOIN orders o ON p.order_id = o.id
-            WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
-        ")->fetchColumn();
-        
+        $totalEligibleEarned = (float) $db->query("
+                SELECT SUM(p.academic_net)
+                FROM payments p
+                JOIN orders o ON p.order_id = o.id
+                WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
+            ")->fetchColumn();
+
         $eligibleBalance = max(0, $totalEligibleEarned - $totalWithdrawn);
-        if ($eligibleBalance > $balance) $eligibleBalance = $balance;
+        if ($eligibleBalance > $balance)
+            $eligibleBalance = $balance;
 
         if ($amount > $eligibleBalance) {
             sendJSONResponse(false, 'المبلغ يتجاوز الرصيد المؤهل للسحب.');
@@ -668,9 +677,9 @@ if ($action === 'submit_withdraw') {
         $db->prepare("UPDATE academics SET balance = ? WHERE id = ?")->execute([$newBalance, $academicId]);
 
         // Insert pending payout
-        $nextNum = (int)$db->query("SELECT COALESCE(MAX(id),0)+1 FROM payouts")->fetchColumn();
+        $nextNum = (int) $db->query("SELECT COALESCE(MAX(id),0)+1 FROM payouts")->fetchColumn();
         $payoutNum = 'WD-' . date('Ym') . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
-        
+
         $insStmt = $db->prepare("INSERT INTO payouts (payout_number, academic_id, bank_account_id, amount, note, status, created_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)");
         $insStmt->execute([$payoutNum, $academicId, $bankAccountId, $amount, $note, $academicId]);
 
@@ -725,9 +734,9 @@ if ($action === 'create_order') {
         // Insert order
         $stmt = $db->prepare(
             'INSERT INTO orders
-               (order_number, student_id, academic_id, service_id, package_id, specialty,
-                academic_level, language, description, deadline, amount, status, created_at)
-             VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
+                (order_number, student_id, academic_id, service_id, package_id, specialty,
+                    academic_level, language, description, deadline, amount, status, created_at)
+                VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
         );
 
         $stmt->execute([
@@ -750,8 +759,8 @@ if ($action === 'create_order') {
 
         $payStmt = $db->prepare(
             'INSERT INTO payments
-               (payment_number, order_id, student_id, amount, platform_fee, academic_net, method, status, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, "credit_card", "paid", NOW())'
+                (payment_number, order_id, student_id, amount, platform_fee, academic_net, method, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, "credit_card", "paid", NOW())'
         );
         $payStmt->execute([
             $payNum,
@@ -807,9 +816,9 @@ if ($action === 'send_message') {
 
         // Ensure academic owns the order or is assigned to it
         $orderStmt = $db->prepare("
-            SELECT id, student_id FROM orders 
-            WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
-        ");
+                SELECT id, student_id FROM orders 
+                WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+            ");
         $orderStmt->execute([$orderId, $academicId, $academicId]);
         $order = $orderStmt->fetch();
 
@@ -830,7 +839,7 @@ if ($action === 'send_message') {
 
         // رفع الملف (إن وجد) + إدراج الرسالة
         $fileInfo = saveChatAttachmentUpload($_FILES['file'] ?? null);
-        sendMessage((int)$conversationId, $academicId, 'academic', $content, $fileInfo);
+        sendMessage((int) $conversationId, $academicId, 'academic', $content, $fileInfo);
 
         // Get academic name
         $acName = $db->query("SELECT name FROM academics WHERE id = $academicId")->fetchColumn() ?: 'الأكاديمي';
@@ -867,9 +876,9 @@ if ($action === 'upload_attachment') {
 
         // Ensure academic owns the order or is assigned to it
         $orderStmt = $db->prepare("
-            SELECT id FROM orders 
-            WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
-        ");
+                SELECT id FROM orders 
+                WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+            ");
         $orderStmt->execute([$orderId, $academicId, $academicId]);
         if (!$orderStmt->fetch()) {
             sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
@@ -930,7 +939,7 @@ if ($action === 'upload_bank_logo') {
     $isRealImage = false;
     if (class_exists('finfo')) {
         $finfo = new finfo(FILEINFO_MIME_TYPE);
-        $mime = $finfo->file((string)$file['tmp_name']);
+        $mime = $finfo->file((string) $file['tmp_name']);
         $isRealImage = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']);
     } else {
         $info = @getimagesize($file['tmp_name']);
@@ -942,7 +951,8 @@ if ($action === 'upload_bank_logo') {
     }
 
     $uploadDir = dirname(__DIR__) . '/../uploads/bank_logos';
-    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+    if (!is_dir($uploadDir))
+        @mkdir($uploadDir, 0755, true);
     if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
         sendJSONResponse(false, 'مجلد رفع الشعارات (uploads/bank_logos) غير قابل للكتابة.');
     }
@@ -997,7 +1007,8 @@ if ($action === 'add_bank_account' || $action === 'update_bank_account') {
             )->execute([$accountType, $accountName, $accountNumber, $holderName, $logo, $id, $academicId]);
             sendJSONResponse(true, 'تم تحديث الحساب بنجاح.');
         } else {
-            if ($logoCleared) $logo = null;
+            if ($logoCleared)
+                $logo = null;
             $db->prepare(
                 "INSERT INTO academic_bank_accounts (academic_id, account_type, account_name, account_number, holder_name, logo) VALUES (?, ?, ?, ?, ?, ?)"
             )->execute([$academicId, $accountType, $accountName, $accountNumber, $holderName, $logo]);

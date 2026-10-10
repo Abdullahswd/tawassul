@@ -1,3 +1,31 @@
+<?php
+require_once dirname(__DIR__) . '/config/auth.php';
+require_once dirname(__DIR__) . '/config/functions.php';
+
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+
+    if (!$email || !$password) {
+        $error = 'يرجى تعبئة جميع الحقول.';
+    } else {
+        $user = getUserByEmail($email);
+        if ($user && password_verify($password, $user['password'])) {
+            if ($user['role'] !== 'admin') {
+                $error = 'هذا الحساب ليس لديه صلاحيات الإدارة.';
+            } else {
+                loginUser($user);
+                header('Location: pages/dashboard.php');
+                exit;
+            }
+        } else {
+            $error = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -170,11 +198,17 @@
     </div>
 
     <!-- Form -->
-    <form onsubmit="handleLogin(event)">
+    <form method="POST" action="">
+
+      <?php if ($error): ?>
+        <div style="background:#ef4444;color:white;padding:12px;border-radius:12px;margin-bottom:16px;font-size:14px;text-align:center;">
+          <?= htmlspecialchars($error) ?>
+        </div>
+      <?php endif; ?>
 
       <div>
         <label class="login-label">البريد الإلكتروني</label>
-        <input class="login-input" type="email" id="loginEmail" placeholder="admin@eduroad.com" required />
+        <input class="login-input" type="email" name="email" id="loginEmail" placeholder="admin@eduroad.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required />
       </div>
 
       <div>
@@ -183,7 +217,7 @@
           <a href="#" style="color:#818cf8;font-size:12px;text-decoration:none">نسيت كلمة المرور؟</a>
         </label>
         <div style="position:relative">
-          <input class="login-input" type="password" id="loginPassword" placeholder="••••••••" required style="margin-bottom:0;padding-left:44px" />
+          <input class="login-input" type="password" name="password" id="loginPassword" placeholder="••••••••" required style="margin-bottom:0;padding-left:44px" />
           <button type="button" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;font-size:18px" onclick="togglePassword()">👁</button>
         </div>
       </div>
@@ -193,7 +227,7 @@
         <label for="rememberMe" style="font-size:14px;color:rgba(255,255,255,0.5);cursor:pointer">تذكرني</label>
       </div>
 
-      <button type="submit" class="login-btn" id="loginBtn">
+      <button type="submit" class="login-btn" id="loginBtn" onclick="this.innerHTML='⏳ جاري التحقق...'; setTimeout(()=>this.disabled=true,0); this.form.submit();">
         تسجيل الدخول
       </button>
 
@@ -202,7 +236,7 @@
     <!-- Quick Access Note -->
     <div style="margin-top:24px;padding:14px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.2);border-radius:12px">
       <p style="font-size:12px;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:6px">بيانات الدخول التجريبية</p>
-      <p style="font-size:13px;color:#a5b4fc;text-align:center;font-weight:500">admin@eduroad.com / 123456</p>
+      <p style="font-size:13px;color:#a5b4fc;text-align:center;font-weight:500">admin@eduroad.com / password</p>
     </div>
 
     <!-- Footer -->
@@ -214,33 +248,6 @@
 </div>
 
 <script>
-function handleLogin(e) {
-  e.preventDefault();
-  const email = document.getElementById('loginEmail').value;
-  const pass = document.getElementById('loginPassword').value;
-  const btn = document.getElementById('loginBtn');
-
-  // Mock auth
-  if (email && pass.length >= 4) {
-    btn.innerHTML = '⏳ جاري التحقق...';
-    btn.disabled = true;
-    btn.style.opacity = '0.7';
-
-    setTimeout(() => {
-      window.location.href = 'pages/dashboard.php';
-    }, 1200);
-  } else {
-    btn.innerHTML = '❌ بيانات غير صحيحة';
-    btn.style.background = 'linear-gradient(135deg,#ef4444,#dc2626)';
-    setTimeout(() => {
-      btn.innerHTML = 'تسجيل الدخول';
-      btn.style.background = 'linear-gradient(135deg,#6366f1,#4f46e5)';
-      btn.disabled = false;
-      btn.style.opacity = '1';
-    }, 2000);
-  }
-}
-
 function togglePassword() {
   const input = document.getElementById('loginPassword');
   input.type = input.type === 'password' ? 'text' : 'password';

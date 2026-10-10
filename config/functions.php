@@ -409,35 +409,56 @@ function updateOrderStatus(int $orderId, string $status): bool {
     $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
     $success = $stmt->execute([$status, $orderId]);
     
-    // If order was just marked as completed, pay the academic
+    // If order was just marked as completed, attempt to pay the academic
     if ($success && $status === 'completed' && $old_status !== 'completed' && !empty($order['academic_id'])) {
-        // Find the pending payment for this order
-        $payStmt = $db->prepare("SELECT id, academic_net FROM payments WHERE order_id = ? AND status = 'pending' LIMIT 1");
-        $payStmt->execute([$orderId]);
-        $payment = $payStmt->fetch();
-        
-        if ($payment) {
-            // Mark payment as paid
-            $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = ?")
-               ->execute([$payment['id']]);
-               
-            // Increase academic balance
-            $db->prepare("UPDATE academics SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?")
-               ->execute([$payment['academic_net'], $payment['academic_net'], $order['academic_id']]);
-               
-            // Send notification to academic
-            createNotification(
-                (int)$order['academic_id'],
-                'academic',
-                'أرباح جديدة تمت إضافتها 💰',
-                'تم اكتمال طلبك رقم ' . $order['order_number'] . ' وإضافة ' . $payment['academic_net'] . ' ر.س إلى رصيدك.',
-                '💰',
-                'academic-earnings.php'
-            );
-        }
+        syncAcademicEarnings($orderId);
     }
     
     return $success;
+}
+
+/**
+ * Transfers the payment for a completed order to the academic's balance.
+ * Prevents double-payment by using the is_transferred_to_academic column.
+ */
+function syncAcademicEarnings(int $orderId): bool {
+    $db = db();
+    try {
+        $db->exec("ALTER TABLE payments ADD COLUMN is_transferred_to_academic TINYINT(1) DEFAULT 0");
+    } catch (Exception $e) {}
+
+    // Check if order is completed and has an academic
+    $stmt = $db->prepare("SELECT status, academic_id, order_number FROM orders WHERE id = ?");
+    $stmt->execute([$orderId]);
+    $order = $stmt->fetch();
+
+    if (!$order || $order['status'] !== 'completed' || empty($order['academic_id'])) {
+        return false;
+    }
+
+    // Find the payment for this order that is paid but hasn't been transferred yet
+    $payStmt = $db->prepare("SELECT id, academic_net FROM payments WHERE order_id = ? AND status = 'paid' AND is_transferred_to_academic = 0 LIMIT 1");
+    $payStmt->execute([$orderId]);
+    $payment = $payStmt->fetch();
+    
+    if ($payment) {
+        $db->prepare("UPDATE payments SET is_transferred_to_academic = 1 WHERE id = ?")
+           ->execute([$payment['id']]);
+           
+        $db->prepare("UPDATE academics SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?")
+           ->execute([$payment['academic_net'], $payment['academic_net'], $order['academic_id']]);
+           
+        createNotification(
+            (int)$order['academic_id'],
+            'academic',
+            'أرباح جديدة تمت إضافتها 💰',
+            'تم اكتمال طلبك رقم ' . $order['order_number'] . ' وإضافة ' . $payment['academic_net'] . ' ر.س إلى رصيدك.',
+            '💰',
+            'academic-earnings.php'
+        );
+        return true;
+    }
+    return false;
 }
 
 function getAssignedAcademics(int $orderId): array {

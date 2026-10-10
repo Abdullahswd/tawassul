@@ -9,17 +9,17 @@ $error   = '';
 $success = '';
 
 // Detect current session type (using new namespace system)
+// Also clear any dangling google_temp_user session
+if (isset($_SESSION['google_temp_user'])) {
+    unset($_SESSION['google_temp_user']);
+}
 $current_session_type = null;
 $current_session_name = '';
-if (isset($_SESSION['student'])) {
+if (isset($_SESSION['user_id']) && $_SESSION['user_role'] === 'student') {
     $current_session_type = 'user';
-    $current_session_name = ($_SESSION['student']['role'] === 'admin') ? 'الإدارة' : 'الطالب';
+    $current_session_name = 'الطالب';
 }
-if (isset($_SESSION['admin'])) {
-    $current_session_type = 'user';
-    $current_session_name = 'الإدارة';
-}
-if (isset($_SESSION['academic'])) {
+if (isset($_SESSION['academic_id'])) {
     $current_session_type = 'academic';
     $current_session_name = 'الأكاديمي';
 }
@@ -48,18 +48,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
             }
         } else {
-            // ── Student / Admin login ──
+            // ── Student login ──
             $user = getUserByEmail($email);
             if ($user && password_verify($password, $user['password'])) {
                 if ($user['status'] === 'suspended') {
                     $error = 'تم تعليق حسابك. يرجى التواصل مع الدعم.';
+                } elseif ($user['role'] === 'admin') {
+                    $error = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
                 } else {
                     loginUser($user);
                     $redirect = $_GET['redirect'] ?? null;
                     if ($redirect) {
                         header('Location: ' . $redirect);
-                    } elseif ($user['role'] === 'admin') {
-                        header('Location: admin/pages/dashboard.php');
                     } else {
                         header('Location: student/student-dashboard.php');
                     }
@@ -211,13 +211,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           ✅ أنت مسجل الدخول حالياً بصفتك <strong><?= e($current_session_name) ?></strong>
         </div>
         <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-          <?php if (isset($_SESSION['admin'])): ?>
-            <a href="admin/pages/dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الإدارة</a>
-          <?php endif; ?>
-          <?php if (isset($_SESSION['student']) && $_SESSION['student']['role'] === 'student'): ?>
+          <?php if (isset($_SESSION['user_id']) && $_SESSION['user_role'] === 'student'): ?>
             <a href="student/student-dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الطالب</a>
           <?php endif; ?>
-          <?php if (isset($_SESSION['academic'])): ?>
+          <?php if (isset($_SESSION['academic_id'])): ?>
             <a href="academics/academic-dashboard.php" class="btn btn-primary" style="padding:10px 24px;font-size:14px;border-radius:40px">🔓 الذهاب للوحة الأكاديمي</a>
           <?php endif; ?>
           <a href="logout.php" class="btn btn-outline" style="padding:10px 24px;font-size:14px;border-radius:40px;border-color:var(--danger);color:var(--danger)">🚪 تسجيل خروج</a>
@@ -230,7 +227,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div style="display:flex;gap:12px;margin-bottom:32px;flex-wrap:wrap">
       <button type="button" class="type-btn active" id="btn-student"  onclick="setUser('student')">📚 بصفتي طالب</button>
       <button type="button" class="type-btn"        id="btn-academic" onclick="setUser('academic')">🎓 بصفتي أكاديمي</button>
-      <button type="button" class="type-btn"        id="btn-admin"    onclick="setUser('admin')">👨‍💼 بصفتي إدارة</button>
     </div>
 
     <form method="POST" action="login.php" id="loginForm">
@@ -255,13 +251,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               style="width:100%;padding:16px;font-size:16px;font-weight:800;border-radius:40px;margin-bottom:8px">
         تسجيل الدخول 🚀
       </button>
+
+      <div style="text-align:center;margin:16px 0;position:relative;">
+        <hr style="border:none;border-top:1px solid var(--border-color);">
+        <span style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--bg-card);padding:0 10px;color:var(--text-muted);font-size:14px;font-weight:600;">أو</span>
+      </div>
+
+      <a href="google-auth.php" class="btn" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:14px;font-size:15px;font-weight:700;border-radius:40px;background:#fff;color:#333;border:2px solid #e5e7eb;text-decoration:none;transition:all 0.3s;">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/c/c1/Google_%22G%22_logo.svg" alt="Google" style="width:20px;height:20px;">
+        تسجيل الدخول بواسطة Google
+      </a>
     </form>
 
     <!-- حسابات تجريبية بشكل أنيق -->
     <div class="demo-box">
       <div style="font-weight:800;margin-bottom:12px;color:var(--text-primary)">🔐 حسابات تجريبية للاختبار:</div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 12px;font-size:13px">
-        <span>👨‍💼 مدير:</span><span><code>admin@eduroad.com</code></span>
         <span>👨‍🎓 طالب:</span><span><code>ahmed@student.com</code></span>
         <span>👨‍🏫 أكاديمي:</span><span><code>dr.mohammed@academic.com</code></span>
         <span>🔑 كلمة المرور:</span><span><code>password</code> (للجميع)</span>
@@ -285,7 +290,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       document.getElementById('userTypeInput').value = type;
       document.getElementById('btn-student').classList.toggle('active', type === 'student');
       document.getElementById('btn-academic').classList.toggle('active', type === 'academic');
-      document.getElementById('btn-admin').classList.toggle('active', type === 'admin');
     }
 
     // تأثير تعطيل الزر أثناء الإرسال لمنع التكرار

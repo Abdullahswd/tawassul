@@ -2,6 +2,11 @@
 require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/functions.php';
 
+// Clear dangling Google session if not coming from Google flow
+if (isset($_SESSION['google_temp_user']) && !isset($_GET['google'])) {
+    unset($_SESSION['google_temp_user']);
+}
+
 $db = db();
 $services = getAllServices(true);
 $servicesJson = [];
@@ -103,7 +108,7 @@ foreach ($services as $s) {
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="form-group" style="grid-column:span 2">
               <label class="form-label">الاسم الكامل <span style="color:var(--danger)">*</span></label>
-              <input class="form-input" id="fullName" name="fullName" placeholder="محمد عبدالله أحمد الزهراني" required/>
+              <input class="form-input" id="fullName" name="fullName" placeholder="محمد عبدالله أحمد الزهراني" value="<?= htmlspecialchars($_SESSION['google_temp_user']['name'] ?? '') ?>" required/>
             </div>
 
             <div class="form-group">
@@ -132,13 +137,18 @@ foreach ($services as $s) {
 
             <div class="form-group">
               <label class="form-label">البريد الإلكتروني <span style="color:var(--danger)">*</span></label>
-              <input class="form-input" name="email" type="email" placeholder="example@email.com" dir="ltr" required/>
+              <input class="form-input" name="email" type="email" placeholder="example@email.com" dir="ltr" value="<?= htmlspecialchars($_SESSION['google_temp_user']['email'] ?? '') ?>" <?= isset($_SESSION['google_temp_user']) ? 'readonly style="background:#f3f4f6"' : '' ?> required/>
             </div>
 
+            <?php if (!isset($_SESSION['google_temp_user'])): ?>
             <div class="form-group">
               <label class="form-label">كلمة المرور للدخول <span style="color:var(--danger)">*</span></label>
               <input class="form-input" name="password" type="password" placeholder="••••••••" required/>
             </div>
+            <?php else: ?>
+              <input type="hidden" name="password" value="<?= bin2hex(random_bytes(8)) ?>" />
+              <input type="hidden" name="google_id" value="<?= htmlspecialchars($_SESSION['google_temp_user']['google_id']) ?>" />
+            <?php endif; ?>
 
             <div class="form-group">
               <label class="form-label">مكان الميلاد</label>

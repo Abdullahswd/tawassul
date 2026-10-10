@@ -51,28 +51,18 @@ $min_withdrawal = (float)($settings['min_withdrawal'] ?? 200);
 $withdrawal_eligibility_days = (int)($settings['withdrawal_eligibility_days'] ?? 14);
 $payout_processing_time = (int)($settings['payout_processing_time'] ?? 3);
 
-// Let's check total earned from payments paid to make it consistent if total_earned column is 0
-$checkEarned = (float)$db->query("
-    SELECT SUM(p.academic_net)
-    FROM payments p
-    JOIN orders o ON p.order_id = o.id
-    WHERE o.academic_id = $academicId AND p.status = 'paid'
-")->fetchColumn();
-if ($checkEarned > $totalEarned) {
-    $totalEarned = $checkEarned;
-    // Update academic total_earned
-    $db->prepare("UPDATE academics SET total_earned = ? WHERE id = ?")->execute([$totalEarned, $academicId]);
-}
+// The `total_earned` is now robustly managed by the system upon order completion.
+// Please run fix_financial_data.php if there are any historical discrepancies.
 
 $totalWithdrawn = $totalEarned - $balance;
 if ($totalWithdrawn < 0) $totalWithdrawn = 0;
 
-// Calculate eligible balance (only from payments older than withdrawal_eligibility_days)
+// Calculate eligible balance (only from payments where order is completed older than withdrawal_eligibility_days)
 $totalEligibleEarned = (float)$db->query("
     SELECT SUM(p.academic_net)
     FROM payments p
     JOIN orders o ON p.order_id = o.id
-    WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
+    WHERE o.academic_id = $academicId AND p.status = 'paid' AND p.is_transferred_to_academic = 1 AND DATEDIFF(NOW(), o.updated_at) >= $withdrawal_eligibility_days
 ")->fetchColumn();
 $eligibleBalance = $totalEligibleEarned - $totalWithdrawn;
 if ($eligibleBalance < 0) $eligibleBalance = 0;
@@ -81,12 +71,12 @@ if ($eligibleBalance > $balance) $eligibleBalance = $balance;
 $pendingEligibility = $balance - $eligibleBalance;
 if ($pendingEligibility < 0) $pendingEligibility = 0;
 
-// Earnings this month
+// Earnings this month (based on when the order was completed)
 $thisMonthEarnings = (float)$db->query("
     SELECT COALESCE(SUM(p.academic_net), 0)
     FROM payments p
     JOIN orders o ON p.order_id = o.id
-    WHERE o.academic_id = $academicId AND p.status = 'paid' AND MONTH(p.paid_at) = MONTH(NOW()) AND YEAR(p.paid_at) = YEAR(NOW())
+    WHERE o.academic_id = $academicId AND p.status = 'paid' AND p.is_transferred_to_academic = 1 AND MONTH(o.updated_at) = MONTH(NOW()) AND YEAR(o.updated_at) = YEAR(NOW())
 ")->fetchColumn();
 
 // Fetch academic's saved bank accounts
@@ -132,7 +122,7 @@ $earningsStmt = $db->prepare("
     SELECT MONTH(p.paid_at) as m, SUM(p.academic_net) as total
     FROM payments p
     JOIN orders o ON p.order_id = o.id
-    WHERE o.academic_id = ? AND p.status = 'paid' AND YEAR(p.paid_at) = YEAR(NOW())
+    WHERE o.academic_id = ? AND p.status = 'paid' AND p.is_transferred_to_academic = 1 AND YEAR(p.paid_at) = YEAR(NOW())
     GROUP BY MONTH(p.paid_at)
 ");
 $earningsStmt->execute([$academicId]);

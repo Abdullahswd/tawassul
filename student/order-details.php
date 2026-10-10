@@ -157,6 +157,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 }
+// Handle additional files upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_additional_files'])) {
+    if (!empty($_FILES['order_attachments']['name'][0])) {
+        $savedCount = saveOrderAttachmentUploads($_FILES['order_attachments'], $order_id);
+        if ($savedCount > 0) {
+            // Notify Admin
+            createNotification(1, 'admin', 'ملفات إضافية 📎', 'قام الطالب بإضافة ملفات جديدة للطلب #' . $order['order_number'], '📎', 'admin/pages/order-details.php?id=' . $order['order_number']);
+            
+            // Notify Academics
+            $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL");
+            $academics->execute([$order_id, $order_id]);
+            foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
+                if ($acid) {
+                    createNotification($acid, 'academic', 'ملفات إضافية من الطالب 📎', 'قام الطالب بإضافة ملفات جديدة للطلب #' . $order['order_number'], '📎', 'academics/academic-order-details.php?id=' . $order['order_number']);
+                }
+            }
+        }
+    }
+    header("Location: order-details.php?id=$order_id");
+    exit;
+}
 
 // Find or Create active conversation
 $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
@@ -408,10 +429,16 @@ require __DIR__ . '/partials/sidebar.php';
               <?php endif; ?>
 
               <!-- Draggable file upload UI -->
-              <div style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:24px;text-align:center;background:var(--bg-body);margin-top:20px;cursor:pointer">
-                <h4 style="font-weight:700;margin-bottom:8px;color:var(--primary)">إضافة ملفات جديدة ➕</h4>
-                <p style="font-size:12px;color:var(--text-secondary)">اسحب وأفلت الملفات هنا أو اضغط للاختيار</p>
-              </div>
+              <form action="order-details.php?id=<?= $order_id ?>" method="POST" enctype="multipart/form-data" id="additionalFilesForm">
+                <input type="hidden" name="add_additional_files" value="1">
+                <input type="file" name="order_attachments[]" id="additionalFileInput" multiple style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
+                <div id="dropZone" style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:24px;text-align:center;background:var(--bg-body);margin-top:20px;cursor:pointer;transition:all 0.3s;">
+                  <h4 style="font-weight:700;margin-bottom:8px;color:var(--primary)">إضافة ملفات جديدة ➕</h4>
+                  <p style="font-size:12px;color:var(--text-secondary)">اسحب وأفلت الملفات هنا أو اضغط للاختيار</p>
+                  <div id="fileList" style="margin-top:10px; font-size:12px; color:var(--text-primary); text-align:right;"></div>
+                  <button type="submit" id="uploadFilesBtn" class="btn btn-primary" style="display:none; margin-top:15px; width:100%;">رفع الملفات 🚀</button>
+                </div>
+              </form>
             </div>
 
           </div>
@@ -734,6 +761,57 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
           }
         } catch (err) { chatForm.submit(); } finally { sending = false; }
       });
+    }
+
+    const dropZone = document.getElementById('dropZone');
+    const additionalFileInput = document.getElementById('additionalFileInput');
+    const fileList = document.getElementById('fileList');
+    const uploadFilesBtn = document.getElementById('uploadFilesBtn');
+
+    if (dropZone && additionalFileInput) {
+      dropZone.addEventListener('click', (e) => {
+        if (e.target !== uploadFilesBtn) additionalFileInput.click();
+      });
+
+      ['dragover', 'dragenter'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropZone.style.borderColor = 'var(--primary)';
+          dropZone.style.background = 'var(--primary-light)';
+        });
+      });
+
+      ['dragleave', 'dragend', 'drop'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault();
+          dropZone.style.borderColor = 'var(--border-color)';
+          dropZone.style.background = 'var(--bg-body)';
+        });
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        if (e.dataTransfer.files.length) {
+          additionalFileInput.files = e.dataTransfer.files;
+          updateAdditionalFileList();
+        }
+      });
+
+      additionalFileInput.addEventListener('change', updateAdditionalFileList);
+
+      function updateAdditionalFileList() {
+        fileList.innerHTML = '';
+        if (additionalFileInput.files.length > 0) {
+          let html = '<ul style="list-style:none; padding:0;">';
+          Array.from(additionalFileInput.files).forEach(file => {
+            html += '<li style="margin-bottom:4px;">📄 ' + escapeHtml(file.name) + '</li>';
+          });
+          html += '</ul>';
+          fileList.innerHTML = html;
+          uploadFilesBtn.style.display = 'block';
+        } else {
+          uploadFilesBtn.style.display = 'none';
+        }
+      }
     }
   </script>
 <?php

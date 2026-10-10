@@ -50,7 +50,7 @@ function requireStudent(): void {
  */
 function requireAdmin(): void {
     if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
-        header('Location: ' . rootUrl() . '/login.php');
+        header('Location: ' . rootUrl() . '/admin/');
         exit;
     }
 }
@@ -94,9 +94,14 @@ function loginAcademic(array $academic): void {
  * Log out any currently logged-in user.
  */
 function logout(): void {
+    $isAdmin = (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin');
     session_unset();
     session_destroy();
-    header('Location: ' . rootUrl() . '/login.php');
+    if ($isAdmin) {
+        header('Location: ' . rootUrl() . '/admin/');
+    } else {
+        header('Location: ' . rootUrl() . '/login.php');
+    }
     exit;
 }
 
