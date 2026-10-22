@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../config/auth.php';
 require_once __DIR__ . '/../../config/functions.php';
+require_once __DIR__ . '/../../config/mailer.php';
 requireAdmin();
 
 $order_no = $_GET['id'] ?? '';
@@ -150,7 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
       foreach ($academic_ids as $ac_id) {
         $ins->execute([$order['id'], $ac_id]);
 
-        // Notify academic
+        // Notify academic (In-app)
         createNotification(
           $ac_id,
           'academic',
@@ -159,6 +160,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
           '📋',
           'academics/academic-orders.php'
         );
+
+        // Send Email to Academic (SMTP)
+        sendOrderAssignedToAcademicEmail((int)$ac_id, $order);
       }
 
       // Set status to assigned

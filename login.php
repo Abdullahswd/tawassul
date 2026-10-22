@@ -4,6 +4,7 @@
  */
 require_once __DIR__ . '/config/auth.php';
 require_once __DIR__ . '/config/functions.php';
+require_once __DIR__ . '/config/mailer.php';
 
 $error   = '';
 $success = '';
@@ -41,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'تم رفض حسابك من قِبل الإدارة. للاستفسار تواصل معنا.';
                 } else {
                     loginAcademic($academic);
+                    sendLoginNotificationEmail($academic, 'academic');
                     header('Location: academics/academic-dashboard.php');
                     exit;
                 }
@@ -57,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
                 } else {
                     loginUser($user);
+                    sendLoginNotificationEmail($user, 'student');
                     $redirect = $_GET['redirect'] ?? null;
                     if ($redirect) {
                         header('Location: ' . $redirect);

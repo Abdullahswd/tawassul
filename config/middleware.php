@@ -1,52 +1,54 @@
-    <?php
-    /**
-     * ============================================================
-     *  Eduroad - Security Middleware
-     *  Handles CSRF protection, Output Buffering Injection, and Headers
-     * ============================================================
-     */
+<?php
+/**
+ * ============================================================
+ *  Eduroad - Security Middleware
+ *  Handles CSRF protection, Output Buffering Injection, and Headers
+ * ============================================================
+ */
 
-    if (session_status() === PHP_SESSION_NONE) {
-        session_start();
-    }
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-    // 1. Generate CSRF Token
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
+// 1. Generate CSRF Token
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
 
-    // 2. Validate CSRF for POST Requests
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+// 2. Validate CSRF for POST Requests
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    $isAjax = (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest');
+    
+    // Exempt specific routes if needed (e.g., Pusher webhooks)
+    $uri = $_SERVER['REQUEST_URI'] ?? '';
+    if (strpos($uri, 'pusher_auth.php') === false && strpos($uri, 'webhook') === false) {
+        $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_CSRF_TOKEN'] ?? '';
         
-        // Exempt specific routes if needed (e.g., Pusher webhooks)
-        $uri = $_SERVER['REQUEST_URI'];
-        if (strpos($uri, 'pusher_auth.php') === false && strpos($uri, 'webhook') === false) {
-            $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_CSRF_TOKEN'] ?? '';
-            
-            if (!hash_equals($_SESSION['csrf_token'], $token)) {
-                if ($isAjax) {
-                    header('HTTP/1.1 403 Forbidden');
-                    header('Content-Type: application/json; charset=utf-8');
-                    echo json_encode(['error' => 'Invalid CSRF token', 'ok' => false]);
-                    exit;
-                } else {
-                    die('
-                    <div style="text-align:center; padding: 50px; font-family: sans-serif;">
-                        <h2 style="color: #e3342f;">خطأ: طلب غير مصرح به (CSRF Mismatch)</h2>
-                        <p>انتهت صلاحية الجلسة أو هناك محاولة لإرسال بيانات غير مصرح بها.</p>
-                        <a href="javascript:history.back()" style="padding: 10px 20px; background: #3490dc; color: #fff; text-decoration: none; border-radius: 5px;">العودة والمحاولة مرة أخرى</a>
-                    </div>
-                    ');
-                }
+        if (!hash_equals($_SESSION['csrf_token'], $token)) {
+            if ($isAjax) {
+                header('HTTP/1.1 403 Forbidden');
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => 'Invalid CSRF token', 'ok' => false]);
+                exit;
+            } else {
+                die('
+                <div style="text-align:center; padding: 50px; font-family: sans-serif;">
+                    <h2 style="color: #e3342f;">خطأ: طلب غير مصرح به (CSRF Mismatch)</h2>
+                    <p>انتهت صلاحية الجلسة أو هناك محاولة لإرسال بيانات غير مصرح بها.</p>
+                    <a href="javascript:history.back()" style="padding: 10px 20px; background: #3490dc; color: #fff; text-decoration: none; border-radius: 5px;">العودة والمحاولة مرة أخرى</a>
+                </div>
+                ');
             }
         }
     }
+}
 
-    // 3. Security Headers
+// 3. Security Headers
+if (!headers_sent()) {
     header("X-Frame-Options: SAMEORIGIN");
     header("X-XSS-Protection: 1; mode=block");
     header("X-Content-Type-Options: nosniff");
+}
 
     // 4. Output Buffer Middleware to Inject CSRF Token
     ob_start(function($buffer) {

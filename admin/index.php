@@ -1,6 +1,7 @@
 <?php
 require_once dirname(__DIR__) . '/config/auth.php';
 require_once dirname(__DIR__) . '/config/functions.php';
+require_once dirname(__DIR__) . '/config/mailer.php';
 
 $error = '';
 
@@ -17,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'هذا الحساب ليس لديه صلاحيات الإدارة.';
       } else {
         loginUser($user);
+        sendLoginNotificationEmail($user, 'admin');
         header('Location: pages/dashboard.php');
         exit;
       }

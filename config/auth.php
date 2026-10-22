@@ -19,9 +19,11 @@ if (session_status() === PHP_SESSION_NONE) {
 require_once __DIR__ . '/middleware.php';
 
 // Prevent browser caching for authenticated pages
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
+if (!headers_sent()) {
+    header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+    header("Cache-Control: post-check=0, pre-check=0", false);
+    header("Pragma: no-cache");
+}
 
 /* ─────────────────────────────────────────────
    SESSION HELPERS

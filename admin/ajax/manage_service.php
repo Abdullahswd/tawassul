@@ -200,6 +200,12 @@ if ($action === 'save') {
             $price = 0.00;
             $platformPercent = 0.00;
             $discountPercent = 0.00;
+        } else {
+            // إذا كانت نسبة المنصة صفر أو غير محددة، نعتمد النسبة الافتراضية المحددة في إعدادات المنصة
+            if ($platformPercent <= 0) {
+                $defStmt = $db->query("SELECT setting_value FROM settings WHERE setting_key = 'commission_percentage'");
+                $platformPercent = (float)($defStmt->fetchColumn() ?: 15.00);
+            }
         }
 
         // تعيين sort_order: نأخذ أكبر قيمة حالية لنفس الأب +1

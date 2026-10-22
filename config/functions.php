@@ -8,6 +8,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/pusher.php';
+require_once __DIR__ . '/mailer.php';
 
 /* ─────────────────────────────────────────────
    USERS
@@ -341,7 +342,11 @@ function createOrder(array $data): int {
         $amount,
         $status
     ]);
-    return (int) db()->lastInsertId();
+    $newId = (int) db()->lastInsertId();
+    if ($newId > 0) {
+        sendNewOrderToAdminEmail($newId);
+    }
+    return $newId;
 }
 
 function getOrdersByStudent(int $studentId): array {
@@ -409,9 +414,12 @@ function updateOrderStatus(int $orderId, string $status): bool {
     $stmt = $db->prepare('UPDATE orders SET status = ? WHERE id = ?');
     $success = $stmt->execute([$status, $orderId]);
     
-    // If order was just marked as completed, attempt to pay the academic
-    if ($success && $status === 'completed' && $old_status !== 'completed' && !empty($order['academic_id'])) {
-        syncAcademicEarnings($orderId);
+    // If order was just marked as completed, attempt to pay the academic & notify student via SMTP
+    if ($success && $status === 'completed' && $old_status !== 'completed') {
+        if (!empty($order['academic_id'])) {
+            syncAcademicEarnings($orderId);
+        }
+        sendOrderCompletedToStudentEmail($orderId);
     }
     
     return $success;

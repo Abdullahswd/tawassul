@@ -781,6 +781,9 @@ if ($action === 'create_order') {
             'admin/pages/order-details.php?id=' . $number
         );
 
+        // Send email to admin (SMTP)
+        sendNewOrderToAdminEmail($orderId);
+
         sendJSONResponse(true, 'تم تقديم الطلب ودفع الرسوم بنجاح! تم تحويل الطلب للإدارة لتعيين الأكاديمي المناسب.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل إرسال الطلب: ' . $e->getMessage());
