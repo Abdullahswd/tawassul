@@ -37,7 +37,16 @@ try {
         message TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
+    
+    // Auto-migrate payouts schema to support all statuses without truncation
+    $db->exec("ALTER TABLE payouts MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending', MODIFY COLUMN paid_at DATETIME NULL DEFAULT NULL");
+    $db->exec("UPDATE payouts SET status = 'approved' WHERE status = '' OR status IS NULL");
 } catch (Exception $e) {}
+
+$csrf = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if (!empty($_SESSION['csrf_token']) && !empty($csrf) && !hash_equals($_SESSION['csrf_token'], $csrf)) {
+    sendError('جلسة العمل غير صالحة (CSRF)', 403);
+}
 
 $action = trim($_POST['action'] ?? '');
 
@@ -49,7 +58,7 @@ if ($action === 'get_data') {
     $academics = [];
     $acadStmt = $db->query("
         SELECT a.id, a.name, a.avatar_initials, a.balance, a.total_earned,
-               COALESCE((SELECT SUM(pa.amount) FROM payouts pa WHERE pa.academic_id = a.id AND pa.status = 'paid'), 0) AS total_paid
+               COALESCE((SELECT SUM(pa.amount) FROM payouts pa WHERE pa.academic_id = a.id AND pa.status IN ('paid', 'approved')), 0) AS total_paid
         FROM academics a
         WHERE a.status = 'approved'
         ORDER BY a.name ASC
@@ -87,13 +96,13 @@ if ($action === 'get_data') {
         }
     }
 
-    // Statistics
+    // Statistics (includes both 'paid' direct transfers and 'approved' withdrawals)
     $stats = [
-        'total_paid'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status='paid'")->fetchColumn(),
-        'this_month'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status='paid' AND MONTH(paid_at)=MONTH(NOW()) AND YEAR(paid_at)=YEAR(NOW())")->fetchColumn(),
-        'last_month'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status='paid' AND MONTH(paid_at)=MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(paid_at)=YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))")->fetchColumn(),
+        'total_paid'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status IN ('paid', 'approved')")->fetchColumn(),
+        'this_month'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status IN ('paid', 'approved') AND MONTH(paid_at)=MONTH(NOW()) AND YEAR(paid_at)=YEAR(NOW())")->fetchColumn(),
+        'last_month'      => (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM payouts WHERE status IN ('paid', 'approved') AND MONTH(paid_at)=MONTH(DATE_SUB(NOW(), INTERVAL 1 MONTH)) AND YEAR(paid_at)=YEAR(DATE_SUB(NOW(), INTERVAL 1 MONTH))")->fetchColumn(),
         'total_pending'   => (float)$db->query("SELECT COALESCE(SUM(balance),0) FROM academics WHERE status='approved'")->fetchColumn(),
-        'payouts_count'   => (int)$db->query("SELECT COUNT(*) FROM payouts WHERE status='paid'")->fetchColumn(),
+        'payouts_count'   => (int)$db->query("SELECT COUNT(*) FROM payouts WHERE status IN ('paid', 'approved')")->fetchColumn(),
         'academics_count' => (int)$db->query("SELECT COUNT(*) FROM academics WHERE status='approved'")->fetchColumn(),
     ];
 
@@ -146,6 +155,16 @@ if ($action === 'add_payout') {
         $db->prepare("UPDATE academics SET balance = GREATEST(balance - ?, 0) WHERE id = ?")->execute([$amount, $academicId]);
         $db->commit();
 
+        // Send notification to the academic
+        createNotification(
+            $academicId,
+            'academic',
+            'تم تسجيل دفعة مالية 💵',
+            'قامت الإدارة بتسجيل دفعة مالية لحسابك بمبلغ ' . number_format($amount, 2) . ' ر.س.',
+            '💵',
+            'academics/academic-earnings.php'
+        );
+
         echo json_encode(['success' => true, 'message' => 'تم تسجيل الدفعة بنجاح.', 'payout_number' => $payoutNumber], JSON_UNESCAPED_UNICODE);
         exit;
     } catch (Exception $e) {
@@ -161,20 +180,59 @@ if ($action === 'update_payout_status') {
     $payoutId = intval($_POST['payout_id'] ?? 0);
     $status = trim($_POST['status'] ?? ''); 
     if ($payoutId > 0 && in_array($status, ['approved', 'rejected'])) {
-        $db->prepare("UPDATE payouts SET status = ?, paid_at = IF(?='approved', NOW(), paid_at) WHERE id = ?")->execute([$status, $status, $payoutId]);
-        
-        // If rejected, refund the balance back to academic
-        if ($status === 'rejected') {
-            $stmt = $db->prepare("SELECT academic_id, amount FROM payouts WHERE id = ?");
+        try {
+            $db->beginTransaction();
+
+            // Lock and fetch current payout status
+            $stmt = $db->prepare("SELECT * FROM payouts WHERE id = ? FOR UPDATE");
             $stmt->execute([$payoutId]);
             $po = $stmt->fetch();
-            if ($po) {
-                $db->prepare("UPDATE academics SET balance = balance + ? WHERE id = ?")->execute([$po['amount'], $po['academic_id']]);
+
+            if (!$po) {
+                $db->rollBack();
+                sendError('طلب الدفعة غير موجود');
             }
+
+            if ($po['status'] !== 'pending') {
+                $db->rollBack();
+                sendError('تم اتخاذ إجراء مسبق على هذا الطلب بالفعل ولا يمكن تغييره مجدداً');
+            }
+
+            if ($status === 'approved') {
+                $db->prepare("UPDATE payouts SET status = 'approved', paid_at = NOW() WHERE id = ?")->execute([$payoutId]);
+
+                // Notify academic of approval
+                createNotification(
+                    (int)$po['academic_id'],
+                    'academic',
+                    'تمت الموافقة على طلب السحب 💸',
+                    'تم اعتماد تحويل مبلغ ' . number_format($po['amount'], 2) . ' ر.س لحسابك بنجاح.',
+                    '💸',
+                    'academics/academic-earnings.php'
+                );
+            } elseif ($status === 'rejected') {
+                $db->prepare("UPDATE payouts SET status = 'rejected' WHERE id = ?")->execute([$payoutId]);
+                // Refund balance back to academic
+                $db->prepare("UPDATE academics SET balance = balance + ? WHERE id = ?")->execute([$po['amount'], $po['academic_id']]);
+
+                // Notify academic of rejection
+                createNotification(
+                    (int)$po['academic_id'],
+                    'academic',
+                    'رفض طلب السحب ❌',
+                    'تم رفض طلب سحب الأرباح بمبلغ ' . number_format($po['amount'], 2) . ' ر.س وإعادة الرصيد إلى محفظتك.',
+                    '❌',
+                    'academics/academic-earnings.php'
+                );
+            }
+
+            $db->commit();
+            echo json_encode(['success' => true, 'message' => $status === 'approved' ? 'تمت الموافقة على الطلب بنجاح' : 'تم رفض الطلب واستعادة الرصيد بنجاح']);
+            exit;
+        } catch (Exception $e) {
+            if ($db->inTransaction()) $db->rollBack();
+            sendError('فشل تحديث حالة الطلب: ' . $e->getMessage());
         }
-        
-        echo json_encode(['success' => true, 'message' => 'تم تحديث حالة الطلب']);
-        exit;
     }
     sendError('بيانات غير صالحة');
 }
@@ -188,6 +246,22 @@ if ($action === 'send_message') {
     if ($payoutId > 0 && !empty($message)) {
         $stmt = $db->prepare("INSERT INTO payout_messages (payout_id, sender_type, sender_id, message) VALUES (?, 'admin', ?, ?)");
         $stmt->execute([$payoutId, $_SESSION['user_id'], $message]);
+
+        // Notify academic about new message
+        $poStmt = $db->prepare("SELECT academic_id, payout_number FROM payouts WHERE id = ?");
+        $poStmt->execute([$payoutId]);
+        $po = $poStmt->fetch();
+        if ($po) {
+            createNotification(
+                (int)$po['academic_id'],
+                'academic',
+                'رسالة جديدة من الإدارة 💬',
+                'وردتك رسالة جديدة من الإدارة بخصوص طلب السحب ' . $po['payout_number'],
+                '💬',
+                'academics/academic-earnings.php'
+            );
+        }
+
         echo json_encode(['success' => true]);
         exit;
     }

@@ -42,6 +42,10 @@ function isLoggedIn(): bool {
  */
 function requireStudent(): void {
     if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'student') {
+        if (!empty($_SESSION['pending_2fa']) && ($_SESSION['pending_2fa']['user_type'] ?? '') === 'student') {
+            header('Location: ' . rootUrl() . '/verify-otp.php');
+            exit;
+        }
         header('Location: ' . rootUrl() . '/login.php?redirect=' . urlencode($_SERVER['REQUEST_URI']));
         exit;
     }
@@ -62,7 +66,11 @@ function requireAdmin(): void {
  */
 function requireAcademic(): void {
     if (!isset($_SESSION['academic_id'])) {
-        header('Location: ' . rootUrl() . '/academics/academic-register.php');
+        if (!empty($_SESSION['pending_2fa']) && ($_SESSION['pending_2fa']['user_type'] ?? '') === 'academic') {
+            header('Location: ' . rootUrl() . '/verify-otp.php');
+            exit;
+        }
+        header('Location: ' . rootUrl() . '/login.php?type=academic&redirect=' . urlencode($_SERVER['REQUEST_URI']));
         exit;
     }
 }
@@ -72,6 +80,9 @@ function requireAcademic(): void {
  */
 function loginUser(array $user): void {
     session_regenerate_id(true);
+    // Unset academic session to prevent cross-role contamination
+    unset($_SESSION['academic_id'], $_SESSION['academic_name'], $_SESSION['academic_email'], $_SESSION['academic_status'], $_SESSION['academic_avatar']);
+
     $_SESSION['user_id']    = $user['id'];
     $_SESSION['user_name']  = $user['name'];
     $_SESSION['user_email'] = $user['email'];
@@ -85,6 +96,9 @@ function loginUser(array $user): void {
  */
 function loginAcademic(array $academic): void {
     session_regenerate_id(true);
+    // Unset user session to prevent cross-role contamination
+    unset($_SESSION['user_id'], $_SESSION['user_name'], $_SESSION['user_email'], $_SESSION['user_role'], $_SESSION['user_avatar'], $_SESSION['user_avatar_path']);
+
     $_SESSION['academic_id']     = $academic['id'];
     $_SESSION['academic_name']   = $academic['name'];
     $_SESSION['academic_email']  = $academic['email'];

@@ -9,6 +9,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/pusher.php';
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/academic_hierarchy.php';
 
 /* ─────────────────────────────────────────────
    USERS
@@ -1078,4 +1079,23 @@ function getPaymentMethodLabel(?int $methodId): string {
     } catch (Exception $e) {
         return '';
     }
+}
+
+/**
+ * Get a system setting from the settings table with a default fallback
+ */
+function getSystemSetting(string $key, string $default = ''): string {
+    static $cachedSettings = null;
+    if ($cachedSettings === null) {
+        $cachedSettings = [];
+        try {
+            $stmt = db()->query("SELECT setting_key, setting_value FROM settings");
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $cachedSettings[$row['setting_key']] = (string) $row['setting_value'];
+            }
+        } catch (Exception $e) {
+            // Ignore if settings table not ready
+        }
+    }
+    return $cachedSettings[$key] ?? $default;
 }

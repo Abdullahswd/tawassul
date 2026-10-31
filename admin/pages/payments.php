@@ -182,6 +182,7 @@ $receiptStatusLabels = [
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>" />
   <title>المدفوعات - Eduroad Admin</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
@@ -761,7 +762,10 @@ function loadPayoutData() {
   fetch('../ajax/manage_payouts.php', { 
     method: 'POST', 
     body: fd,
-    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    headers: { 
+      'X-Requested-With': 'XMLHttpRequest',
+      'X-CSRF-Token': csrf 
+    }
   })
     .then(r => r.json())
     .then(res => {
@@ -890,7 +894,7 @@ function savePayout() {
   if (!amount || amount <= 0) { Toast.show('يرجى إدخال مبلغ صحيح', 'error'); return; }
 
   const a = PAYOUT_DATA.academics.find(x => String(x.id) === String(academicId));
-  if (a && amount > a.balance) { Toast.show('المبلغ أكبر من الرصيد المستحق (' + fmtMoney(a.balance) + ' ر.س)', 'error'); return; }
+  if (a && amount > parseFloat(a.balance || 0)) { Toast.show('المبلغ أكبر من الرصيد المستحق (' + fmtMoney(a.balance) + ' ر.س)', 'error'); return; }
 
   const fd = new FormData();
   fd.append('action', 'add_payout');
@@ -905,7 +909,10 @@ function savePayout() {
   fetch('../ajax/manage_payouts.php', { 
       method: 'POST', 
       body: fd,
-      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      headers: { 
+        'X-Requested-With': 'XMLHttpRequest',
+        'X-CSRF-Token': csrf
+      }
   })
     .then(r => r.json())
     .then(res => {
@@ -930,7 +937,10 @@ function updatePayoutStatus(payoutId, status) {
     fetch('../ajax/manage_payouts.php', { 
         method: 'POST', 
         body: fd,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        headers: { 
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrf
+        }
     })
       .then(r => r.json())
       .then(res => {
@@ -987,7 +997,10 @@ function sendAdminPayoutMessage() {
     fetch('../ajax/manage_payouts.php', { 
         method: 'POST', 
         body: fd,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        headers: { 
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRF-Token': csrf
+        }
     })
       .then(r => r.json())
       .then(res => {

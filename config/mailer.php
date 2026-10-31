@@ -530,6 +530,157 @@ function sendPasswordChangedConfirmationEmail(string $email, string $userName): 
 }
 
 /**
+ * 2c. Ensure login_otps table exists
+ */
+function ensureLoginOtpsTable(): void {
+    static $ensured = false;
+    if ($ensured) return;
+
+    try {
+        db()->exec("CREATE TABLE IF NOT EXISTS `login_otps` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `email` VARCHAR(150) NOT NULL,
+            `user_type` ENUM('student', 'academic', 'admin') NOT NULL DEFAULT 'student',
+            `user_id` INT UNSIGNED NOT NULL,
+            `otp_code` VARCHAR(10) NOT NULL,
+            `attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            `expires_at` DATETIME NOT NULL,
+            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            INDEX `idx_email_type` (`email`, `user_type`),
+            INDEX `idx_expires` (`expires_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $ensured = true;
+    } catch (Exception $e) {
+        error_log('ensureLoginOtpsTable error: ' . $e->getMessage());
+    }
+}
+
+/**
+ * 2d. Send Login OTP Email
+ */
+function sendLoginOtpEmail(string $email, string $userName, string $otp, string $userType): bool {
+    $roleTitle = match($userType) {
+        'academic' => 'حساب أكاديمي',
+        'admin'    => 'حساب إدارة النظام',
+        default    => 'حساب طالب',
+    };
+
+    $subject = "🔐 رمز التحقق لتسجيل الدخول: {$otp} - Eduroad";
+    $content = "<p>مرحباً <strong>{$userName}</strong>،</p>
+    <p>تلقينا طلباً لتسجيل الدخول إلى {$roleTitle} الخاص بك في منصة Eduroad.</p>
+    <p>استخدم رمز التحقق (OTP) التالي لتأكيد هويتك وإكمال الدخول:</p>
+    <div style='text-align:center;margin:28px 0;'>
+      <div style='display:inline-block;background:linear-gradient(135deg, #4f46e5, #6366f1);color:#ffffff;font-size:36px;font-weight:900;letter-spacing:10px;padding:16px 36px;border-radius:18px;box-shadow:0 8px 25px rgba(79,70,229,0.35);font-family:monospace;'>
+        {$otp}
+      </div>
+    </div>
+    <div style='background:#fef3c7;border:1px solid #fde68a;border-radius:12px;padding:12px 16px;color:#92400e;font-size:13px;margin:16px 0;'>
+      ⏳ <strong>تنبيه أمان:</strong> هذا الرمز صالح لمدة <strong>10 دقائق فقط</strong> ويستخدم لمرة واحدة. لا تشارك هذا الرمز مع أي شخص إطلاقاً.
+    </div>
+    <p style='color:#64748b;font-size:13px;'>إذا لم تكن أنت من حاول تسجيل الدخول، نوصيك بتغيير كلمة المرور الخاصة بك على الفور لحماية حسابك.</p>";
+
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'غير معروف';
+    $dateTime = date('Y-m-d H:i') . ' (توقيت الخادم)';
+    $details = [
+        'نوع الحساب'    => $roleTitle,
+        'وقت الطلب'     => $dateTime,
+        'عنوان IP'      => $ip,
+        'صلاحية الرمز'  => '10 دقائق ⏱️',
+    ];
+
+    $html = renderEmailTemplate('🔐 رمز التحقق (2FA)', 'رمز تأكيد تسجيل الدخول', $content, null, $details);
+    return sendMail($email, $userName, $subject, $html);
+}
+
+/**
+ * 2e. Generate, Save and Send Login OTP
+ */
+function generateAndSendLoginOtp(array $user, string $userType, ?string $redirect = null): array {
+    ensureLoginOtpsTable();
+    $db = db();
+
+    $email = $user['email'];
+    $userId = (int) $user['id'];
+    $userName = $user['name'] ?? 'المستخدم';
+
+    // Generate random 6-digit code
+    $otp = sprintf('%06d', random_int(100000, 999999));
+
+    // Delete any previous active OTPs for this email and role
+    $db->prepare("DELETE FROM login_otps WHERE email = ? AND user_type = ?")->execute([$email, $userType]);
+
+    // Insert new OTP with 10 minutes expiry
+    $stmt = $db->prepare("INSERT INTO login_otps (email, user_type, user_id, otp_code, expires_at) VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))");
+    $stmt->execute([$email, $userType, $userId, $otp]);
+
+    // Set pending 2FA in session
+    if (session_status() === PHP_SESSION_NONE) session_start();
+    $_SESSION['pending_2fa'] = [
+        'user_id'   => $userId,
+        'user_type' => $userType,
+        'email'     => $email,
+        'name'      => $userName,
+        'redirect'  => $redirect,
+        'user_data' => $user,
+        'sent_at'   => time(),
+    ];
+
+    // Log OTP to error_log for dev/debugging convenience
+    error_log("[Eduroad OTP] Login 2FA Code for {$email} ({$userType}): {$otp}");
+
+    // Send email
+    $sent = sendLoginOtpEmail($email, $userName, $otp, $userType);
+
+    return [
+        'success' => true,
+        'email_sent' => $sent,
+        'otp' => $otp
+    ];
+}
+
+/**
+ * 2f. Verify Login OTP
+ */
+function verifyLoginOtp(string $email, string $userType, string $inputOtp): array {
+    ensureLoginOtpsTable();
+    $db = db();
+
+    $inputOtp = preg_replace('/\D/', '', $inputOtp); // numbers only
+    if (strlen($inputOtp) !== 6) {
+        return ['ok' => false, 'error' => 'يرجى إدخال رمز تحقق مكون من 6 أرقام.'];
+    }
+
+    $stmt = $db->prepare("SELECT * FROM login_otps WHERE email = ? AND user_type = ? AND expires_at > NOW() ORDER BY id DESC LIMIT 1");
+    $stmt->execute([$email, $userType]);
+    $row = $stmt->fetch();
+
+    if (!$row) {
+        return ['ok' => false, 'error' => 'رمز التحقق منتهي الصلاحية أو غير موجود. يرجى طلب رمز جديد.'];
+    }
+
+    if ((int)$row['attempts'] >= 5) {
+        $db->prepare("DELETE FROM login_otps WHERE id = ?")->execute([$row['id']]);
+        return ['ok' => false, 'error' => 'تم تجاوز الحد الأقصى للمحاولات الخاطئة (5 محاولات). يرجى طلب رمز جديد.'];
+    }
+
+    if ($row['otp_code'] !== $inputOtp) {
+        $newAttempts = (int)$row['attempts'] + 1;
+        $db->prepare("UPDATE login_otps SET attempts = ? WHERE id = ?")->execute([$newAttempts, $row['id']]);
+        $remaining = 5 - $newAttempts;
+        return [
+            'ok' => false,
+            'error' => "رمز التحقق غير صحيح. متبقي لديك {$remaining} " . ($remaining === 1 ? 'محاولة' : 'محاولات') . "."
+        ];
+    }
+
+    // Success -> delete OTP
+    $db->prepare("DELETE FROM login_otps WHERE id = ?")->execute([$row['id']]);
+
+    return ['ok' => true];
+}
+
+/**
  * 3. Order Assigned to Academic (إرسال إيميل للأكاديمي عند توجيه طلب له)
  */
 function sendOrderAssignedToAcademicEmail(int|array $academic, array $order): bool {

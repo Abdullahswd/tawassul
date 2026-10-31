@@ -26,10 +26,13 @@ if (isset($_SESSION['academic_id'])) {
 }
 
 // ── Handle POST ──────────────────────────────────────────────
+$is2faEnabled = (getSystemSetting('two_factor_auth', '1') === '1');
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email    = trim($_POST['email']    ?? '');
     $password = trim($_POST['password'] ?? '');
-    $type     = $_POST['user_type']     ?? 'student'; // student | academic | admin
+    $type     = $_POST['user_type']     ?? 'student'; // student | academic
+    $redirect = $_GET['redirect'] ?? null;
 
     if (!$email || !$password) {
         $error = 'يرجى تعبئة جميع الحقول.';
@@ -43,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     loginAcademic($academic);
                     sendLoginNotificationEmail($academic, 'academic');
-                    header('Location: academics/academic-dashboard.php');
+                    header('Location: ' . ($redirect ?: 'academics/academic-dashboard.php'));
                     exit;
                 }
             } else {
@@ -60,12 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     loginUser($user);
                     sendLoginNotificationEmail($user, 'student');
-                    $redirect = $_GET['redirect'] ?? null;
-                    if ($redirect) {
-                        header('Location: ' . $redirect);
-                    } else {
-                        header('Location: student/student-dashboard.php');
-                    }
+                    header('Location: ' . ($redirect ?: 'student/student-dashboard.php'));
                     exit;
                 }
             } else {
@@ -226,14 +224,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <hr style="border:none;border-top:1px solid var(--border-color);margin-bottom:24px">
     <?php endif; ?>
 
+    <?php
+    $initialType = $_POST['user_type'] ?? $_GET['type'] ?? 'student';
+    if (!in_array($initialType, ['student', 'academic'], true)) $initialType = 'student';
+    ?>
     <!-- تبويب نوع المستخدم -->
     <div style="display:flex;gap:12px;margin-bottom:32px;flex-wrap:wrap">
-      <button type="button" class="type-btn active" id="btn-student"  onclick="setUser('student')">📚 بصفتي طالب</button>
-      <button type="button" class="type-btn"        id="btn-academic" onclick="setUser('academic')">🎓 بصفتي أكاديمي</button>
+      <button type="button" class="type-btn <?= $initialType === 'student' ? 'active' : '' ?>" id="btn-student"  onclick="setUser('student')">📚 بصفتي طالب</button>
+      <button type="button" class="type-btn <?= $initialType === 'academic' ? 'active' : '' ?>" id="btn-academic" onclick="setUser('academic')">🎓 بصفتي أكاديمي</button>
     </div>
 
-    <form method="POST" action="login.php" id="loginForm">
-      <input type="hidden" name="user_type" id="userTypeInput" value="<?= isset($_POST['user_type']) ? e($_POST['user_type']) : 'student' ?>">
+    <form method="POST" action="login.php<?= !empty($_GET['redirect']) ? '?redirect=' . urlencode($_GET['redirect']) : '' ?>" id="loginForm">
+      <input type="hidden" name="user_type" id="userTypeInput" value="<?= e($initialType) ?>">
 
       <div style="margin-bottom:20px">
         <label style="display:block;font-weight:700;margin-bottom:10px;color:var(--text-primary)">📧 البريد الإلكتروني</label>

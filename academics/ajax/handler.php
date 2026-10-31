@@ -53,6 +53,8 @@ if (!$action) {
     sendJSONResponse(false, 'إجراء غير محدد.');
 }
 
+$academicId = (int) ($_SESSION['academic_id'] ?? 0);
+
 // ── إضافة تلقائية للأعمدة (logo + الصورة الشخصية) إن لم تكن موجودة ──
 // تعمل عند أي استدعاء، وتعود بنتيجة لمعرفة إن نجحت أم لا
 function columnExists($conn, $table, $column)
@@ -261,13 +263,25 @@ if ($action === 'register') {
     $address = trim($_POST['address'] ?? '');
 
     // Credentials
-    $password = $_POST['password'] ?? 'Academic@123'; // Default fallback if not provided
+    $password = $_POST['password'] ?? '';
+    $passwordConfirm = $_POST['password_confirm'] ?? '';
     $googleId = $_POST['google_id'] ?? null;
 
+    if (!$googleId) {
+        if (empty($password) || mb_strlen($password) < 6) {
+            sendJSONResponse(false, 'كلمة المرور يجب ألا تقل عن 6 خانات.');
+        }
+        if ($password !== $passwordConfirm) {
+            sendJSONResponse(false, 'كلمتا المرور غير متطابقتين.');
+        }
+    } else {
+        $password = $password ?: bin2hex(random_bytes(8));
+    }
+
     // Qualifications checkbox indicators
-    $hasBachelor = isset($_POST['hasBachelor']) || !empty($_POST['bsUniversity']);
-    $hasMasters = isset($_POST['hasMasters']) || !empty($_POST['msUniversity']);
-    $hasPhd = isset($_POST['hasPhd']) || !empty($_POST['phdUniversity']);
+    $hasBachelor = isset($_POST['hasBachelor']) || !empty($_POST['bsUniversity']) || !empty($_POST['bsCollege']) || !empty($_POST['bsMajor']);
+    $hasMasters = isset($_POST['hasMasters']) || !empty($_POST['msUniversity']) || !empty($_POST['msCollege']) || !empty($_POST['msMajor']);
+    $hasPhd = isset($_POST['hasPhd']) || !empty($_POST['phdUniversity']) || !empty($_POST['phdCollege']) || !empty($_POST['phdMajor']);
 
     // Selected services
     $services = $_POST['services'] ?? []; // Array of service IDs
@@ -313,6 +327,20 @@ if ($action === 'register') {
         // Avatar Initials
         $initials = mb_substr($name, 0, 1, 'UTF-8') . mb_substr(explode(' ', $name)[1] ?? '', 0, 1, 'UTF-8');
 
+        // Determine main college and department
+        $mainCollege = '';
+        $mainDept = '';
+        if ($hasPhd) {
+            $mainCollege = trim($_POST['phdCollege'] ?? '');
+            $mainDept = trim($_POST['phdDepartment'] ?? '');
+        } elseif ($hasMasters) {
+            $mainCollege = trim($_POST['msCollege'] ?? '');
+            $mainDept = trim($_POST['msDepartment'] ?? '');
+        } elseif ($hasBachelor) {
+            $mainCollege = trim($_POST['bsCollege'] ?? '');
+            $mainDept = trim($_POST['bsDepartment'] ?? '');
+        }
+
         // Insert into academics
         $stmt = $db->prepare(
             "INSERT INTO academics (name, email, password, google_id, phone, specialty, degree, university, bio, avatar_initials, starting_price, status, availability, created_at)
@@ -334,21 +362,49 @@ if ($action === 'register') {
 
         $academicId = (int) $db->lastInsertId();
 
+        // Save college and department in academics table if columns exist
+        try {
+            $db->prepare("UPDATE academics SET college = ?, department = ? WHERE id = ?")->execute([$mainCollege, $mainDept, $academicId]);
+        } catch (Exception $e) {}
+
+        // Helper to insert qualification with college, department, specialization
+        $insertQual = function($level, $pfx) use ($db, $academicId) {
+            $docFile = uploadQualificationDoc($_FILES[$pfx . 'Document'] ?? null);
+            $college = trim($_POST[$pfx . 'College'] ?? '');
+            $department = trim($_POST[$pfx . 'Department'] ?? '');
+            $major = trim($_POST[$pfx . 'Major'] ?? 'عام');
+            $collegeId = !empty($_POST[$pfx . 'CollegeId']) ? (int)$_POST[$pfx . 'CollegeId'] : null;
+            $deptId = !empty($_POST[$pfx . 'DepartmentId']) ? (int)$_POST[$pfx . 'DepartmentId'] : null;
+            $specId = !empty($_POST[$pfx . 'SpecializationId']) ? (int)$_POST[$pfx . 'SpecializationId'] : null;
+            $university = trim($_POST[$pfx . 'University'] ?? 'غير محدد');
+            $country = trim($_POST[$pfx . 'Country'] ?? 'السعودية');
+            $year = intval($_POST[$pfx . 'Year'] ?? date('Y'));
+
+            try {
+                $qStmt = $db->prepare("
+                    INSERT INTO academic_qualifications 
+                    (academic_id, level, college, department, field, college_id, department_id, specialization_id, university, country, graduation_year, document_file, verified) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ");
+                $qStmt->execute([
+                    $academicId, $level, $college, $department, $major, $collegeId, $deptId, $specId, $university, $country, $year, $docFile
+                ]);
+            } catch (Exception $e) {
+                // Fallback in case columns not yet refreshed
+                $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)")
+                    ->execute([$academicId, $level, $major, $university, $country, $year, $docFile]);
+            }
+        };
+
         // Save Qualifications
         if ($hasBachelor) {
-            $docFile = uploadQualificationDoc($_FILES['bsDocument'] ?? null);
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'بكالوريوس', ?, ?, ?, ?, ?, 1)")
-                ->execute([$academicId, trim($_POST['bsMajor'] ?? 'عام'), trim($_POST['bsUniversity'] ?? 'غير محدد'), trim($_POST['bsCountry'] ?? 'السعودية'), intval($_POST['bsYear'] ?? 2015), $docFile]);
+            $insertQual('بكالوريوس', 'bs');
         }
         if ($hasMasters) {
-            $docFile = uploadQualificationDoc($_FILES['msDocument'] ?? null);
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'ماجستير', ?, ?, ?, ?, ?, 1)")
-                ->execute([$academicId, trim($_POST['msMajor'] ?? 'عام'), trim($_POST['msUniversity'] ?? 'غير محدد'), trim($_POST['msCountry'] ?? 'السعودية'), intval($_POST['msYear'] ?? 2018), $docFile]);
+            $insertQual('ماجستير', 'ms');
         }
         if ($hasPhd) {
-            $docFile = uploadQualificationDoc($_FILES['phdDocument'] ?? null);
-            $db->prepare("INSERT INTO academic_qualifications (academic_id, level, field, university, country, graduation_year, document_file, verified) VALUES (?, 'دكتوراه', ?, ?, ?, ?, ?, 1)")
-                ->execute([$academicId, trim($_POST['phdMajor'] ?? 'عام'), trim($_POST['phdUniversity'] ?? 'غير محدد'), trim($_POST['phdCountry'] ?? 'السعودية'), intval($_POST['phdYear'] ?? 2022), $docFile]);
+            $insertQual('دكتوراه', 'phd');
         }
 
         // Save Services
@@ -359,15 +415,21 @@ if ($action === 'register') {
             }
         }
 
-        // Auto log in as academic
-        $newAcademic = getAcademicById($academicId);
-        loginAcademic($newAcademic);
-
         if (isset($_SESSION['google_temp_user'])) {
             unset($_SESSION['google_temp_user']);
         }
 
-        sendJSONResponse(true, 'تم تسجيل حسابك بنجاح وقيد المراجعة الآن من الإدارة!');
+        // Fetch newly created academic
+        $newAcademic = getAcademicById($academicId);
+
+        // Require OTP Verification before entering the dashboard
+        require_once __DIR__ . '/../../config/mailer.php';
+        generateAndSendLoginOtp($newAcademic, 'academic', 'academics/academic-dashboard.php');
+
+        sendJSONResponse(true, 'تم تسجيل حسابك بنجاح! تم إرسال رمز التحقق (OTP) إلى بريدك الإلكتروني لتأكيد حسابك وإكمال الدخول.', [
+            'requires_otp' => true,
+            'redirect_url' => rootUrl() . '/verify-otp.php'
+        ]);
 
     } catch (Exception $e) {
         sendJSONResponse(false, 'حدث خطأ أثناء التسجيل: ' . $e->getMessage());
@@ -680,7 +742,7 @@ if ($action === 'submit_withdraw') {
         $nextNum = (int) $db->query("SELECT COALESCE(MAX(id),0)+1 FROM payouts")->fetchColumn();
         $payoutNum = 'WD-' . date('Ym') . '-' . str_pad($nextNum, 4, '0', STR_PAD_LEFT);
 
-        $insStmt = $db->prepare("INSERT INTO payouts (payout_number, academic_id, bank_account_id, amount, note, status, created_by) VALUES (?, ?, ?, ?, ?, 'pending', ?)");
+        $insStmt = $db->prepare("INSERT INTO payouts (payout_number, academic_id, bank_account_id, amount, note, status, paid_at, created_by) VALUES (?, ?, ?, ?, ?, 'pending', NULL, ?)");
         $insStmt->execute([$payoutNum, $academicId, $bankAccountId, $amount, $note, $academicId]);
 
         sendJSONResponse(true, 'تم إرسال طلب السحب بنجاح. سيتم تحويل المبلغ إلى حسابك البنكي قريباً.');

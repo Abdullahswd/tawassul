@@ -46,12 +46,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
         $fullName = $firstName . ' ' . $lastName;
         $userId   = createUser($fullName, $email, $password, $phone);
         $user     = getUserById($userId);
-        loginUser($user);
 
         // Welcome notification
-        createNotification($userId, 'student', 'مرحباً بك في تواصل 🎉', 'تم إنشاء حسابك بنجاح. ابدأ بتصفح الخدمات المتاحة.', '🎓', 'student/services.php');
+        createNotification($userId, 'student', 'مرحباً بك في Eduroad 🎉', 'تم إنشاء حسابك بنجاح. يرجى تأكيد حسابك برمز التحقق.', '🎓', 'student/student-dashboard.php');
 
-        header('Location: student/student-dashboard.php');
+        // Send OTP verification to verify the new account email
+        require_once __DIR__ . '/config/mailer.php';
+        generateAndSendLoginOtp($user, 'student', 'student/student-dashboard.php');
+
+        header('Location: verify-otp.php');
         exit;
     }
 }

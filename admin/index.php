@@ -3,6 +3,12 @@ require_once dirname(__DIR__) . '/config/auth.php';
 require_once dirname(__DIR__) . '/config/functions.php';
 require_once dirname(__DIR__) . '/config/mailer.php';
 
+// Check if already logged in as admin
+if (isset($_SESSION['user_id']) && ($_SESSION['user_role'] ?? '') === 'admin') {
+    header('Location: pages/dashboard.php');
+    exit;
+}
+
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -16,7 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($user && password_verify($password, $user['password'])) {
       if ($user['role'] !== 'admin') {
         $error = 'هذا الحساب ليس لديه صلاحيات الإدارة.';
+      } elseif (($user['status'] ?? 'active') === 'suspended') {
+        $error = 'تم تعليق هذا الحساب الإداري. يرجى مراجعة إدارة المنصة.';
       } else {
+        // Direct login for Admin without OTP
         loginUser($user);
         sendLoginNotificationEmail($user, 'admin');
         header('Location: pages/dashboard.php');

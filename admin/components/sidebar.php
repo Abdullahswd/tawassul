@@ -19,6 +19,10 @@ $sb_students_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM users WHERE role = 
 $sb_academics_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM academics")->fetchColumn();
 $sb_featured_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM featured_academics")->fetchColumn();
 $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
+$sb_colleges_cnt = 0;
+try {
+    $sb_colleges_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM colleges")->fetchColumn();
+} catch (Exception $e) {}
 ?>
 <!-- ============================================
      Sidebar Component - Eduroad Admin
@@ -62,6 +66,14 @@ $sb_orders_cnt = (int) $sb_db->query("SELECT COUNT(*) FROM orders WHERE status =
       <span class="nav-icon" style="color:#f59e0b">⭐</span>
       <span class="nav-label">الأكاديميون المتميزون</span>
       <span class="nav-badge" style="background:linear-gradient(135deg,#f59e0b,#d97706)"><?= number_format($sb_featured_cnt) ?></span>
+    </a>
+
+    <a href="../pages/colleges.php" class="nav-item" id="nav-colleges">
+      <span class="nav-icon">🏛️</span>
+      <span class="nav-label">الكليات والتخصصات</span>
+      <?php if ($sb_colleges_cnt > 0): ?>
+        <span class="nav-badge"><?= number_format($sb_colleges_cnt) ?></span>
+      <?php endif; ?>
     </a>
 
     <!-- Operations -->
