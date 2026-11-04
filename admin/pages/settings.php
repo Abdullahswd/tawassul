@@ -479,7 +479,7 @@ $appBaseUrl = rtrim($scriptName, '/');
                         <div style="display:flex;gap:8px;align-items:center">
                           <label class="toggle-switch" title="<?= $active ? 'إيقاف' : 'تفعيل' ?>" style="margin-left:4px"><input type="checkbox" onchange="toggleMethod(<?= (int)$pm['id'] ?>)" <?= $active ? 'checked' : '' ?> /><span class="toggle-slider"></span></label>
                           <button class="btn btn-outline btn-sm" onclick="openMethodForm(<?= (int)$pm['id'] ?>)">✏️ تعديل</button>
-                          <button class="btn btn-danger btn-sm" onclick="deleteMethod(<?= (int)$pm['id'] ?>, '<?= e($pm['account_name'], true) ?>')">🗑️ حذف</button>
+                          <button class="btn btn-danger btn-sm" onclick="deleteMethod(<?= (int)$pm['id'] ?>, '<?= e($pm['account_name']) ?>')">🗑️ حذف</button>
                         </div>
                       </div>
                     <?php endforeach; ?>

@@ -944,8 +944,8 @@ function getAdminDashboardStats(): array {
 /**
  * Escape output safely for HTML
  */
-function e(mixed $value): string {
-    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8');
+function e(mixed $value, bool $doubleEncode = true): string {
+    return htmlspecialchars((string)($value ?? ''), ENT_QUOTES, 'UTF-8', $doubleEncode);
 }
 
 /**
