@@ -4,6 +4,8 @@ require_once __DIR__ . '/../config/functions.php';
 
 requireAcademic();
 
+autoApproveDeliveredOrders();
+
 $currentAcademicId = $_SESSION['academic_id'];
 $db = db();
 

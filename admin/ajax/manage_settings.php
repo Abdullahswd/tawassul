@@ -55,6 +55,7 @@ if ($action === 'save_settings') {
     $allowed = [
         'site_name', 'site_email', 'site_phone', 'site_url', 'site_language', 'site_timezone', 'site_description', 'site_logo',
         'commission_percentage', 'min_withdrawal', 'payout_cycle',
+        'withdrawal_eligibility_days', 'auto_approve_hours', 'payout_processing_time',
         'maintenance_mode', 'allow_registration', 'email_verification', 'two_factor_auth', 'session_logging',
         'notify_new_order', 'notify_payment', 'daily_summary_email', 'notify_new_academic',
         'payment_stripe_enabled', 'payment_moyasar_enabled', 'payment_paypal_enabled',

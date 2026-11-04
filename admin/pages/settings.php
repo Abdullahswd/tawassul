@@ -34,6 +34,9 @@ $site_description = getSetting($settings, 'site_description', '');
 $commission_percentage = getSetting($settings, 'commission_percentage', '15');
 $min_withdrawal = getSetting($settings, 'min_withdrawal', '200');
 $payout_cycle = getSetting($settings, 'payout_cycle', 'monthly');
+$withdrawal_eligibility_days = getSetting($settings, 'withdrawal_eligibility_days', '14');
+$auto_approve_hours = getSetting($settings, 'auto_approve_hours', '72');
+$payout_processing_time = getSetting($settings, 'payout_processing_time', '3');
 $maintenance_mode = getSetting($settings, 'maintenance_mode', '0');
 $allow_registration = getSetting($settings, 'allow_registration', '1');
 $email_verification = getSetting($settings, 'email_verification', '1');
@@ -264,21 +267,92 @@ $appBaseUrl = rtrim($scriptName, '/');
                   </div>
                 </div>
 
+                <!-- سياسة الاعتماد التلقائي وأرباح وسحب الأكاديميين -->
+                <div style="border-top:1px solid var(--border-color);padding-top:24px;margin-top:20px;margin-bottom:24px">
+                  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+                    <span style="font-size:22px">⚙️</span>
+                    <div>
+                      <h4 style="font-size:16px;font-weight:800;color:var(--text-primary);margin:0">سياسة تسليم الطلبات وسحب أرباح الأكاديميين</h4>
+                      <p style="font-size:12px;color:var(--text-secondary);margin:0">التحكم الكامل في مهلة الاعتماد التلقائي وفترة تجميد الأرباح للأمان والحد الأدنى للسحب</p>
+                    </div>
+                  </div>
+
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:20px">
+                    
+                    <!-- 1. مهلة الاعتماد التلقائي بالساعات -->
+                    <div style="background:rgba(99,102,241,0.04);border:1.5px solid rgba(99,102,241,0.25);padding:18px;border-radius:14px">
+                      <label class="form-label" style="font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text-primary)">
+                        <span>⏱️</span> مهلة الاعتماد التلقائي للطلبات المسلمة
+                      </label>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <input class="form-input" type="number" id="auto_approve_hours" value="<?= htmlspecialchars($auto_approve_hours) ?>" min="1" step="1" style="font-size:16px;font-weight:700" />
+                        <span style="font-weight:700;color:var(--text-secondary);white-space:nowrap">ساعة</span>
+                      </div>
+                      <div style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;line-height:1.5">
+                        المهلة الممنوحة للطالب لمراجعة العمل بعد تسليمه؛ عند انقضائها دون رد يعتمد النظام الطلب تلقائياً وتتحول المستحقات للأكاديمي.
+                      </div>
+                    </div>
+
+                    <!-- 2. فترة تعليق الأرباح بالأيام -->
+                    <div style="background:rgba(245,158,11,0.04);border:1.5px solid rgba(245,158,11,0.25);padding:18px;border-radius:14px">
+                      <label class="form-label" style="font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text-primary)">
+                        <span>⏳</span> فترة تجميد الأرباح قبل السحب
+                      </label>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <input class="form-input" type="number" id="withdrawal_eligibility_days" value="<?= htmlspecialchars($withdrawal_eligibility_days) ?>" min="0" step="1" style="font-size:16px;font-weight:700" />
+                        <span style="font-weight:700;color:var(--text-secondary);white-space:nowrap">يوم</span>
+                      </div>
+                      <div style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;line-height:1.5">
+                        عدد الأيام التي تبقى فيها أرباح الأكاديمي معلقة بعد إكمال الطلب كفترة أمان للمنصة ضد النزاعات، وتصبح قابلة للسحب بعدها.
+                      </div>
+                    </div>
+
+                    <!-- 3. الحد الأدنى للسحب -->
+                    <div style="background:var(--bg-main);border:1px solid var(--border-color);padding:18px;border-radius:14px">
+                      <label class="form-label" style="font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text-primary)">
+                        <span>💰</span> الحد الأدنى للسحب البنكي
+                      </label>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <input class="form-input" type="number" id="min_withdrawal" value="<?= htmlspecialchars($min_withdrawal) ?>" min="1" step="1" style="font-size:16px;font-weight:700" />
+                        <span style="font-weight:700;color:var(--text-secondary);white-space:nowrap">ر.س</span>
+                      </div>
+                      <div style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;line-height:1.5">
+                        أقل مبلغ مؤهل يمكن للأكاديمي تقديم طلب سحب بنكي له من رصيده المتاح.
+                      </div>
+                    </div>
+
+                    <!-- 4. زمن معالجة التحويل البنكي -->
+                    <div style="background:var(--bg-main);border:1px solid var(--border-color);padding:18px;border-radius:14px">
+                      <label class="form-label" style="font-weight:700;display:flex;align-items:center;gap:6px;color:var(--text-primary)">
+                        <span>🏦</span> زمن تنفيذ السحب البنكي
+                      </label>
+                      <div style="display:flex;align-items:center;gap:10px">
+                        <input class="form-input" type="number" id="payout_processing_time" value="<?= htmlspecialchars($payout_processing_time) ?>" min="1" step="1" style="font-size:16px;font-weight:700" />
+                        <span style="font-weight:700;color:var(--text-secondary);white-space:nowrap">أيام عمل</span>
+                      </div>
+                      <div style="font-size:11.5px;color:var(--text-secondary);margin-top:6px;line-height:1.5">
+                        المهلة الزمنية المتوقعة لتحويل المبلغ من المنصة لحساب الأكاديمي بعد طلبه.
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+
                 <!-- Direct link to Payout Policy -->
                 <div style="background:var(--bg-main);border:1px dashed var(--border-color);border-radius:12px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;margin-bottom:24px">
                   <div style="display:flex;align-items:center;gap:12px">
                     <span style="font-size:26px">💼</span>
                     <div>
-                      <div style="font-size:14px;font-weight:700;color:var(--text-primary)">شروط سحب أرباح الأكاديميين</div>
-                      <div style="font-size:12px;color:var(--text-secondary)">الحد الأدنى للسحب وفترة تعليق الأرباح وزمن التحويل تُدار بالكامل عبر سياسة دفع الأكاديميين.</div>
+                      <div style="font-size:14px;font-weight:700;color:var(--text-primary)">صفحة سياسة دفع الأكاديميين المنفصلة</div>
+                      <div style="font-size:12px;color:var(--text-secondary)">يمكنك أيضاً مراجعة وتعديل هذه الشروط مباشرة عبر الصفحة المخصصة لها.</div>
                     </div>
                   </div>
                   <a href="payout-policy.php" class="btn btn-outline btn-sm" style="display:inline-flex;align-items:center;gap:6px">
-                    ⚙️ فتح سياسة دفع الأكاديميين
+                    ⚙️ فتح صفحة سياسة الدفع
                   </a>
                 </div>
 
-                <button class="btn btn-primary" onclick="saveAllSettings()" type="button">💾 حفظ وتطبيق نسبة العمولة على الخدمات</button>
+                <button class="btn btn-primary" onclick="saveAllSettings()" type="button">💾 حفظ وتطبيق جميع الإعدادات والسياسات المالية</button>
               </div>
             </div>
 
@@ -722,13 +796,19 @@ $appBaseUrl = rtrim($scriptName, '/');
       formData.append('site_timezone', document.getElementById('site_timezone').value);
       formData.append('site_description', document.getElementById('site_description').value);
 
-      // العمولة
+      // العمولة والسياسة المالية والطلبات
       const commEl = document.getElementById('commission_percentage');
       if (commEl) formData.append('commission_percentage', commEl.value);
       const minW = document.getElementById('min_withdrawal');
       if (minW) formData.append('min_withdrawal', minW.value);
       const pCycle = document.getElementById('payout_cycle');
       if (pCycle) formData.append('payout_cycle', pCycle.value);
+      const aah = document.getElementById('auto_approve_hours');
+      if (aah) formData.append('auto_approve_hours', aah.value);
+      const wed = document.getElementById('withdrawal_eligibility_days');
+      if (wed) formData.append('withdrawal_eligibility_days', wed.value);
+      const ppt = document.getElementById('payout_processing_time');
+      if (ppt) formData.append('payout_processing_time', ppt.value);
 
       // التبديلات
       formData.append('maintenance_mode', document.getElementById('maintenance_mode').checked ? '1' : '0');

@@ -539,7 +539,8 @@ require __DIR__ . '/partials/sidebar.php';
 
                     <div style="margin-top:14px;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
                       <span>⏱️</span>
-                      <span><strong>مهلة الاستلام التلقائي:</strong> سيتم اعتماد الطلب تلقائياً بعد مرور 72 ساعة لضمان حقوق المنفذ في حال عدم الرد.</span>
+                      <?php $autoApproveHours = (int) getSystemSetting('auto_approve_hours', '72'); ?>
+                      <span><strong>مهلة الاستلام التلقائي:</strong> سيتم اعتماد الطلب تلقائياً بعد مرور <?= $autoApproveHours ?> ساعة لضمان حقوق المنفذ في حال عدم الرد.</span>
                     </div>
                   </div>
                 </div>

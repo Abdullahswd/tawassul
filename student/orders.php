@@ -3,6 +3,8 @@ require_once __DIR__ . '/../config/auth.php';
 require_once __DIR__ . '/../config/functions.php';
 requireStudent();
 
+autoApproveDeliveredOrders();
+
 $user = currentUser();
 $orders = getOrdersByStudent($user['id']);
 
@@ -10,7 +12,7 @@ $orders = getOrdersByStudent($user['id']);
 $filter = $_GET['filter'] ?? 'all';
 if ($filter === 'progress') {
     $orders = array_filter($orders, function($o) {
-        return in_array($o['status'], ['new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'revision']);
+        return in_array($o['status'], ['new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'delivered', 'revision']);
     });
 } elseif ($filter === 'completed') {
     $orders = array_filter($orders, function($o) {
@@ -21,7 +23,7 @@ if ($filter === 'progress') {
 // Counts for filter bar
 $db = db();
 $cnt_all = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'])->fetchColumn();
-$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'revision')")->fetchColumn();
+$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status IN ('new', 'pending_assignment', 'assigned', 'accepted', 'in_progress', 'delivered', 'revision')")->fetchColumn();
 $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE student_id = " . $user['id'] . " AND status = 'completed'")->fetchColumn();
 
 $pageTitle  = 'طلباتي';

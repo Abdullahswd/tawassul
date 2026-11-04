@@ -3,6 +3,7 @@
   require_once __DIR__ . '/../config/functions.php';
 
   requireAcademic();
+  autoApproveDeliveredOrders();
   $academicId = $_SESSION['academic_id'];
   $academicData = getAcademicById($academicId);
 
@@ -431,7 +432,7 @@
                     <div style="padding:14px;background:#e0e7ff;color:#3730a3;border-radius:12px;font-size:13px;font-weight:700;text-align:center;border:1.5px solid #a5b4fc;margin-bottom:12px">
                       📦 تم تسليم العمل للعميل بنجاح!
                       <div style="font-size:12px;font-weight:600;margin-top:4px;color:#4338ca">
-                        بانتظار مراجعة وتأكيد الاستلام من قِبل الطالب لاعتماد الأرباح (أو الاعتماد التلقائي بعد 72 ساعة).
+                        <?php $autoApproveHours = (int) getSystemSetting('auto_approve_hours', '72'); ?>بانتظار مراجعة وتأكيد الاستلام من قِبل الطالب لاعتماد الأرباح (أو الاعتماد التلقائي بعد <?= $autoApproveHours ?> ساعة).
                       </div>
                     </div>
                   <?php elseif ($myAssignmentStatus === 'completed'): ?>

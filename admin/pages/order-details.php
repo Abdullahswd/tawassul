@@ -4,6 +4,8 @@ require_once __DIR__ . '/../../config/functions.php';
 require_once __DIR__ . '/../../config/mailer.php';
 requireAdmin();
 
+autoApproveDeliveredOrders();
+
 $order_no = $_GET['id'] ?? '';
 if (!$order_no) {
   header('Location: orders.php');

@@ -750,8 +750,9 @@ INSERT IGNORE INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_gr
 ('26', 'smtp_port', '587', 'email', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('27', 'smtp_user', 'noreply@tawassul.com', 'email', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('28', 'smtp_password', '', 'email', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
-('388', 'withdrawal_eligibility_days', '0', 'general', '2026-09-26 19:30:43', '2026-09-27 00:18:53'),
-('389', 'payout_processing_time', '6', 'general', '2026-09-26 19:30:43', '2026-09-26 19:30:43');
+('388', 'withdrawal_eligibility_days', '14', 'financial', '2026-09-26 19:30:43', '2026-11-04 22:30:00'),
+('389', 'payout_processing_time', '3', 'financial', '2026-09-26 19:30:43', '2026-11-04 22:30:00'),
+('390', 'auto_approve_hours', '72', 'financial', '2026-11-04 22:30:00', '2026-11-04 22:30:00');
 
 -- Seed Data for `colleges` (6 rows)
 INSERT IGNORE INTO `colleges` (`id`, `name`, `code`, `description`, `icon`, `sort_order`, `is_active`, `created_at`) VALUES

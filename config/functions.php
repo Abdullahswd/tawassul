@@ -429,11 +429,18 @@ function updateOrderStatus(int $orderId, string $status): bool {
 
 /**
  * اعتماد تلقائي للطلبات المسلمة التي مضت عليها مهلة الاستلام دون اعتراض من الطالب
- * الافتراضي: 72 ساعة (3 أيام)
+ * يتم جلب المهلة ديناميكياً من إعدادات النظام (auto_approve_hours) وتخضع لتحكم الإدارة بالكامل
  */
-function autoApproveDeliveredOrders(int $autoApproveHours = 72): int {
+function autoApproveDeliveredOrders(?int $autoApproveHours = null): int {
     $db = db();
     try {
+        if ($autoApproveHours === null || $autoApproveHours <= 0) {
+            $autoApproveHours = (int) getSystemSetting('auto_approve_hours', '72');
+            if ($autoApproveHours <= 0) {
+                $autoApproveHours = 72;
+            }
+        }
+
         $stmt = $db->prepare("
             SELECT id, order_number, student_id, academic_id 
             FROM orders 

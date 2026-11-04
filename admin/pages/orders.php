@@ -3,6 +3,8 @@ require_once __DIR__ . '/../../config/auth.php';
 require_once __DIR__ . '/../../config/functions.php';
 requireAdmin();
 
+autoApproveDeliveredOrders();
+
 $db = db();
 
 // Fetch orders
@@ -20,7 +22,7 @@ $orders = $orders_stmt->fetchAll();
 // Count stats
 $cnt_all = count($orders);
 $cnt_new = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('new', 'pending_assignment', 'assigned')")->fetchColumn();
-$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
+$cnt_progress = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('accepted', 'in_progress', 'delivered', 'revision')")->fetchColumn();
 $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
 ?>
 <!DOCTYPE html>
