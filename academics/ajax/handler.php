@@ -271,7 +271,10 @@ if ($action === 'register') {
     // Credentials
     $password = $_POST['password'] ?? '';
     $passwordConfirm = $_POST['password_confirm'] ?? '';
-    $googleId = $_POST['google_id'] ?? null;
+    $googleId = trim($_POST['google_id'] ?? ($_SESSION['google_temp_user']['google_id'] ?? ''));
+    if (empty($googleId)) {
+        $googleId = null;
+    }
 
     if (!$googleId) {
         if (empty($password) || mb_strlen($password) < 6) {
@@ -450,7 +453,19 @@ if ($action === 'register') {
         // Fetch newly created academic
         $newAcademic = getAcademicById($academicId);
 
-        // Require OTP Verification before entering the dashboard
+        // إذا كان التسجيل عبر Google: البريد الإلكتروني موثق مسبقاً، يتم الدخول مباشرة دون طلب OTP
+        if ($googleId) {
+            unset($_SESSION['pending_2fa']);
+            loginAcademic($newAcademic);
+            createNotification($academicId, 'academic', 'مرحباً بك في منصة تواصل 🎉', 'تم إنشاء وتوثيق حسابك الأكاديمي بنجاح عبر Google.', '🎓', 'academics/academic-dashboard.php');
+
+            sendJSONResponse(true, 'تم تسجيل وتفعيل حسابك الأكاديمي بنجاح عبر Google! جارٍ تحويلك إلى لوحة التحكم...', [
+                'requires_otp' => false,
+                'redirect_url' => rootUrl() . '/academics/academic-dashboard.php'
+            ]);
+        }
+
+        // Require OTP Verification before entering the dashboard for manual registrations
         require_once __DIR__ . '/../../config/mailer.php';
         generateAndSendLoginOtp($newAcademic, 'academic', 'academics/academic-dashboard.php');
 

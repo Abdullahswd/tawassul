@@ -170,8 +170,18 @@ function currentAcademic(): ?array {
  * Get root URL for redirects (production safe)
  */
 function rootUrl(): string {
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host     = $_SERVER['HTTP_HOST'];
+    $appUrl = env('APP_URL', '');
+    if (!empty($appUrl)) {
+        return rtrim($appUrl, '/');
+    }
+
+    $protocol = 'http';
+    if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (!empty($_SERVER['SERVER_PORT']) && (int)$_SERVER['SERVER_PORT'] === 443)) {
+        $protocol = 'https';
+    }
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
 
     // حساب مسار التطبيق (المجلد الفرعي) تلقائياً، مثلاً /eduroad عند العمل عبر XAMPP
     $base = '';

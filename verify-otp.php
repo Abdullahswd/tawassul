@@ -24,6 +24,35 @@ $userType  = $pending['user_type'];
 $isAdmin   = ($userType === 'admin');
 $redirect  = $pending['redirect'] ?? null;
 
+// إذا كان الحساب مرتبطاً أو مسجلاً بواسطة Google، فإن البريد موثق مسبقاً من قِبل Google -> يتم تسجيل الدخول وتخطي OTP تلقائياً
+$isGoogleAccount = !empty($pending['user_data']['google_id']);
+if (!$isGoogleAccount && !empty($pending['user_id'])) {
+    try {
+        $table = ($userType === 'academic') ? 'academics' : 'users';
+        $chk = db()->prepare("SELECT google_id FROM {$table} WHERE id = ?");
+        $chk->execute([(int)$pending['user_id']]);
+        $gid = $chk->fetchColumn();
+        if (!empty($gid)) {
+            $isGoogleAccount = true;
+        }
+    } catch (Exception $e) {}
+}
+
+if ($isGoogleAccount) {
+    unset($_SESSION['pending_2fa']);
+    if ($userType === 'academic') {
+        $academicRow = getAcademicById((int)$pending['user_id']) ?: $pending['user_data'];
+        loginAcademic($academicRow);
+        $targetUrl = $redirect ?: 'academics/academic-dashboard.php';
+    } else {
+        $userRow = getUserById((int)$pending['user_id']) ?: $pending['user_data'];
+        loginUser($userRow);
+        $targetUrl = $redirect ?: 'student/student-dashboard.php';
+    }
+    header('Location: ' . $targetUrl);
+    exit;
+}
+
 $error   = '';
 $success = '';
 

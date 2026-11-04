@@ -907,28 +907,6 @@ StepForm.update = function() {
   }
 };
 
-// Override StepForm.next to validate Step 1 (passwords), Step 2 (qualifications), Step 3 (services)
-const _origNext = StepForm.next.bind(StepForm);
-StepForm.next = function() {
-  // Step 1: Personal info & password validation
-  if (StepForm.currentStep === 1) {
-    const pwd = document.getElementById('regPassword');
-    const pwdConfirm = document.getElementById('regPasswordConfirm');
-    if (pwd && pwdConfirm) {
-      if (pwd.value.length < 6) {
-        Toast.show('يجب ألا تقل كلمة المرور عن 6 خانات', 'error');
-        pwd.focus();
-        return;
-      }
-      if (pwd.value !== pwdConfirm.value) {
-        Toast.show('كلمتا المرور غير متطابقتين', 'error');
-        pwdConfirm.focus();
-        return;
-      }
-    }
-  }
-
-
 // دالة التحقق من التسلسل الزمني لسنوات التخرج: بكالوريوس ➜ ماجستير ➜ دكتوراه
 function validateAcademicGraduationYears() {
   const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
@@ -973,6 +951,27 @@ function validateAcademicGraduationYears() {
   return true;
 }
 
+// Override StepForm.next to validate Step 1 (passwords), Step 2 (qualifications), Step 3 (services)
+const _origNext = StepForm.next.bind(StepForm);
+StepForm.next = function() {
+  // Step 1: Personal info & password validation
+  if (StepForm.currentStep === 1) {
+    const pwd = document.getElementById('regPassword');
+    const pwdConfirm = document.getElementById('regPasswordConfirm');
+    if (pwd && pwdConfirm) {
+      if (pwd.value.length < 6) {
+        Toast.show('يجب ألا تقل كلمة المرور عن 6 خانات', 'error');
+        pwd.focus();
+        return;
+      }
+      if (pwd.value !== pwdConfirm.value) {
+        Toast.show('كلمتا المرور غير متطابقتين', 'error');
+        pwdConfirm.focus();
+        return;
+      }
+    }
+  }
+
   // Step 2: Ensure at least one degree is entered & validate graduation years
   if (StepForm.currentStep === 2) {
     const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
@@ -1002,8 +1001,25 @@ function validateAcademicGraduationYears() {
 
 // Override StepForm.submit to perform actual DB insert via AJAX fetch
 StepForm.submit = function() {
-  if (!this.validate()) return;
+  // 1. Validate Step 1 required fields
+  const step1 = document.getElementById('step-1');
+  if (step1) {
+    let step1Valid = true;
+    step1.querySelectorAll('[required]').forEach(inp => {
+      inp.classList.remove('error');
+      if (!inp.value.trim()) {
+        inp.classList.add('error');
+        step1Valid = false;
+      }
+    });
+    if (!step1Valid) {
+      Toast.show('يرجى ملء جميع الحقول المطلوبة في البيانات الشخصية', 'error');
+      StepForm.goTo(1);
+      return;
+    }
+  }
 
+  // 2. Validate passwords (if manual registration)
   const pwd = document.getElementById('regPassword');
   const pwdConfirm = document.getElementById('regPasswordConfirm');
   if (pwd && pwdConfirm) {
@@ -1019,6 +1035,21 @@ StepForm.submit = function() {
     }
   }
 
+  // 3. Validate Step 2 qualifications & graduation years
+  const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
+  const hasMs = document.getElementById('hasMasters')?.checked || !!getDegreeResolvedName('ms', 'College') || !!document.querySelector('input[name="msUniversity"]')?.value;
+  const hasPhd = document.getElementById('hasPhd')?.checked || !!getDegreeResolvedName('phd', 'College') || !!document.querySelector('input[name="phdUniversity"]')?.value;
+  if (!hasBs && !hasMs && !hasPhd) {
+    Toast.show('يرجى تحديد وتعبئة مؤهل أكاديمي واحد على الأقل', 'error');
+    StepForm.goTo(2);
+    return;
+  }
+  if (!validateAcademicGraduationYears()) {
+    StepForm.goTo(2);
+    return;
+  }
+
+  // 4. Validate Step 3 services
   const checkedServices = document.querySelectorAll('input[name="services[]"]:checked');
   if (checkedServices.length === 0) {
     Toast.show('يرجى اختيار خدمة واحدة على الأقل في قسم الخدمات', 'error');
@@ -1026,12 +1057,8 @@ StepForm.submit = function() {
     return;
   }
 
-  if (!validateAcademicGraduationYears()) {
-    StepForm.goTo(2);
-    return;
-  }
-
-  const agree = document.getElementById('agreeTerms').checked;
+  // 5. Validate Step 4 terms
+  const agree = document.getElementById('agreeTerms')?.checked;
   if (!agree) {
     Toast.show('يجب الموافقة على الشروط والأحكام للاستمرار', 'error');
     return;
@@ -1044,7 +1071,6 @@ StepForm.submit = function() {
   const formData = new FormData(form);
   formData.append('csrf_token', csrfTokenJs);
 
-  const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
   if (hasBs) {
     formData.append('hasBachelor', '1');
     formData.set('bsCollege', getDegreeResolvedName('bs', 'College'));
@@ -1052,7 +1078,6 @@ StepForm.submit = function() {
     formData.set('bsMajor', getDegreeResolvedName('bs', 'Major'));
   }
 
-  const hasMs = document.getElementById('hasMasters')?.checked || !!getDegreeResolvedName('ms', 'College') || !!document.querySelector('input[name="msUniversity"]')?.value;
   if (hasMs) {
     formData.append('hasMasters', '1');
     formData.set('msCollege', getDegreeResolvedName('ms', 'College'));
@@ -1060,7 +1085,6 @@ StepForm.submit = function() {
     formData.set('msMajor', getDegreeResolvedName('ms', 'Major'));
   }
 
-  const hasPhd = document.getElementById('hasPhd')?.checked || !!getDegreeResolvedName('phd', 'College') || !!document.querySelector('input[name="phdUniversity"]')?.value;
   if (hasPhd) {
     formData.append('hasPhd', '1');
     formData.set('phdCollege', getDegreeResolvedName('phd', 'College'));
@@ -1072,7 +1096,15 @@ StepForm.submit = function() {
     method: 'POST',
     body: formData
   })
-  .then(res => res.json())
+  .then(async res => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch(e) {
+      console.error('Server response was not JSON:', text);
+      throw new Error('استجابة غير متوقعة من الخادم: ' + text.substring(0, 100));
+    }
+  })
   .then(data => {
     if (data.success) {
       document.getElementById('formSuccess').style.display = 'block';
@@ -1087,15 +1119,24 @@ StepForm.submit = function() {
         setTimeout(() => {
           window.location.href = data.redirect_url;
         }, 1200);
+      } else if (data.redirect_url) {
+        const verifyBtn = document.getElementById('verifyOtpBtn');
+        if (verifyBtn) {
+          verifyBtn.href = data.redirect_url;
+          verifyBtn.innerHTML = '🚀 الانتقال إلى لوحة التحكم ←';
+        }
+        setTimeout(() => {
+          window.location.href = data.redirect_url;
+        }, 1200);
       }
     } else {
       if (btn) { btn.innerHTML = '✅ إرسال الطلب'; btn.disabled = false; }
-      Toast.show(data.message, 'error');
+      Toast.show(data.message || 'حدث خطأ أثناء إرسال الطلب', 'error');
     }
   })
   .catch(err => {
     if (btn) { btn.innerHTML = '✅ إرسال الطلب'; btn.disabled = false; }
-    Toast.show('حدث خطأ في الاتصال بالخادم.', 'error');
+    Toast.show(err.message || 'حدث خطأ في الاتصال بالخادم.', 'error');
   });
 };
 

@@ -5,7 +5,7 @@ require_once __DIR__ . '/env.php';
 if (!defined('DB_HOST'))
     define('DB_HOST', env('DB_HOST', 'localhost'));
 if (!defined('DB_NAME'))
-    define('DB_NAME', env('DB_NAME', 'acadimic'));
+    define('DB_NAME', env('DB_NAME', 'eduroad'));
 if (!defined('DB_USER'))
     define('DB_USER', env('DB_USER', 'root'));
 if (!defined('DB_PASS'))

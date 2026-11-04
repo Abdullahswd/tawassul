@@ -725,7 +725,7 @@ INSERT IGNORE INTO `settings` (`id`, `setting_key`, `setting_value`, `setting_gr
 ('1', 'site_name', 'Eduroad', 'general', '2026-06-09 19:05:16', '2026-08-20 00:10:53'),
 ('2', 'site_email', 'info@tawassul.com', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('3', 'site_phone', '+967 775113262', 'general', '2026-06-09 19:05:16', '2026-06-09 19:08:02'),
-('4', 'site_url', 'https://tawassul.com', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
+('4', 'site_url', 'https://eduroad.tawassu.com', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('5', 'site_language', 'ar', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('6', 'site_timezone', 'Asia/Riyadh', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
 ('7', 'site_description', 'منصة تواصل الأكاديمي - نربط الطلاب بأفضل الأكاديميين لتقديم خدمات أكاديمية متميزة', 'general', '2026-06-09 19:05:16', '2026-06-09 19:05:16'),
