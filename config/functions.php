@@ -428,6 +428,55 @@ function updateOrderStatus(int $orderId, string $status): bool {
 }
 
 /**
+ * اعتماد تلقائي للطلبات المسلمة التي مضت عليها مهلة الاستلام دون اعتراض من الطالب
+ * الافتراضي: 72 ساعة (3 أيام)
+ */
+function autoApproveDeliveredOrders(int $autoApproveHours = 72): int {
+    $db = db();
+    try {
+        $stmt = $db->prepare("
+            SELECT id, order_number, student_id, academic_id 
+            FROM orders 
+            WHERE status = 'delivered' 
+              AND updated_at <= DATE_SUB(NOW(), INTERVAL ? HOUR)
+        ");
+        $stmt->execute([$autoApproveHours]);
+        $orders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $count = 0;
+        foreach ($orders as $ord) {
+            $orderId = (int)$ord['id'];
+            if (updateOrderStatus($orderId, 'completed')) {
+                $count++;
+
+                createNotification(
+                    (int)$ord['student_id'],
+                    'student',
+                    'تم اعتماد واكتمال طلبك تلقائياً ✅',
+                    'تم اعتماد الطلب #' . $ord['order_number'] . ' واكتماله بنجاح بعد مرور مهلة الاستلام المحددة (' . $autoApproveHours . ' ساعة).',
+                    '✅',
+                    'student/order-details.php?id=' . $orderId
+                );
+
+                if (!empty($ord['academic_id'])) {
+                    createNotification(
+                        (int)$ord['academic_id'],
+                        'academic',
+                        'تم اعتماد الطلب وتحويل الأرباح 🎉',
+                        'تم اعتماد الطلب #' . $ord['order_number'] . ' واكتماله تلقائياً وإيداع أرباحك في محفظتك.',
+                        '🎉',
+                        'academics/academic-order-details.php?id=' . $ord['order_number']
+                    );
+                }
+            }
+        }
+        return $count;
+    } catch (Exception $e) {
+        return 0;
+    }
+}
+
+/**
  * Transfers the payment for a completed order to the academic's balance.
  * Prevents double-payment by using the is_transferred_to_academic column.
  */
@@ -911,6 +960,7 @@ function orderStatusLabel(string $status): array {
         'new'         => ['label' => 'جديد',         'class' => 'badge-info'],
         'accepted'    => ['label' => 'مقبول',         'class' => 'badge-primary'],
         'in_progress' => ['label' => 'قيد التنفيذ',   'class' => 'badge-warning'],
+        'delivered'   => ['label' => 'تم التسليم (بانتظار استلام الطالب)', 'class' => 'badge-info'],
         'revision'    => ['label' => 'تحت المراجعة',  'class' => 'badge-warning'],
         'completed'   => ['label' => 'مكتمل',         'class' => 'badge-success'],
         'cancelled'   => ['label' => 'ملغي',          'class' => 'badge-danger'],

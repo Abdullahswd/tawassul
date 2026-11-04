@@ -333,7 +333,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `deadline` date DEFAULT NULL,
   `academics_count` int(10) unsigned NOT NULL DEFAULT 1,
   `amount` decimal(10,2) NOT NULL DEFAULT 0.00,
-  `status` enum('awaiting_payment','pending_assignment','assigned','new','accepted','in_progress','revision','completed','cancelled','cancellation_requested') NOT NULL DEFAULT 'awaiting_payment',
+  `status` enum('awaiting_payment','pending_assignment','assigned','new','accepted','in_progress','delivered','revision','completed','cancelled','cancellation_requested') NOT NULL DEFAULT 'awaiting_payment',
   `admin_notes` text DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT current_timestamp(),
   `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),

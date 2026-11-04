@@ -81,7 +81,9 @@ $cnt_completed = (int) $db->query("SELECT COUNT(*) FROM orders WHERE status = 'c
             <option value="assigned">أُرسل إلى الأكاديمي</option>
             <option value="new">جديد (قيد المراجعة)</option>
             <option value="in_progress">قيد التنفيذ</option>
-            <option value="completed">مكتمل</option>
+            <option value="delivered">📦 تم التسليم للعميل</option>
+            <option value="revision">✏️ تحت المراجعة</option>
+            <option value="completed">✓ مكتمل</option>
             <option value="cancelled">ملغي</option>
             <option value="cancellation_requested">مطلوب إلغاؤه</option>
           </select>

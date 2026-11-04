@@ -692,7 +692,7 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
             }
 
             sendJSONResponse(true, 'تم تسجيل اعتذارك عن هذه المهمة بنجاح.');
-        } elseif ($status === 'completed') {
+        } elseif ($status === 'completed' || $status === 'delivered') {
             // تحديث حالة إسناد هذا الأكاديمي إلى مكتمل
             $db->prepare("UPDATE order_assignments SET status = 'completed', completed_at = NOW() WHERE order_id = ? AND academic_id = ?")
                 ->execute([$orderId, $academicId]);
@@ -714,19 +714,19 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
             }
 
             if ($totalAssigned > 0 && $completedCount >= $totalAssigned) {
-                // اكتمل العمل من قِبل جميع الأكاديميين المكلفين من الإدارة
-                updateOrderStatus($orderId, 'completed');
+                // تسليم العمل للعميل للمراجعة وتأكيد الاستلام
+                updateOrderStatus($orderId, 'delivered');
 
                 createNotification(
                     $order['student_id'],
                     'student',
-                    'اكتمل تنفيذ طلبك بالكامل 🎉',
-                    'أكمل جميع الأكاديميين المكلفين تنفيذ طلبك #' . $order['order_number'] . ' بنجاح.',
-                    '🎉',
+                    'تم تسليم طلبك بنجاح 📦',
+                    'أكمل الأكاديمي تنفيذ طلبك #' . $order['order_number'] . ' وقام بتسليمه. يرجى مراجعة العمل وتأكيد الاستلام أو طلب أي تعديلات.',
+                    '📦',
                     'student/order-details.php?id=' . $orderId
                 );
 
-                sendJSONResponse(true, 'تم اكتمال الطلب بنجاح بعد إنجازه من قبل جميع الأكاديميين المكلفين.');
+                sendJSONResponse(true, 'تم تسليم الطلب بنجاح! تم إشعار الطالب لمراجعة الملفات وتأكيد الاستلام.');
             } else {
                 // تم إنجاز هذا الجزء فقط، وما زال باقي الفريق يعمل
                 $remaining = max(1, $totalAssigned - $completedCount);
@@ -865,7 +865,7 @@ if ($action === 'submit_withdraw') {
                 SELECT SUM(p.academic_net)
                 FROM payments p
                 JOIN orders o ON p.order_id = o.id
-                WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), p.paid_at) >= $withdrawal_eligibility_days
+                WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), COALESCE(o.updated_at, p.paid_at)) >= $withdrawal_eligibility_days
             ")->fetchColumn();
 
         $eligibleBalance = max(0, $totalEligibleEarned - $totalWithdrawn);

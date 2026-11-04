@@ -47,6 +47,7 @@ function getStatusBadge(status) {
     assigned: '<span class="badge badge-primary" style="background:rgba(99,102,241,.15);color:#6366f1;border-color:rgba(99,102,241,.3)">→ مسند إليك</span>',
     accepted: '<span class="badge badge-success" style="background:rgba(16,185,129,.15);color:#059669;border-color:rgba(16,185,129,.3)">✓ مقبول</span>',
     in_progress: '<span class="badge badge-warning">⟳ قيد التنفيذ</span>',
+    delivered: '<span class="badge badge-primary" style="background:rgba(139,92,246,0.15);color:#7c3aed;border-color:rgba(139,92,246,0.3)">📦 تم التسليم للعميل</span>',
     revision: '<span class="badge badge-secondary">✍ تحت المراجعة</span>',
     completed: '<span class="badge badge-success">✓ مكتمل</span>',
     cancelled: '<span class="badge badge-danger">✗ ملغي</span>',

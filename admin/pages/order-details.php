@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 // Handle status updates
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_status') {
   $new_status = $_POST['status'] ?? '';
-  if (in_array($new_status, ['pending_assignment', 'assigned', 'new', 'accepted', 'in_progress', 'revision', 'completed', 'cancelled', 'cancellation_requested'])) {
+  if (in_array($new_status, ['pending_assignment', 'assigned', 'new', 'accepted', 'in_progress', 'delivered', 'revision', 'completed', 'cancelled', 'cancellation_requested'])) {
     updateOrderStatus($order['id'], $new_status);
 
     if ($new_status === 'cancelled') {
@@ -1079,8 +1079,12 @@ $academic_net = round($order['amount'] - $platform_fee, 2);
                     طلب جديد</button>
                   <button type="submit" name="status" value="in_progress" class="btn btn-warning"
                     style="justify-content:center">⟳ قيد التنفيذ</button>
+                  <button type="submit" name="status" value="delivered" class="btn btn-info"
+                    style="justify-content:center;background:#8b5cf6">📦 تم التسليم للعميل</button>
+                  <button type="submit" name="status" value="revision" class="btn btn-warning"
+                    style="justify-content:center;background:#f59e0b">✏️ طلب تعديلات</button>
                   <button type="submit" name="status" value="completed" class="btn btn-success"
-                    style="justify-content:center">✓ مكتمل</button>
+                    style="justify-content:center">✓ اعتماد واكتمال الطلب</button>
                   <hr class="divider" />
                   <?php if ($order['status'] === 'cancellation_requested'): ?>
                     <div

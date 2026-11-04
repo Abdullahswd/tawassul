@@ -422,22 +422,30 @@
                   <div style="padding:10px;background:#f3f4f6;border-radius:8px;color:#6b7280;font-size:13px;text-align:center;border:1px dashed #d1d5db">
                     لا يمكنك تغيير حالة الطلب حالياً.
                   </div>
+                <?php elseif ($order['status'] === 'completed'): ?>
+                  <div style="padding:14px;background:#dcfce7;color:#166534;border-radius:12px;font-size:13px;font-weight:700;text-align:center;border:1.5px solid #86efac">
+                    🎉 تم استلام هذا الطلب واكتماله، وتم إيداع أرباحك في محفظتك بنجاح!
+                  </div>
                 <?php else: ?>
-                  <?php if ($myAssignmentStatus === 'completed'): ?>
+                  <?php if ($order['status'] === 'delivered'): ?>
+                    <div style="padding:14px;background:#e0e7ff;color:#3730a3;border-radius:12px;font-size:13px;font-weight:700;text-align:center;border:1.5px solid #a5b4fc;margin-bottom:12px">
+                      📦 تم تسليم العمل للعميل بنجاح!
+                      <div style="font-size:12px;font-weight:600;margin-top:4px;color:#4338ca">
+                        بانتظار مراجعة وتأكيد الاستلام من قِبل الطالب لاعتماد الأرباح (أو الاعتماد التلقائي بعد 72 ساعة).
+                      </div>
+                    </div>
+                  <?php elseif ($myAssignmentStatus === 'completed'): ?>
                     <div style="padding:12px;background:#dcfce7;color:#166534;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1px solid #86efac;margin-bottom:12px">
                       ✅ لقد أنهيت الجزء المخصص لك بنجاح.
-                      <?php if ($order['status'] !== 'completed'): ?>
-                        <div style="font-size:11px;font-weight:600;margin-top:4px;color:#15803d">
-                          (الطلب بانتظار إنجاز باقي الأكاديميين المكلفين ليصبح مكتملاً نهائياً)
-                        </div>
-                      <?php endif; ?>
+                      <div style="font-size:11px;font-weight:600;margin-top:4px;color:#15803d">
+                        (الطلب بانتظار إنجاز باقي الأكاديميين المكلفين ليصبح مكتملاً نهائياً)
+                      </div>
                     </div>
                   <?php endif; ?>
                   <select class="form-input form-select" id="orderStatus" style="padding-left:36px">
-                    <option value="accepted" <?= $order['status']=='accepted'?'selected':'' ?>>مقبول وجاري العمل</option>
-                    <option value="in_progress" <?= $order['status']=='in_progress'?'selected':'' ?>>قيد التنفيذ</option>
-                    <option value="revision" <?= $order['status']=='revision'?'selected':'' ?>>تحت المراجعة</option>
-                    <option value="completed" <?= $order['status']=='completed'?'selected':'' ?>>مكتمل</option>
+                    <option value="in_progress" <?= in_array($order['status'], ['accepted', 'in_progress']) ? 'selected' : '' ?>>⟳ قيد التنفيذ</option>
+                    <option value="revision" <?= $order['status']=='revision'?'selected':'' ?>>✏️ تحت المراجعة والتعديل</option>
+                    <option value="delivered" <?= in_array($order['status'], ['delivered', 'completed']) ? 'selected' : '' ?>>📦 تسليم العمل للعميل (للاعتماد)</option>
                   </select>
                   <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="updateOrderStatus()">تحديث الحالة</button>
                 <?php endif; ?>

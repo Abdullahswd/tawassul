@@ -11,6 +11,9 @@ if (!$order_id) {
     exit;
 }
 
+// التحقق من الاعتماد التلقائي للطلبات المسلمة التي مضى عليها 72 ساعة
+autoApproveDeliveredOrders();
+
 $order = getOrderById($order_id);
 
 if (!$order || $order['student_id'] !== $user['id']) {
@@ -21,6 +24,10 @@ if (!$order || $order['student_id'] !== $user['id']) {
 // إشعار الدفع المرفق مع الطلب (إن وُجد)
 $orderReceipt = (float)($order['amount'] ?? 0) > 0 ? getReceiptForOrder($order_id) : null;
 $orderRefund = getRefundForOrder($order_id);
+$existingReview = null;
+try {
+    $existingReview = db()->query("SELECT * FROM reviews WHERE order_id = " . (int)$order_id)->fetch(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 $appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 
 // Fetch assigned team of academics
@@ -158,6 +165,88 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         exit;
     }
 }
+// ── تأكيد استلام العمل واعتماد اكتمال الطلب ────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'confirm_delivery') {
+    if ($order['status'] === 'delivered') {
+        updateOrderStatus($order_id, 'completed');
+
+        // إشعار الأكاديميين المكلفين
+        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced') UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = orders.academic_id AND status = 'replaced')");
+        $academics->execute([$order_id, $order_id]);
+        foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
+            createNotification(
+                (int)$acid,
+                'academic',
+                'تم اعتماد الطلب وتحويل الأرباح ✅',
+                'قام الطالب بتأكيد استلام الطلب #' . $order['order_number'] . ' بنجاح، وتم إيداع الأرباح في محفظتك.',
+                '💰',
+                'academics/academic-order-details.php?id=' . $order['order_number']
+            );
+        }
+
+        // إشعار الإدارة
+        createNotification(1, 'admin', 'اكتمال واعتماد طلب 🎉', 'قام الطالب بتأكيد استلام الطلب #' . $order['order_number'] . ' وتم اعتماد الأرباح.', '🎉', 'admin/pages/order-details.php?id=' . $order['order_number']);
+
+        $_SESSION['flash_success'] = 'تم تأكيد استلام العمل واعتماد اكتمال الطلب بنجاح! تم إيداع مستحقات الأكاديمي. يمكنك الآن تقييم الخدمة أدناه.';
+        header("Location: order-details.php?id=$order_id&confirmed=1");
+        exit;
+    }
+}
+
+// ── طلب تعديل على العمل المسلم ──────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'request_revision') {
+    $notes = trim($_POST['revision_notes'] ?? '');
+    if ($order['status'] === 'delivered' || $order['status'] === 'in_progress') {
+        updateOrderStatus($order_id, 'revision');
+
+        // إعادة حالة إسناد الأكاديميين إلى قيد العمل
+        $db->prepare("UPDATE order_assignments SET status = 'accepted' WHERE order_id = ? AND status = 'completed'")->execute([$order_id]);
+
+        // إرسال الملاحظات تلقائياً في شات الطلب
+        $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
+        $convStmt->execute([$order_id, $user['id']]);
+        $convId = $convStmt->fetchColumn();
+        if ($convId) {
+            $chatMsg = "🔄 [طلب تعديل من الطالب]:\n" . ($notes ?: 'يرجى مراجعة التعديلات المطلوبة.');
+            $db->prepare("INSERT INTO messages (conversation_id, sender_id, sender_type, content, created_at) VALUES (?, ?, 'student', ?, NOW())")
+               ->execute([$convId, $user['id'], $chatMsg]);
+        }
+
+        // إشعار الأكاديميين
+        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced') UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = orders.academic_id AND status = 'replaced')");
+        $academics->execute([$order_id, $order_id]);
+        foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
+            createNotification(
+                (int)$acid,
+                'academic',
+                'طلب تعديل جديد ✏️',
+                'طلب الطالب تعديلات على الطلب #' . $order['order_number'] . ': ' . mb_substr($notes, 0, 50) . '...',
+                '✏️',
+                'academics/academic-order-details.php?id=' . $order['order_number']
+            );
+        }
+
+        createNotification(1, 'admin', 'طلب تعديل على طلب ✏️', 'طلب الطالب تعديلات على الطلب #' . $order['order_number'], '✏️', 'admin/pages/order-details.php?id=' . $order['order_number']);
+
+        $_SESSION['flash_success'] = 'تم إرسال طلب التعديل للأكاديمي بنجاح، جاري متابعة التعديلات.';
+        header("Location: order-details.php?id=$order_id&revision_requested=1");
+        exit;
+    }
+}
+
+// ── تقييم الأكاديمي ────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'submit_review') {
+    $rating = max(1, min(5, (int)($_POST['rating'] ?? 5)));
+    $comment = trim($_POST['comment'] ?? '');
+    $acadId = (int)($order['academic_id'] ?? 0);
+    if ($acadId && $order['status'] === 'completed') {
+        submitReview($order_id, $user['id'], $acadId, $rating, $comment);
+        $_SESSION['flash_success'] = 'شكراً لك! تم حفظ تقييمك للأكاديمي بنجاح.';
+        header("Location: order-details.php?id=$order_id&reviewed=1");
+        exit;
+    }
+}
+
 // Handle additional files upload
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_additional_files'])) {
     if (!empty($_FILES['order_attachments']['name'][0])) {
@@ -409,6 +498,87 @@ require __DIR__ . '/partials/sidebar.php';
               <?php endif; ?>
             <?php endif; ?>
             
+            <?php if (!empty($_SESSION['flash_success'])): ?>
+              <div class="card anim-fade-up" style="background:#dcfce7;border:1.5px solid #86efac;color:#166534;padding:14px 20px;border-radius:14px;font-weight:700;margin-bottom:18px;display:flex;align-items:center;gap:10px">
+                <span style="font-size:20px">✅</span>
+                <span><?= e($_SESSION['flash_success']) ?></span>
+              </div>
+              <?php unset($_SESSION['flash_success']); ?>
+            <?php endif; ?>
+
+            <?php if ($order['status'] === 'delivered'): ?>
+              <!-- Delivery Acceptance Banner -->
+              <div class="card anim-fade-up" style="background:linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(99, 102, 241, 0.08));border:2px solid #10b981;border-radius:20px;padding:26px;margin-bottom:24px;box-shadow:0 10px 25px rgba(16, 185, 129, 0.12)">
+                <div style="display:flex;align-items:flex-start;gap:18px;flex-wrap:wrap">
+                  <div style="width:56px;height:56px;border-radius:18px;background:#10b981;color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;box-shadow:0 6px 16px rgba(16,185,129,0.3)">
+                    📦
+                  </div>
+                  <div style="flex:1;min-width:280px">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+                      <h3 style="font-size:19px;font-weight:800;color:var(--text-primary);margin:0">تم تسليم العمل من قِبل الأكاديمي 🎉</h3>
+                      <span class="badge badge-success" style="font-size:12px">جاهز للمعاينة</span>
+                    </div>
+                    <p style="font-size:14px;color:var(--text-secondary);line-height:1.7;margin-bottom:18px">
+                      أكمل الأكاديمي تنفيذ العمل المطلوب وقام بتسليمه لك. يُرجى مراجعة الملفات المرفقة والمحادثة بدقة. إذا كان العمل مكتملاً ومطابقاً لطلبك، اضغط على <strong>"تأكيد الاستلام واعتماد الطلب"</strong> لإغلاق الطلب وإيداع مستحقات الأكاديمي في محفظته. أو يمكنك طلب تعديل إذا لزم الأمر.
+                    </p>
+                    
+                    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                      <!-- زر تأكيد الاستلام -->
+                      <form method="POST" style="margin:0" onsubmit="return confirm('هل تأكدت من مراجعة العمل وترغب في تأكيد الاستلام واعتماد اكتمال الطلب؟\n(سيتم إيداع مستحقات الأكاديمي وإغلاق الطلب بنجاح)')">
+                        <input type="hidden" name="action" value="confirm_delivery">
+                        <button type="submit" class="btn btn-primary" style="background:linear-gradient(135deg, #10b981, #059669);border:none;padding:12px 26px;font-size:14.5px;font-weight:800;display:flex;align-items:center;gap:8px;box-shadow:0 4px 14px rgba(16, 185, 129, 0.35);border-radius:30px;cursor:pointer">
+                          <span>✅</span> تأكيد الاستلام واعتماد الطلب
+                        </button>
+                      </form>
+
+                      <!-- زر طلب تعديل -->
+                      <button type="button" class="btn btn-outline" onclick="document.getElementById('revisionModal').style.display='flex'" style="border-color:#f59e0b;color:#d97706;padding:12px 22px;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;border-radius:30px;cursor:pointer">
+                        <span>✏️</span> طلب تعديل على العمل
+                      </button>
+                    </div>
+
+                    <div style="margin-top:14px;font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px">
+                      <span>⏱️</span>
+                      <span><strong>مهلة الاستلام التلقائي:</strong> سيتم اعتماد الطلب تلقائياً بعد مرور 72 ساعة لضمان حقوق المنفذ في حال عدم الرد.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            <?php elseif ($order['status'] === 'completed'): ?>
+              <!-- Completed & Review Banner -->
+              <div class="card anim-fade-up" style="background:linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(59, 130, 246, 0.05));border:1.5px solid #10b981;border-radius:16px;padding:20px 24px;margin-bottom:24px">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+                  <div style="display:flex;align-items:center;gap:14px">
+                    <span style="font-size:32px">🎉</span>
+                    <div>
+                      <div style="font-weight:800;color:#065f46;font-size:16px">تم استلام هذا الطلب واكتماله بنجاح!</div>
+                      <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">شكراً لتعاملك معنا. نأمل أن تكون الخدمة نالت رضاك واستحسانك.</div>
+                    </div>
+                  </div>
+                  <?php if (!empty($order['academic_id']) && !$existingReview): ?>
+                    <button type="button" onclick="document.getElementById('reviewModal').style.display='flex'" class="btn btn-primary" style="background:linear-gradient(135deg, #f59e0b, #d97706);border:none;font-weight:800;padding:10px 22px;border-radius:30px;box-shadow:0 4px 12px rgba(245,158,11,0.3)">
+                      ⭐ تقييم الأكاديمي
+                    </button>
+                  <?php endif; ?>
+                </div>
+
+                <?php if ($existingReview): ?>
+                  <div style="margin-top:16px;padding:14px 18px;background:var(--bg-body);border-radius:12px;border:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+                    <div>
+                      <div style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#f59e0b">
+                        <span>تقييمك للأكاديمي:</span>
+                        <span><?= str_repeat('★', (int)$existingReview['rating']) ?><?= str_repeat('☆', 5 - (int)$existingReview['rating']) ?> (<?= $existingReview['rating'] ?>/5)</span>
+                      </div>
+                      <?php if (!empty($existingReview['comment'])): ?>
+                        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">"<?= e($existingReview['comment']) ?>"</div>
+                      <?php endif; ?>
+                    </div>
+                    <span style="font-size:12px;color:var(--text-secondary)"><?= formatDate($existingReview['created_at']) ?></span>
+                  </div>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+
             <!-- Order Header Card -->
             <div class="card">
               <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
@@ -593,13 +763,13 @@ require __DIR__ . '/partials/sidebar.php';
                     <?= $order['academic_id'] ? 'تم تعيين الأكاديمي وقبول العمل.' : (($order['status'] === 'assigned') ? 'تم إرسال الطلب للأكاديمي، بانتظار القبول.' : 'جاري البحث عن أكاديمي متخصص.') ?>
                   </div>
                 </div>
-                <div class="timeline-item <?= ($order['status'] === 'completed') ? 'done' : (in_array($order['status'], ['in_progress', 'revision']) ? 'active' : '') ?>">
+                <div class="timeline-item <?= in_array($order['status'], ['delivered', 'completed']) ? 'done' : (in_array($order['status'], ['in_progress', 'revision']) ? 'active' : '') ?>">
                   <div class="ti-title">قيد التنفيذ</div>
                   <div class="ti-desc">يقوم الأكاديمي حالياً بالعمل على الملفات.</div>
                 </div>
-                <div class="timeline-item <?= ($order['status'] === 'completed') ? 'done' : '' ?>">
-                  <div class="ti-title">اكتمال وتسليم</div>
-                  <div class="ti-desc">مراجعة الملفات النهائية وتنزيلها.</div>
+                <div class="timeline-item <?= ($order['status'] === 'completed') ? 'done' : (($order['status'] === 'delivered') ? 'active' : '') ?>">
+                  <div class="ti-title"><?= ($order['status'] === 'completed') ? 'مكتمل ومعتمد' : 'تم تسليم العمل' ?></div>
+                  <div class="ti-desc"><?= ($order['status'] === 'completed') ? 'تم تأكيد الاستلام واكتمال الطلب بنجاح.' : 'قام الأكاديمي بتسليم العمل، بانتظار تأكيد استلامك.' ?></div>
                 </div>
               </div>
             </div>
@@ -889,6 +1059,77 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       }
     }
   </script>
+  <!-- Modal: Request Revision (طلب تعديل) -->
+  <div id="revisionModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
+    <div class="card" style="max-width:540px;width:100%;border-radius:24px;padding:32px;box-shadow:0 20px 40px rgba(0,0,0,0.2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:24px">✏️</span>
+          <h3 style="font-size:18px;font-weight:800;color:var(--text-primary);margin:0">طلب تعديل على العمل</h3>
+        </div>
+        <button type="button" onclick="document.getElementById('revisionModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary)">&times;</button>
+      </div>
+      <p style="font-size:13.5px;color:var(--text-secondary);line-height:1.6;margin-bottom:20px">
+        يرجى كتابة الملاحظات والنقاط التي تحتاج إلى تعديل بوضوح لمساعدة الأكاديمي على تنفيذها بدقة:
+      </p>
+      <form method="POST">
+        <input type="hidden" name="action" value="request_revision">
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label">ملاحظات التعديل المطلوبة <span style="color:var(--danger)">*</span></label>
+          <textarea name="revision_notes" class="form-input" rows="5" placeholder="اكتب تفاصيل التعديلات المطلوبة هنا..." required style="resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:flex-end">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('revisionModal').style.display='none'">إلغاء</button>
+          <button type="submit" class="btn btn-primary" style="background:#f59e0b;border:none;font-weight:800">إرسال طلب التعديل للأكاديمي ←</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Review Academic (تقييم الأكاديمي) -->
+  <div id="reviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)">
+    <div class="card" style="max-width:500px;width:100%;border-radius:24px;padding:32px;box-shadow:0 20px 40px rgba(0,0,0,0.2);text-align:center">
+      <div style="font-size:48px;margin-bottom:12px">⭐</div>
+      <h3 style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:6px">تقييم الأكاديمي والخدمة</h3>
+      <p style="font-size:13.5px;color:var(--text-secondary);margin-bottom:24px">رأيك يهمنا ويساعد في تطوير جودة الخدمات الأكاديمية</p>
+      
+      <form method="POST">
+        <input type="hidden" name="action" value="submit_review">
+        <div class="form-group" style="margin-bottom:24px">
+          <label class="form-label" style="text-align:center">اختر التقييم</label>
+          <div style="display:flex;justify-content:center;gap:12px;font-size:32px;cursor:pointer;direction:ltr" id="starRatingContainer">
+            <span class="star-btn" data-val="1" onclick="setRating(1)">★</span>
+            <span class="star-btn" data-val="2" onclick="setRating(2)">★</span>
+            <span class="star-btn" data-val="3" onclick="setRating(3)">★</span>
+            <span class="star-btn" data-val="4" onclick="setRating(4)">★</span>
+            <span class="star-btn" data-val="5" onclick="setRating(5)">★</span>
+          </div>
+          <input type="hidden" name="rating" id="selectedRating" value="5">
+        </div>
+        <div class="form-group" style="margin-bottom:24px;text-align:right">
+          <label class="form-label">تعليقك أو كلمتك للأكاديمي (اختياري)</label>
+          <textarea name="comment" class="form-input" rows="3" placeholder="أشكر الأكاديمي على تعاونه وسرعة إنجازه..." style="resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:12px;justify-content:center">
+          <button type="button" class="btn btn-outline" onclick="document.getElementById('reviewModal').style.display='none'">إلغاء</button>
+          <button type="submit" class="btn btn-primary" style="padding:10px 32px;font-weight:800">حفظ وإرسال التقييم ✓</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function setRating(val) {
+      document.getElementById('selectedRating').value = val;
+      const stars = document.querySelectorAll('#starRatingContainer .star-btn');
+      stars.forEach((s, idx) => {
+        s.style.color = (idx < val) ? '#f59e0b' : '#d1d5db';
+      });
+    }
+    // Init stars to 5 by default
+    setTimeout(() => { if (typeof setRating === 'function') setRating(5); }, 100);
+  </script>
+
 <?php
 $extraJs = ob_get_clean();
 require __DIR__ . '/partials/footer.php';
