@@ -15,8 +15,8 @@ $selectedServices = $db->query("SELECT service_id FROM academic_services WHERE a
 // All services
 $allServicesList = getAllServices(true);
 
-// Qualifications for list
-$qualsStmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ?");
+// Qualifications for list (Ordered: بكالوريوس ➜ ماجستير ➜ دكتوراه)
+$qualsStmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY FIELD(level, 'بكالوريوس', 'ماجستير', 'دكتوراه') ASC, graduation_year ASC, id ASC");
 $qualsStmt->execute([$academicId]);
 $quals = $qualsStmt->fetchAll();
 
@@ -712,6 +712,14 @@ function renderQualificationCard(q) {
 function renderQualificationsList() {
   const list = document.getElementById('qualificationsList');
   if (!list) return;
+  // الترتيب الأكاديمي الصارم: 1. بكالوريوس ➜ 2. ماجستير ➜ 3. دكتوراه
+  const levelOrder = { 'بكالوريوس': 1, 'ماجستير': 2, 'دكتوراه': 3 };
+  qualsStore.sort((a, b) => {
+    const oA = levelOrder[a.level] || 99;
+    const oB = levelOrder[b.level] || 99;
+    if (oA !== oB) return oA - oB;
+    return (parseInt(a.graduation_year) || 0) - (parseInt(b.graduation_year) || 0);
+  });
   if (!qualsStore.length) {
     list.innerHTML = '<div style="text-align:center;padding:48px 20px;background:var(--bg-main);border:2px dashed var(--border-color);border-radius:18px">'
       + '<div style="width:64px;height:64px;border-radius:20px;background:linear-gradient(135deg,rgba(99,102,241,0.12),rgba(99,102,241,0.05));border:1px solid rgba(99,102,241,0.2);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 16px">🎓</div>'
@@ -750,6 +758,62 @@ function saveQualification() {
   if (!field || !university) {
     Toast.show('يرجى إدخال التخصص والجامعة', 'error');
     return;
+  }
+
+  // التحقق الزمني من التسلسل الأكاديمي: بكالوريوس ➜ ماجستير ➜ دكتوراه
+  const currentId = parseInt(id) || 0;
+  const yearNum = parseInt(graduation_year) || 0;
+  const currentYear = new Date().getFullYear();
+
+  if (yearNum > 0) {
+    if (yearNum < 1960 || yearNum > currentYear + 1) {
+      Toast.show(`يرجى إدخال سنة تخرج صالحة (بين 1960 و ${currentYear + 1})`, 'error');
+      document.getElementById('qualYear').focus();
+      return;
+    }
+
+    // مطابقة السنة مع الشهادات الأخرى المسجلة
+    for (const q of qualsStore) {
+      const qId = parseInt(q.id) || 0;
+      if (qId === currentId) continue;
+      const qYear = parseInt(q.graduation_year) || 0;
+      if (qYear <= 0) continue;
+
+      if (level === 'ماجستير') {
+        if (q.level === 'بكالوريوس' && yearNum <= qYear) {
+          Toast.show(`تنبيه: سنة تخرج الماجستير (${yearNum}) يجب أن تكون بعد سنة تخرج البكالوريوس (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+        if (q.level === 'دكتوراه' && yearNum >= qYear) {
+          Toast.show(`تنبيه: سنة تخرج الماجستير (${yearNum}) يجب أن تكون قبل سنة تخرج الدكتوراه (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+      } else if (level === 'دكتوراه') {
+        if (q.level === 'ماجستير' && yearNum <= qYear) {
+          Toast.show(`تنبيه: سنة تخرج الدكتوراه (${yearNum}) يجب أن تكون بعد سنة تخرج الماجستير (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+        if (q.level === 'بكالوريوس' && yearNum <= qYear) {
+          Toast.show(`تنبيه: سنة تخرج الدكتوراه (${yearNum}) يجب أن تكون بعد سنة تخرج البكالوريوس (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+      } else if (level === 'بكالوريوس') {
+        if (q.level === 'ماجستير' && yearNum >= qYear) {
+          Toast.show(`تنبيه: سنة تخرج البكالوريوس (${yearNum}) يجب أن تكون قبل سنة تخرج الماجستير (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+        if (q.level === 'دكتوراه' && yearNum >= qYear) {
+          Toast.show(`تنبيه: سنة تخرج البكالوريوس (${yearNum}) يجب أن تكون قبل سنة تخرج الدكتوراه (${qYear})`, 'error');
+          document.getElementById('qualYear').focus();
+          return;
+        }
+      }
+    }
   }
 
   const action = id ? 'update_qualification' : 'add_qualification';

@@ -85,7 +85,7 @@ $payout_processing_time = getSetting($settings, 'payout_processing_time', '3');
               <div class="form-group">
                 <label class="form-label" style="font-weight: 700; color: var(--text-primary);">الحد الأدنى للسحب (ر.س)</label>
                 <div class="text-xs text-slate-500 mb-2">أقل مبلغ يمكن للأكاديمي سحبه من رصيده المتاح.</div>
-                <input type="number" name="min_withdrawal" class="form-input" value="<?= htmlspecialchars($min_withdrawal) ?>" required min="0" step="1" />
+                <input type="number" name="min_withdrawal" class="form-input" value="<?= htmlspecialchars($min_withdrawal) ?>" required min="0" step="0.01" />
               </div>
 
               <!-- b. يحق له السحب بعد مدة -->

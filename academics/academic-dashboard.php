@@ -33,11 +33,11 @@ $ordersStmt = $db->prepare("
     FROM orders o
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN users u ON o.student_id = u.id
-    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'assigned' AND o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?))
+    WHERE (o.academic_id = ? AND o.id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced')) OR (o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced')))
     ORDER BY o.created_at DESC
     LIMIT 5
 ");
-$ordersStmt->execute([$academicId, $academicId]);
+$ordersStmt->execute([$academicId, $academicId, $academicId]);
 $latestOrders = $ordersStmt->fetchAll();
 
 $latestOrdersJson = [];
@@ -71,7 +71,7 @@ while ($row = $earningsStmt->fetch()) {
 }
 
 // Donut chart distribution (Completed, In Progress, New)
-$newCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'assigned' AND id IN (SELECT order_id FROM order_assignments WHERE academic_id = $academicId)")->fetchColumn();
+$newCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status = 'assigned' AND id IN (SELECT order_id FROM order_assignments WHERE academic_id = $academicId AND status NOT IN ('rejected', 'replaced'))")->fetchColumn();
 $inProgressCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status IN ('accepted', 'in_progress', 'revision')")->fetchColumn();
 $completedCount = (int)$db->query("SELECT COUNT(*) FROM orders WHERE academic_id = $academicId AND status = 'completed'")->fetchColumn();
 

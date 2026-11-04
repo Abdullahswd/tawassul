@@ -5,11 +5,7 @@ requireAdmin();
 
 $db = db();
 
-// التأكد من وجود الأعمدة المطلوبة في جدول packages
-try { $db->exec("ALTER TABLE packages ADD COLUMN icon VARCHAR(20) NOT NULL DEFAULT '📦'"); } catch (Exception $e) {}
-try { $db->exec("ALTER TABLE packages ADD COLUMN original_price DECIMAL(10,2) NOT NULL DEFAULT 0.00"); } catch (Exception $e) {}
-try { $db->exec("ALTER TABLE packages ADD COLUMN service_ids TEXT DEFAULT NULL"); } catch (Exception $e) {}
-
+// تم نقل تعديلات الجداول إلى migrations/
 // جلب الباقات
 $packages_stmt = $db->query("
     SELECT p.id, p.name, p.icon, p.price, p.original_price, p.color, p.service_ids, p.features_json, p.is_active AS active,

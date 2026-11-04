@@ -73,6 +73,22 @@ function requireAcademic(): void {
         header('Location: ' . rootUrl() . '/login.php?type=academic&redirect=' . urlencode($_SERVER['REQUEST_URI']));
         exit;
     }
+
+    // Check if academic status has been suspended or rejected
+    $acId = (int)$_SESSION['academic_id'];
+    $stmt = db()->prepare('SELECT status FROM academics WHERE id = ? LIMIT 1');
+    $stmt->execute([$acId]);
+    $currStatus = $stmt->fetchColumn();
+
+    if ($currStatus === 'suspended') {
+        unset($_SESSION['academic_id'], $_SESSION['academic_name'], $_SESSION['academic_email'], $_SESSION['academic_status'], $_SESSION['academic_avatar']);
+        header('Location: ' . rootUrl() . '/login.php?error=' . urlencode('تم إيقاف / تجميد حسابك الأكاديمي من قِبل الإدارة. يرجى مراجعة إدارة المنصة.'));
+        exit;
+    } elseif ($currStatus === 'rejected') {
+        unset($_SESSION['academic_id'], $_SESSION['academic_name'], $_SESSION['academic_email'], $_SESSION['academic_status'], $_SESSION['academic_avatar']);
+        header('Location: ' . rootUrl() . '/login.php?error=' . urlencode('تم رفض حسابك من قِبل الإدارة. للاستفسار تواصل معنا.'));
+        exit;
+    }
 }
 
 /**

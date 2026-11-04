@@ -133,10 +133,22 @@ $receipts = getAllPaymentReceipts();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refund_id'], $_POST['refund_action'])) {
     $rid = (int) $_POST['refund_id'];
     $action = $_POST['refund_action'] === 'process' ? 'processed' : 'rejected';
-    $admin_note = $_POST['admin_note'] ?? '';
+    $admin_note = trim($_POST['admin_note'] ?? '');
+    $transaction_ref = trim($_POST['transaction_ref'] ?? '');
     
-    $db->prepare("UPDATE refund_requests SET status = ?, admin_note = ? WHERE id = ?")
-      ->execute([$action, $admin_note, $rid]);
+    // Handle transfer receipt file upload
+    $receipt_path = null;
+    if ($action === 'processed' && !empty($_FILES['receipt_file']['name'])) {
+        $receipt_path = saveRefundReceiptUpload($_FILES['receipt_file']);
+    }
+    
+    if ($action === 'processed') {
+        $db->prepare("UPDATE refund_requests SET status = ?, admin_note = ?, receipt_path = ?, transaction_ref = ?, processed_at = NOW() WHERE id = ?")
+          ->execute([$action, $admin_note, $receipt_path, $transaction_ref, $rid]);
+    } else {
+        $db->prepare("UPDATE refund_requests SET status = ?, admin_note = ? WHERE id = ?")
+          ->execute([$action, $admin_note, $rid]);
+    }
       
     // Notify student
     $stmt = $db->prepare('SELECT student_id, order_id FROM refund_requests WHERE id = ?');
@@ -153,7 +165,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['refund_id'], $_POST['
             $db->prepare("UPDATE payment_receipts SET status = 'rejected', rejection_reason = 'تم استرجاع المبلغ' WHERE order_id = ?")->execute([$refundData['order_id']]);
         }
         
-        $msg = $action === 'processed' ? 'تم تحويل مبلغ الاسترجاع بنجاح لطلبك الملغي 💸.' : 'نعتذر، تم رفض طلب الاسترجاع للسبب التالي: ' . $admin_note;
+        if ($action === 'processed') {
+            $msg = 'تم تحويل مبلغ الاسترجاع بنجاح لطلبك الملغي 💸.';
+            if ($receipt_path) {
+                $msg .= ' تم إرفاق إشعار التحويل البنكي في تفاصيل الطلب للاطلاع عليه.';
+            }
+        } else {
+            $msg = 'نعتذر، تم رفض طلب الاسترجاع للسبب التالي: ' . $admin_note;
+        }
         $link = 'student/order-details.php?id=' . $refundData['order_id'];
         createNotification($refundData['student_id'], 'student', 'تحديث حالة طلب الاسترجاع 💸', $msg, '💸', $link);
     }
@@ -224,7 +243,7 @@ $receiptStatusLabels = [
       <div class="grid-responsive-4">
         <div class="stat-card animate-fadeInUp delay-1" style="background:linear-gradient(135deg,#10b981,#059669);color:white;border:none">
           <div class="card-icon" style="background:rgba(255,255,255,0.2);margin-bottom:12px">💰</div>
-          <div class="card-value" style="font-size:30px;color:white" data-counter="<?= $total_revenue ?>" data-suffix=" ر.س">0</div>
+          <div class="card-value" style="font-size:30px;color:white" data-counter="<?= (float)$total_revenue ?>" data-decimals="2" data-suffix=" ر.س"><?= number_format((float)$total_revenue, 2) ?> ر.س</div>
           <div class="card-label" style="color:rgba(255,255,255,0.8)">إجمالي الأرباح</div>
           <div class="card-trend up" style="color:rgba(255,255,255,0.9)">من العمليات الناجحة المكتملة</div>
         </div>
@@ -236,13 +255,13 @@ $receiptStatusLabels = [
         </div>
         <div class="stat-card animate-fadeInUp delay-3" style="padding:22px">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="<?= $pending_amount ?>" data-suffix=" ر.س">0</div><div class="card-label">مدفوعات معلقة</div></div>
+            <div><div class="card-value" style="font-size:26px" data-counter="<?= (float)$pending_amount ?>" data-decimals="2" data-suffix=" ر.س"><?= number_format((float)$pending_amount, 2) ?> ر.س</div><div class="card-label">مدفوعات معلقة</div></div>
             <div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0">⏳</div>
           </div>
         </div>
         <div class="stat-card animate-fadeInUp delay-4" style="padding:22px">
           <div style="display:flex;align-items:center;justify-content:space-between">
-            <div><div class="card-value" style="font-size:26px" data-counter="<?= $failed_amount ?>" data-suffix=" ر.س">0</div><div class="card-label">مدفوعات فاشلة</div></div>
+            <div><div class="card-value" style="font-size:26px" data-counter="<?= (float)$failed_amount ?>" data-decimals="2" data-suffix=" ر.س"><?= number_format((float)$failed_amount, 2) ?> ر.س</div><div class="card-label">مدفوعات فاشلة</div></div>
             <div class="card-icon" style="background:rgba(239,68,68,0.1);margin:0">❌</div>
           </div>
         </div>
@@ -256,7 +275,7 @@ $receiptStatusLabels = [
             <p style="font-size:13px;color:var(--text-secondary);margin-top:2px">الإيرادات الإجمالية خلال السنة الحالية</p>
           </div>
           <div style="text-align:left">
-            <div style="font-size:28px;font-weight:900;color:var(--success)"><?= number_format($total_revenue, 0, '.', ',') ?> ر.س</div>
+            <div style="font-size:28px;font-weight:900;color:var(--success)"><?= number_format((float)$total_revenue, 2, '.', ',') ?> ر.س</div>
             <div style="font-size:13px;color:var(--text-secondary)">إجمالي هذه السنة</div>
           </div>
         </div>
@@ -310,7 +329,7 @@ $receiptStatusLabels = [
         <div style="padding:16px 24px;background:var(--bg-main);border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
           <div style="font-size:13px;color:var(--text-secondary)">عرض 1-<?= count($payments) ?> من <strong><?= $total_cnt ?></strong> عملية</div>
           <div style="display:flex;gap:24px">
-            <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">إجمالي المبالغ</div><div style="font-size:18px;font-weight:800;color:var(--success)"><?= number_format($total_revenue, 0, '.', ',') ?> ر.س</div></div>
+            <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">إجمالي المبالغ</div><div style="font-size:18px;font-weight:800;color:var(--success)"><?= number_format((float)$total_revenue, 2, '.', ',') ?> ر.س</div></div>
             <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">العمليات الناجحة</div><div style="font-size:18px;font-weight:800;color:var(--primary)"><?= $success_cnt ?></div></div>
             <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">العمليات الفاشلة</div><div style="font-size:18px;font-weight:800;color:var(--danger)"><?= $failed_cnt ?></div></div>
           </div>
@@ -434,13 +453,13 @@ $receiptStatusLabels = [
                   <td><span style="background:<?= $rfStatus[1] ?>;color:<?= $rfStatus[2] ?>;border:1px solid <?= $rfStatus[3] ?>;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800"><?= $rfStatus[0] ?></span></td>
                   <td>
                     <?php if ($rf['status'] === 'pending'): ?>
-                      <div style="display:flex;gap:6px">
-                        <form method="POST" style="margin:0" onsubmit="return confirm('هل قمت بتحويل المبلغ لحساب الطالب بالفعل؟')">
-                          <input type="hidden" name="refund_id" value="<?= (int)$rf['id'] ?>">
-                          <input type="hidden" name="refund_action" value="process">
-                          <button type="submit" style="background:#10b981;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">تم التحويل ✓</button>
-                        </form>
-                        <form method="POST" style="margin:0;display:flex;align-items:center;gap:4px">
+                      <div style="display:flex;gap:6px;align-items:center">
+                        <button type="button" 
+                                style="background:#10b981;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:4px"
+                                onclick="openProcessRefundModal(<?= (int)$rf['id'] ?>, '<?= e(addslashes($rf['student_name'])) ?>', '<?= e(addslashes($rf['order_number'])) ?>', '<?= number_format((float)$rf['amount'], 2) ?>')">
+                          تم التحويل وإرفاق الإشعار ✓
+                        </button>
+                        <form method="POST" style="margin:0;display:flex;align-items:center;gap:4px" onsubmit="return confirm('هل أنت متأكد من رفض طلب الاسترجاع؟')">
                           <input type="hidden" name="refund_id" value="<?= (int)$rf['id'] ?>">
                           <input type="hidden" name="refund_action" value="reject">
                           <input type="text" name="admin_note" placeholder="سبب الرفض..." required style="width:110px;font-size:11px;padding:4px;border:1px solid #fca5a5;border-radius:4px;outline:none">
@@ -448,7 +467,22 @@ $receiptStatusLabels = [
                         </form>
                       </div>
                     <?php else: ?>
-                      <span style="font-size:12px;color:var(--text-secondary)"><?= $rf['admin_note'] ? 'ملاحظة: ' . e($rf['admin_note']) : '—' ?></span>
+                      <div style="display:flex;flex-direction:column;gap:4px;font-size:12px">
+                        <?php if (!empty($rf['receipt_path'])): ?>
+                          <a href="<?= e($adminAppBase . '/' . ltrim($rf['receipt_path'], '/')) ?>" target="_blank" class="btn btn-outline btn-xs" style="color:#059669;border-color:#10b981;padding:3px 8px;font-size:11px;display:inline-flex;align-items:center;gap:4px;width:fit-content;font-weight:700">
+                            👁️ عرض إشعار التحويل
+                          </a>
+                        <?php endif; ?>
+                        <?php if (!empty($rf['transaction_ref'])): ?>
+                          <span style="font-size:11px;color:var(--text-secondary);font-family:monospace">مرجع: <?= e($rf['transaction_ref']) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($rf['admin_note'])): ?>
+                          <span style="font-size:11px;color:var(--text-secondary)">ملاحظة: <?= e($rf['admin_note']) ?></span>
+                        <?php endif; ?>
+                        <?php if (!empty($rf['processed_at'])): ?>
+                          <span style="font-size:10px;color:var(--text-secondary)"><?= formatDate($rf['processed_at']) ?></span>
+                        <?php endif; ?>
+                      </div>
                     <?php endif; ?>
                   </td>
                 </tr>
@@ -666,7 +700,7 @@ function renderPayments(data) {
           <span>${p.student}</span>
         </div>
       </td>
-      <td><strong style="font-size:15px">${Number(p.amount).toLocaleString('ar')} ر.س</strong></td>
+      <td><strong style="font-size:15px">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</strong></td>
       <td><span style="font-size:16px">${methodIcon}</span> ${methodAr}</td>
       <td>${getStatusBadge(p.status === 'paid' ? 'paid' : p.status === 'pending' ? 'pending_pay' : 'failed')}</td>
       <td style="color:var(--text-secondary);font-size:13px">${p.date}</td>
@@ -701,7 +735,7 @@ function viewPaymentDetails(paymentId) {
       <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">رقم الطلب</td><td style="padding:10px 0;text-align:left;font-weight:600"><a href="order-details.php" style="color:var(--primary);text-decoration:none">${p.order_number || p.order}</a></td></tr>
       <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">الطالب</td><td style="padding:10px 0;text-align:left;font-weight:600">${p.student}</td></tr>
       <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">طريقة الدفع</td><td style="padding:10px 0;text-align:left;font-weight:600">${methodIcon} ${methodAr}</td></tr>
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">المبلغ الإجمالي</td><td style="padding:10px 0;text-align:left;font-weight:700;color:var(--text-primary)">${Number(p.amount).toLocaleString('ar')} ر.س</td></tr>
+      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">المبلغ الإجمالي</td><td style="padding:10px 0;text-align:left;font-weight:700;color:var(--text-primary)">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</td></tr>
       <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">تاريخ الإنشاء</td><td style="padding:10px 0;text-align:left" dir="ltr">${p.date}</td></tr>
     </table>
   `;
@@ -743,7 +777,7 @@ window.addEventListener('resize', () => {
   ============================================= */
 let PAYOUT_DATA = { academics: [], payouts: [], stats: {}, messages: {} };
 
-function fmtMoney(n) { return Number(n || 0).toLocaleString('ar'); }
+function fmtMoney(n) { return Number(n || 0).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
 function escHtml(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
 }
@@ -804,6 +838,7 @@ function renderAcademicsTable() {
         <div style="display:flex;align-items:center;gap:10px">
           <div class="table-avatar" style="background:${getAvatarColor(i)};width:34px;height:34px;border-radius:8px;font-size:12px;color:white">${initials}</div>
           <span style="font-weight:600">${escHtml(a.name)}</span>
+          ${a.status === 'suspended' ? '<span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;font-size:10px;padding:2px 6px">موقوف 🚫</span>' : ''}
         </div>
       </td>
       <td style="min-width:220px">${banksHtml}</td>
@@ -1013,6 +1048,96 @@ function sendAdminPayoutMessage() {
           }
       });
 }
+</script>
+
+<!-- Modal for processing refund & uploading transfer receipt -->
+<div id="processRefundModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)">
+  <div style="width:100%;max-width:500px;padding:24px;border-radius:16px;background:var(--bg-card);box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);border:1px solid var(--border-color);position:relative">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;border-bottom:1px solid var(--border-color);padding-bottom:12px">
+      <h3 style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0;display:flex;align-items:center;gap:8px">
+        <span>💸</span> تأكيد تحويل الاسترجاع وإرفاق الإشعار
+      </h3>
+      <button type="button" onclick="closeProcessRefundModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);line-height:1">&times;</button>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" id="processRefundForm">
+      <input type="hidden" name="refund_id" id="modal_refund_id" value="">
+      <input type="hidden" name="refund_action" value="process">
+
+      <!-- Refund Info Summary Box -->
+      <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
+          <span style="color:var(--text-secondary)">الطالب:</span>
+          <span id="modal_student_name" style="font-weight:700;color:var(--text-primary)">-</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:13px">
+          <span style="color:var(--text-secondary)">رقم الطلب:</span>
+          <span id="modal_order_number" style="font-weight:700;color:var(--primary)">-</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:14px">
+          <span style="color:var(--text-secondary)">المبلغ المسترد:</span>
+          <span id="modal_refund_amount" style="font-weight:900;color:#ef4444">- ر.س</span>
+        </div>
+      </div>
+
+      <!-- Receipt File Upload -->
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label" style="font-size:13px;font-weight:700;margin-bottom:6px;display:block">
+          📎 إشعار التحويل البنكي (صورة أو PDF) <span style="font-size:11px;color:var(--text-secondary);font-weight:normal">(يُفضل إرفاقه لتوثيق الحوالة)</span>
+        </label>
+        <input type="file" name="receipt_file" id="modal_receipt_file" class="form-control" accept=".jpg,.jpeg,.png,.webp,.pdf" style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-main);color:var(--text-primary);font-size:13px">
+        <small style="color:var(--text-secondary);font-size:11px;margin-top:4px;display:block">
+          الصيغ المدعومة: JPG, PNG, WEBP, PDF (الحد الأقصى: 10 ميجابايت).
+        </small>
+      </div>
+
+      <!-- Transaction Reference -->
+      <div class="form-group" style="margin-bottom:14px">
+        <label class="form-label" style="font-size:13px;font-weight:700;margin-bottom:6px;display:block">
+          رقم الحوالة أو المرجع البنكي (إن وجد)
+        </label>
+        <input type="text" name="transaction_ref" id="modal_transaction_ref" class="form-control" placeholder="مثال: REF-987654321..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-main);color:var(--text-primary);font-size:13px">
+      </div>
+
+      <!-- Admin Note -->
+      <div class="form-group" style="margin-bottom:16px">
+        <label class="form-label" style="font-size:13px;font-weight:700;margin-bottom:6px;display:block">
+          ملاحظات حول التحويل
+        </label>
+        <textarea name="admin_note" id="modal_admin_note" rows="2" class="form-control" placeholder="أي تفاصيل أو ملاحظات إضافية حول العملية..." style="width:100%;padding:8px 12px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-main);color:var(--text-primary);font-size:13px;resize:vertical"></textarea>
+      </div>
+
+      <div style="background:rgba(16,185,129,0.08);border:1px dashed #10b981;padding:10px 12px;border-radius:8px;margin-bottom:16px;font-size:12px;color:#065f46;line-height:1.5">
+        ℹ️ <strong>تنبيه:</strong> سيتم تأكيد استرجاع المبلغ للطالب، وتحديث حالة الطلب والدفع، وإرسال إشعار فوري للطالب متضمناً إشعار التحويل المرفوع.
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeProcessRefundModal()">إلغاء</button>
+        <button type="submit" class="btn btn-success btn-sm" style="background:#10b981;color:#fff;border:none;font-weight:700;padding:8px 16px">✓ تأكيد التحويل وحفظ الإشعار</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openProcessRefundModal(id, student, orderNo, amount) {
+  document.getElementById('modal_refund_id').value = id;
+  document.getElementById('modal_student_name').textContent = student;
+  document.getElementById('modal_order_number').textContent = '#' + orderNo;
+  document.getElementById('modal_refund_amount').textContent = amount + ' ر.س';
+  document.getElementById('modal_receipt_file').value = '';
+  document.getElementById('modal_transaction_ref').value = '';
+  document.getElementById('modal_admin_note').value = '';
+  document.getElementById('processRefundModal').style.display = 'flex';
+}
+
+function closeProcessRefundModal() {
+  document.getElementById('processRefundModal').style.display = 'none';
+}
+
+document.getElementById('processRefundModal')?.addEventListener('click', function(e) {
+  if (e.target === this) closeProcessRefundModal();
+});
 </script>
 </body>
 </html>

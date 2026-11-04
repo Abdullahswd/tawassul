@@ -4,24 +4,8 @@ require_once __DIR__ . '/../../config/functions.php';
 requireAdmin();
 $db = db();
 
-// --- TEMPORARY DB MODIFICATIONS ---
+// تم نقل هيكل سياسات النظام إلى migrations/
 try {
-    $db->exec("DROP TABLE IF EXISTS policies;");
-    $db->exec("CREATE TABLE IF NOT EXISTS policy_items (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        policy_type ENUM('student', 'academic') NOT NULL,
-        icon VARCHAR(20) DEFAULT '📌',
-        title VARCHAR(255) NOT NULL,
-        content TEXT NOT NULL,
-        sort_order INT DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    
-    // Add icon column if it doesn't exist
-    try {
-        $db->exec("ALTER TABLE policy_items ADD COLUMN icon VARCHAR(20) DEFAULT '📌' AFTER policy_type;");
-    } catch (Exception $e) {}
-    
     // Seed initial content if empty
     $count = (int)$db->query("SELECT COUNT(*) FROM policy_items")->fetchColumn();
     if ($count == 0) {
@@ -50,7 +34,6 @@ try {
         }
     }
 } catch (Exception $e) {}
-// --- END TEMPORARY DB MODIFICATIONS ---
 
 // Handle AJAX actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {

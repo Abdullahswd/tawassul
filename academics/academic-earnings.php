@@ -9,18 +9,7 @@ $academicData = getAcademicById($academicId);
 
 $db = db();
 
-// --- TEMPORARY DB MODIFICATIONS ---
-try {
-    $db->exec("CREATE TABLE IF NOT EXISTS payout_messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        payout_id INT NOT NULL,
-        sender_type ENUM('admin', 'academic') NOT NULL,
-        sender_id INT NOT NULL,
-        message TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-} catch(Exception $e) {}
-// --- END TEMPORARY DB MODIFICATIONS ---
+// تم نقل جداول المدفوعات إلى migrations/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'send_payout_message') {
     $payoutId = intval($_POST['payout_id'] ?? 0);

@@ -56,9 +56,11 @@ foreach ($services as $s) {
     'description' => $s['description'] ?? '',
     'included' => in_array((int) $s['id'], $remainingIncludedIds, true),
     'used'     => in_array((int) $s['id'], $usedIncludedIds, true),
+    'needs_multiple_academics' => (int) ($s['needs_multiple_academics'] ?? 0),
   ];
 }
 $servicesJson = json_encode($servicesDataMap, JSON_UNESCAPED_UNICODE);
+$isMultiAcademicService = !empty($selectedService['needs_multiple_academics']);
 
 /* ─────────────────────────────────────────────
    الكليات (التخصص الدقيق) — قائمة منسدلة للاختيار
@@ -112,14 +114,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     // جلب سعر الخدمة الأصلي
-    $stmtSrv = $db->prepare('SELECT price FROM services WHERE id = ? LIMIT 1');
+    $stmtSrv = $db->prepare('SELECT price, needs_multiple_academics FROM services WHERE id = ? LIMIT 1');
     $stmtSrv->execute([$service_id]);
-    $srvPrice = (float) $stmtSrv->fetchColumn();
-    $amount = $srvPrice > 0 ? $srvPrice : 150.0;
+    $srvRow = $stmtSrv->fetch(PDO::FETCH_ASSOC);
+    $srvPrice = (float) ($srvRow['price'] ?? 0);
+    $srvBase = $srvPrice > 0 ? $srvPrice : 150.0;
+    $needsMulti = !empty($srvRow['needs_multiple_academics']);
+    $academicsCount = $needsMulti ? max(1, min(10, (int)($_POST['academics_count'] ?? 1))) : 1;
+    $amount = round($srvBase * $academicsCount, 2);
+
     
     if ($coveringSub && !in_array($service_id, $usedIncludedIds, true)) {
       $isIncludedSvc = true;
-      $student_payable = 0.0;
+      $student_payable = $academicsCount > 1 ? round($srvBase * ($academicsCount - 1), 2) : 0.0;
       $package_id = (int) $coveringSub['package_id'];
       
       // حساب القيمة الحقيقية بعد تخفيض الباقة
@@ -139,7 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   // نسبة الخصم للباقة (سعر الباقة / مجموع أسعار خدماتها)
                   $discountMultiplier = $pkgPrice / $totalOriginalServicesPrice;
                   // القيمة الحقيقية لهذه الخدمة تحديداً ضمن الباقة
-                  $amount = round($amount * $discountMultiplier, 2);
+                  $amount = round(($srvBase * $discountMultiplier) + ($srvBase * ($academicsCount - 1)), 2);
               }
           }
       }
@@ -165,6 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       'academic_level' => $academic_level,
       'language' => $language,
       'description' => $description,
+      'academics_count' => $academicsCount,
+      'student_payable' => $student_payable,
       'amount' => $amount,
     ]);
 
@@ -434,6 +443,32 @@ require __DIR__ . '/partials/sidebar.php';
                 لتغيير الخدمة: <a href="services.php" style="color:var(--primary);font-weight:800">اختر خدمة أخرى من صفحة الخدمات</a>
               </div>
             </div>
+
+            <!-- اختيار عدد الأكاديميين (يظهر ديناميكياً للخدمات التي تتطلب أكثر من أكاديمي) -->
+            <div class="form-group" id="academicsCountBox"
+              style="display:<?= $isMultiAcademicService ? 'block' : 'none' ?>;margin-top:16px;border:2px dashed #f59e0b;border-radius:var(--radius-md);padding:18px;background:rgba(245,158,11,0.06)">
+              <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                <div>
+                  <label class="form-label" style="margin:0;display:flex;align-items:center;gap:6px">
+                    <span style="font-size:15px;font-weight:800;color:var(--text-primary)">👥 عدد الأكاديميين المطلوبين</span>
+                    <span style="font-size:11px;font-weight:800;background:#fef3c7;color:#b45309;padding:2px 8px;border-radius:12px;border:1px solid #fde68a">خدمة جماعية</span>
+                  </label>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">
+                    السعر المعروض هو لأكاديمي واحد، ويتضاعف الإجمالي تلقائياً بحسب عدد الأكاديميين.
+                  </div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button type="button" class="btn btn-outline" onclick="changeAcademicsCount(-1)" style="width:38px;height:38px;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:10px;padding:0">-</button>
+                  <input type="number" name="academics_count" id="academicsCountInput" value="1" min="1" max="10" class="form-input" style="width:75px;text-align:center;font-size:16px;font-weight:800;padding:6px;border-radius:10px" onchange="onAcademicsCountChange()" oninput="onAcademicsCountChange()">
+                  <button type="button" class="btn btn-outline" onclick="changeAcademicsCount(1)" style="width:38px;height:38px;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;border-radius:10px;padding:0">+</button>
+                  <span style="font-size:13px;font-weight:700;color:var(--text-primary)">أكاديمي</span>
+                </div>
+              </div>
+              <div id="academicsCountSummaryText" style="margin-top:10px;font-size:12px;font-weight:700;color:#b45309;background:#fff;padding:8px 12px;border-radius:8px;border:1px solid #fde68a;display:inline-block">
+                1 أكاديمي × سعر الخدمة
+              </div>
+              </div>
+            </div>
           <?php else: ?>
             <!-- لم تُحدَّد خدمة (فتح الصفحة مباشرة بدون اختيار) -->
             <div class="form-group"
@@ -649,6 +684,11 @@ require __DIR__ . '/partials/sidebar.php';
 
         <div
           style="margin-top:20px;border-top:1px dashed var(--border-color);padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+        <div id="summaryAcademicsRow"
+          style="display:<?= $isMultiAcademicService ? 'flex' : 'none' ?>;justify-content:space-between;margin-bottom:12px;font-size:14px;color:var(--text-secondary)">
+          <span>عدد الأكاديميين</span>
+          <span id="summaryAcademicsCount" style="font-weight:700;color:var(--text-primary)">1 أكاديمي</span>
+        </div>
           <span style="font-weight:700">الإجمالي المتوقع</span>
           <span id="totalPrice"
             style="font-size:24px;font-weight:800;color:var(--primary)"><?= $initialIncluded ? 'مشمول بالباقة 🎁' : formatMoney($initialPrice) ?></span>
@@ -731,22 +771,94 @@ require __DIR__ . '/partials/sidebar.php';
       if (nonIncludedBadgeEl) nonIncludedBadgeEl.style.display = !included ? 'inline-block' : 'none';
     }
 
+    function changeAcademicsCount(delta) {
+      const input = document.getElementById('academicsCountInput');
+      if (!input) return;
+      let val = parseInt(input.value) || 1;
+      val = Math.max(1, Math.min(10, val + delta));
+      input.value = val;
+      onAcademicsCountChange();
+    }
+
+    function onAcademicsCountChange() {
+      const input = document.getElementById('academicsCountInput');
+      if (!input) return;
+      let val = parseInt(input.value) || 1;
+      if (val < 1) { val = 1; input.value = 1; }
+      if (val > 10) { val = 10; input.value = 10; }
+      
+      const summaryText = document.getElementById('academicsCountSummaryText');
+      if (summaryText) {
+        summaryText.textContent = `${val} أكاديمي × سعر الخدمة`;
+      }
+      
+      const summaryCount = document.getElementById('summaryAcademicsCount');
+      if (summaryCount) {
+        summaryCount.textContent = `${val} أكاديمي`;
+      }
+      
+      updatePricing();
+    }
+
     function updatePricing() {
       const svc = getSelectedService();
-      let price = 150;
-      let included = false;
+      let baseUnit = 150;
+      let isMulti = false;
+      let academicsCount = 1;
+      const countBox = document.getElementById('academicsCountBox');
+      const summaryRow = document.getElementById('summaryAcademicsRow');
+
       if (svc) {
-        included = includedIdsSet.has(svc.id);
-        price = included ? 0 : (isNaN(svc.price) ? 150 : svc.price);
+        isMulti = Number(svc.needs_multiple_academics) === 1;
+        baseUnit = isNaN(svc.price) ? 150 : Number(svc.price);
       }
-      basePriceEl.textContent = price + ' ر.س';
-      totalPriceEl.textContent = included ? 'مشمول بالباقة 🎁' : price + ' ر.س';
-      // تحديث سطر السعر داخل بطاقة الخدمة الثابتة
+      
+      if (countBox) countBox.style.display = isMulti ? 'block' : 'none';
+      if (summaryRow) summaryRow.style.display = isMulti ? 'flex' : 'none';
+      
+      if (isMulti) {
+        const input = document.getElementById('academicsCountInput');
+        academicsCount = input ? (parseInt(input.value) || 1) : 1;
+      }
+
+      const included = svc ? includedIdsSet.has(svc.id) : false;
+      let calculatedAmount = baseUnit * academicsCount;
+      let studentPayable = calculatedAmount;
+      let priceDisplay = '';
+
+      if (included) {
+        if (academicsCount > 1) {
+          studentPayable = baseUnit * (academicsCount - 1);
+          priceDisplay = `${studentPayable} ر.س (مشمول 1 بالباقة 🎁 + ${academicsCount - 1} إضافي)`;
+        } else {
+          studentPayable = 0;
+          priceDisplay = 'مشمول بالباقة 🎁';
+        }
+      } else {
+        priceDisplay = isMulti && academicsCount > 1 
+          ? `${calculatedAmount} ر.س (${academicsCount} × ${baseUnit} ر.س)`
+          : `${calculatedAmount} ر.س`;
+      }
+
+      basePriceEl.textContent = `${baseUnit} ر.س` + (isMulti ? ' (لكل أكاديمي)' : '');
+      totalPriceEl.textContent = priceDisplay;
+      
       if (fixedPriceEl) {
-        fixedPriceEl.textContent = '💵 السعر: ' + (included ? 'مشمول بالباقة 🎁' : price + ' ر.س');
+        fixedPriceEl.textContent = '💵 السعر: ' + priceDisplay;
       }
+
+      // تحديث حالة خطوة الدفع إذا تغير المبلغ
+      const freeNote = document.getElementById('payStepFreeNote');
+      const payContent = document.getElementById('payStepContent');
+      if (freeNote && payContent) {
+        const isFree = studentPayable === 0;
+        freeNote.style.display = isFree ? 'block' : 'none';
+        payContent.style.display = isFree ? 'none' : 'block';
+      }
+
       updateServiceCard();
     }
+
 
     function renderStep() {
       steps.forEach((s, idx) => {

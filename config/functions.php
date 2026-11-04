@@ -219,15 +219,6 @@ function subscribeStudentToPackage(int $studentId, int $packageId): int {
  * Service IDs already consumed (used) by the student from their active package.
  */
 function usedPackageServiceIds(int $studentId): array {
-    // ضمان وجود جدول الاستهلاك (ترقية تلقائية آمنة)
-    db()->exec("CREATE TABLE IF NOT EXISTS `package_subscription_uses` (
-          `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `subscription_id` INT UNSIGNED NOT NULL,
-          `service_id`      INT UNSIGNED NOT NULL,
-          `used_at`         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          UNIQUE KEY `uq_use_sub_service` (`subscription_id`, `service_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     $stmt = db()->prepare(
         'SELECT u.service_id
          FROM package_subscription_uses u
@@ -321,25 +312,35 @@ function generateOrderNumber(): string {
 function createOrder(array $data): int {
     $number = generateOrderNumber();
     $amount = (float)($data['amount'] ?? 0);
-    $package_id = $data['package_id'] ?? null;
-    $status = ($amount == 0 || !empty($package_id)) ? 'pending_assignment' : 'awaiting_payment';
+    $package_id = !empty($data['package_id']) ? (int)$data['package_id'] : null;
+    $service_id = !empty($data['service_id']) ? (int)$data['service_id'] : null;
+    $payable = isset($data['student_payable']) ? (float)$data['student_payable'] : $amount;
+    $status = ($amount == 0 || (!empty($package_id) && $payable == 0)) ? 'pending_assignment' : 'awaiting_payment';
+    $academicsCount = max(1, (int)($data['academics_count'] ?? 1));
+    
+    $specialty     = !empty($data['specialty']) ? trim((string)$data['specialty']) : null;
+    $academicLevel = !empty($data['academic_level']) ? trim((string)$data['academic_level']) : null;
+    $language      = !empty($data['language']) ? trim((string)$data['language']) : 'العربية';
+    $description   = !empty($data['description']) ? trim((string)$data['description']) : null;
+    $deadline      = !empty($data['deadline']) ? trim((string)$data['deadline']) : null;
     
     $stmt   = db()->prepare(
         'INSERT INTO orders
            (order_number, student_id, service_id, package_id, specialty,
-            academic_level, language, description, deadline, amount, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?)'
+            academic_level, language, description, deadline, academics_count, amount, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)'
     );
     $stmt->execute([
         $number,
-        $data['student_id'],
-        $data['service_id'],
-        $data['package_id']     ?? null,
-        $data['specialty']      ?? null,
-        $data['academic_level'] ?? null,
-        $data['language']       ?? 'العربية',
-        $data['description']    ?? null,
-        $data['deadline']       ?? null,
+        (int)$data['student_id'],
+        $service_id,
+        $package_id,
+        $specialty,
+        $academicLevel,
+        $language,
+        $description,
+        $deadline,
+        $academicsCount,
         $amount,
         $status
     ]);
@@ -432,16 +433,25 @@ function updateOrderStatus(int $orderId, string $status): bool {
  */
 function syncAcademicEarnings(int $orderId): bool {
     $db = db();
-    try {
-        $db->exec("ALTER TABLE payments ADD COLUMN is_transferred_to_academic TINYINT(1) DEFAULT 0");
-    } catch (Exception $e) {}
-
-    // Check if order is completed and has an academic
+    // Check if order is completed
     $stmt = $db->prepare("SELECT status, academic_id, order_number FROM orders WHERE id = ?");
     $stmt->execute([$orderId]);
     $order = $stmt->fetch();
 
-    if (!$order || $order['status'] !== 'completed' || empty($order['academic_id'])) {
+    if (!$order || $order['status'] !== 'completed') {
+        return false;
+    }
+
+    // Get all assigned academics (from order_assignments or orders.academic_id, excluding rejected & replaced)
+    $acStmt = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced')");
+    $acStmt->execute([$orderId]);
+    $assignedAcademicIds = $acStmt->fetchAll(PDO::FETCH_COLUMN);
+
+    if (empty($assignedAcademicIds) && !empty($order['academic_id'])) {
+        $assignedAcademicIds = [(int)$order['academic_id']];
+    }
+
+    if (empty($assignedAcademicIds)) {
         return false;
     }
 
@@ -453,18 +463,23 @@ function syncAcademicEarnings(int $orderId): bool {
     if ($payment) {
         $db->prepare("UPDATE payments SET is_transferred_to_academic = 1 WHERE id = ?")
            ->execute([$payment['id']]);
-           
-        $db->prepare("UPDATE academics SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?")
-           ->execute([$payment['academic_net'], $payment['academic_net'], $order['academic_id']]);
-           
-        createNotification(
-            (int)$order['academic_id'],
-            'academic',
-            'أرباح جديدة تمت إضافتها 💰',
-            'تم اكتمال طلبك رقم ' . $order['order_number'] . ' وإضافة ' . $payment['academic_net'] . ' ر.س إلى رصيدك.',
-            '💰',
-            'academic-earnings.php'
-        );
+
+        $numAcademics = count($assignedAcademicIds);
+        $perAcademicNet = round($payment['academic_net'] / $numAcademics, 2);
+
+        foreach ($assignedAcademicIds as $acid) {
+            $db->prepare("UPDATE academics SET balance = balance + ?, total_earned = total_earned + ? WHERE id = ?")
+               ->execute([$perAcademicNet, $perAcademicNet, $acid]);
+
+            createNotification(
+                (int)$acid,
+                'academic',
+                'أرباح جديدة تمت إضافتها 💰',
+                'تم اكتمال طلبك رقم ' . $order['order_number'] . ' وإضافة ' . $perAcademicNet . ' ر.س إلى رصيدك.',
+                '💰',
+                'academic-earnings.php'
+            );
+        }
         return true;
     }
     return false;
@@ -476,11 +491,45 @@ function getAssignedAcademics(int $orderId): array {
                 oa.status AS assignment_status, oa.assigned_at, oa.response_at
          FROM order_assignments oa
          JOIN academics a ON oa.academic_id = a.id
-         WHERE oa.order_id = ?
+         WHERE oa.order_id = ? AND oa.status != \'replaced\'
          ORDER BY oa.assigned_at ASC'
     );
     $stmt->execute([$orderId]);
     return $stmt->fetchAll();
+}
+
+/**
+ * جلب سجل استبدال الأكاديميين لطلب معين
+ */
+function getReplacementHistory(int $orderId): array {
+    $stmt = db()->prepare(
+        'SELECT oa.id, oa.order_id, oa.academic_id AS old_academic_id, oa.status,
+                oa.replacement_reason, oa.replacement_note, oa.replaced_at, oa.replaced_by_academic_id,
+                old_a.name AS old_academic_name, old_a.email AS old_academic_email,
+                new_a.name AS new_academic_name, new_a.email AS new_academic_email
+         FROM order_assignments oa
+         JOIN academics old_a ON oa.academic_id = old_a.id
+         LEFT JOIN academics new_a ON oa.replaced_by_academic_id = new_a.id
+         WHERE oa.order_id = ? AND oa.status = \'replaced\'
+         ORDER BY oa.replaced_at DESC, oa.id DESC'
+    );
+    $stmt->execute([$orderId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * تسمية سبب استبدال الأكاديمي
+ */
+function replacementReasonLabel(?string $reason): string {
+    return match ($reason) {
+        'no_response'     => 'عدم الرد أو التجاوب',
+        'apology'         => 'اعتذار لظرف طارئ أو شخصي',
+        'delay'           => 'تأخر غير مبرر في الإنجاز',
+        'quality'         => 'عدم مطابقة معايير الجودة',
+        'student_request' => 'بناءً على طلب الطالب',
+        'other'           => 'سبب إداري آخر',
+        default           => $reason ?? 'غير محدد',
+    };
 }
 
 /* ─────────────────────────────────────────────
@@ -573,18 +622,8 @@ function getConversationMessages(int $conversationId): array {
  * Ensure the messages table has chat file-attachment columns (safe auto-upgrade).
  */
 function ensureMessageFileColumns(): void {
-    try {
-        $cols = db()->query("SHOW COLUMNS FROM `messages` LIKE 'file_path'")->fetchAll();
-        if (empty($cols)) {
-            db()->exec("ALTER TABLE `messages`
-                ADD COLUMN `file_path` VARCHAR(500) DEFAULT NULL AFTER `content`,
-                ADD COLUMN `file_name` VARCHAR(255) DEFAULT NULL AFTER `file_path`,
-                ADD COLUMN `file_type` VARCHAR(100) DEFAULT NULL AFTER `file_name`,
-                ADD COLUMN `file_size` INT UNSIGNED DEFAULT NULL AFTER `file_type`");
-        }
-    } catch (Exception $e) {
-        error_log('ensureMessageFileColumns failed: ' . $e->getMessage());
-    }
+    // تم نقل الأعمدة إلى migrations/
+    return;
 }
 
 /**
@@ -632,8 +671,9 @@ function saveChatAttachmentUpload(?array $file): ?array {
     ];
 }
 
-function sendMessage(int $conversationId, int $senderId, string $senderType, string $content, ?array $fileInfo = null): int {
+function sendMessage(int $conversationId, int $senderId, string $senderType, ?string $content = '', ?array $fileInfo = null): int {
     ensureMessageFileColumns();
+    $content = (string)($content ?? '');
     $stmt = db()->prepare(
         'INSERT INTO messages (conversation_id, sender_id, sender_type, content, file_path, file_name, file_type, file_size)
          VALUES (?,?,?,?,?,?,?,?)'
@@ -675,6 +715,75 @@ function sendMessage(int $conversationId, int $senderId, string $senderType, str
     triggerPusherEvent("chat-{$conversationId}", "new-message", $msgData);
     
     return $msgId;
+}
+
+/**
+ * Send an internal message between academics assigned to an order (and admin).
+ * The student has NO visibility to these messages.
+ */
+function sendTeamMessage(int $orderId, int $senderId, string $senderType, ?string $content = '', ?array $fileInfo = null): int {
+    $content = (string)($content ?? '');
+    $stmt = db()->prepare(
+        'INSERT INTO order_team_messages (order_id, sender_id, sender_type, content, file_path, file_name, file_type, file_size)
+         VALUES (?,?,?,?,?,?,?,?)'
+    );
+    $stmt->execute([
+        $orderId, $senderId, $senderType, $content,
+        $fileInfo['path'] ?? null,
+        $fileInfo['name'] ?? null,
+        $fileInfo['type'] ?? null,
+        $fileInfo['size'] ?? null,
+    ]);
+    
+    $msgId = (int) db()->lastInsertId();
+    
+    // Fetch sender name
+    $senderName = 'الإدارة';
+    if ($senderType === 'academic') {
+        $aStmt = db()->prepare('SELECT name FROM academics WHERE id = ?');
+        $aStmt->execute([$senderId]);
+        $senderName = $aStmt->fetchColumn() ?: 'أكاديمي';
+    } else {
+        $uStmt = db()->prepare('SELECT name FROM users WHERE id = ?');
+        $uStmt->execute([$senderId]);
+        $senderName = $uStmt->fetchColumn() ?: 'الإدارة';
+    }
+    
+    $msgData = [
+        'id' => $msgId,
+        'order_id' => $orderId,
+        'sender_id' => $senderId,
+        'sender_type' => $senderType,
+        'sender_name' => $senderName,
+        'content' => $content,
+        'file_path' => $fileInfo['path'] ?? null,
+        'file_name' => $fileInfo['name'] ?? null,
+        'sent_at' => date('Y-m-d H:i:s')
+    ];
+    
+    triggerPusherEvent("order-team-chat-{$orderId}", "new-team-message", $msgData);
+    
+    return $msgId;
+}
+
+/**
+ * Fetch all team messages for an order (academics and admin only).
+ */
+function getTeamMessages(int $orderId): array {
+    $stmt = db()->prepare(
+        "SELECT m.*,
+                CASE
+                    WHEN m.sender_type = 'academic' THEN a.name
+                    ELSE COALESCE(u.name, 'الإدارة')
+                END AS sender_name
+         FROM order_team_messages m
+         LEFT JOIN academics a ON m.sender_id = a.id AND m.sender_type = 'academic'
+         LEFT JOIN users     u ON m.sender_id = u.id AND m.sender_type = 'admin'
+         WHERE m.order_id = ?
+         ORDER BY m.sent_at ASC"
+    );
+    $stmt->execute([$orderId]);
+    return $stmt->fetchAll();
 }
 
 /* ─────────────────────────────────────────────
@@ -837,23 +946,8 @@ function getActivePaymentMethods(): array {
 
 /** Create the payment_receipts table if it does not exist yet. */
 function ensurePaymentReceiptsTable(): void {
-    db()->exec("CREATE TABLE IF NOT EXISTS `payment_receipts` (
-          `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `order_id`        INT UNSIGNED DEFAULT NULL COMMENT 'For service orders',
-          `subscription_id` INT UNSIGNED DEFAULT NULL COMMENT 'For package subscriptions',
-          `student_id`      INT UNSIGNED NOT NULL,
-          `method_id`       INT UNSIGNED DEFAULT NULL,
-          `method_label`    VARCHAR(150) DEFAULT NULL,
-          `amount`          DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-          `receipt_path`    VARCHAR(500) NOT NULL,
-          `status`          ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-          `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          INDEX `idx_rcpt_order` (`order_id`),
-          INDEX `idx_rcpt_sub`   (`subscription_id`),
-          INDEX `idx_rcpt_std`   (`student_id`),
-          INDEX `idx_rcpt_status`(`status`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    // تم نقل جدول إيصالات الدفع إلى migrations/
+    return;
 }
 
 /**
@@ -894,17 +988,57 @@ function saveReceiptUpload(?array $file): ?string {
 }
 
 /**
+ * Validate & store an uploaded refund transfer receipt (image or PDF).
+ * Returns the stored relative path or null on failure/absence.
+ */
+function saveRefundReceiptUpload(?array $file): ?string {
+    if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return null;
+    if (($file['size'] ?? 0) <= 0 || ($file['size'] ?? 0) > 10 * 1024 * 1024) return null;
+
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+    if (!in_array($ext, $allowed, true)) return null;
+
+    $tmpPath = $file['tmp_name'];
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+        $ok = false;
+        if (class_exists('finfo')) {
+            $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)$tmpPath);
+            $ok = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
+        } else {
+            $info = @getimagesize($tmpPath);
+            $ok = is_array($info) && !empty($info['mime']);
+        }
+        if (!$ok) return null;
+    } elseif ($ext === 'pdf') {
+        $head = (string) @file_get_contents($tmpPath, false, null, 0, 5);
+        if (trim($head) !== '%PDF-') return null;
+    }
+
+    $uploadDir = dirname(__DIR__) . '/uploads/receipts/refunds';
+    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
+    if (!is_dir($uploadDir) || !is_writable($uploadDir)) return null;
+
+    $fileName = 'refund_rcpt_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
+    if (!move_uploaded_file($tmpPath, $uploadDir . '/' . $fileName)) return null;
+    return 'uploads/receipts/refunds/' . $fileName;
+}
+
+/**
+ * جلب بيانات طلب استرجاع المبلغ المرتبط بطلب معين
+ */
+function getRefundForOrder(int $orderId): ?array {
+    $stmt = db()->prepare('SELECT * FROM refund_requests WHERE order_id = ? ORDER BY id DESC LIMIT 1');
+    $stmt->execute([$orderId]);
+    return $stmt->fetch() ?: null;
+}
+
+/**
  * Ensure the users table has an avatar_path column (safe auto-upgrade).
  */
 function ensureUserAvatarColumn(): void {
-    try {
-        $cols = db()->query("SHOW COLUMNS FROM `users` LIKE 'avatar_path'")->fetchAll();
-        if (empty($cols)) {
-            db()->exec("ALTER TABLE `users` ADD COLUMN `avatar_path` VARCHAR(255) DEFAULT NULL AFTER `avatar_initials`");
-        }
-    } catch (Exception $e) {
-        error_log('ensureUserAvatarColumn failed: ' . $e->getMessage());
-    }
+    // تم نقل الأعمدة إلى migrations/
+    return;
 }
 
 /**

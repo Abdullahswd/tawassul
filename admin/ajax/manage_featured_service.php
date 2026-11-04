@@ -40,21 +40,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 $db = db();
 
-// تأمين: إنشاء الجدول إن لم يكن موجوداً (نفس كود صفحة services.php)
-try {
-    $db->exec("CREATE TABLE IF NOT EXISTS featured_services (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        service_id INT UNSIGNED NOT NULL,
-        badge VARCHAR(100) DEFAULT NULL COMMENT 'شارة مميزة مثل: الأكثر طلباً',
-        sort_order INT NOT NULL DEFAULT 0,
-        is_active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_service (service_id),
-        KEY idx_active_sort (is_active, sort_order)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-} catch (Exception $e) { /* تجاهل */ }
-
+// تم نقل إنشاء featured_services إلى migrations/
 $action = trim($_POST['action'] ?? '');
 
 /* ── ADD / SAVE ── */

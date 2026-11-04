@@ -28,20 +28,7 @@ if (!function_exists('db')) sendError('دالة db غير موجودة', 500);
 $db = db();
 if (!$db) sendError('فشل الاتصال بقاعدة البيانات', 500);
 
-try {
-    $db->exec("CREATE TABLE IF NOT EXISTS payout_messages (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        payout_id INT NOT NULL,
-        sender_type ENUM('admin', 'academic') NOT NULL,
-        sender_id INT NOT NULL,
-        message TEXT NOT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
-    
-    // Auto-migrate payouts schema to support all statuses without truncation
-    $db->exec("ALTER TABLE payouts MODIFY COLUMN status VARCHAR(20) NOT NULL DEFAULT 'pending', MODIFY COLUMN paid_at DATETIME NULL DEFAULT NULL");
-    $db->exec("UPDATE payouts SET status = 'approved' WHERE status = '' OR status IS NULL");
-} catch (Exception $e) {}
+// تم نقل جداول المدفوعات إلى migrations/
 
 $csrf = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!empty($_SESSION['csrf_token']) && !empty($csrf) && !hash_equals($_SESSION['csrf_token'], $csrf)) {
@@ -57,10 +44,10 @@ if ($action === 'get_data') {
     // Academics with balance, earned, total paid and their bank accounts
     $academics = [];
     $acadStmt = $db->query("
-        SELECT a.id, a.name, a.avatar_initials, a.balance, a.total_earned,
+        SELECT a.id, a.name, a.avatar_initials, a.balance, a.total_earned, a.status,
                COALESCE((SELECT SUM(pa.amount) FROM payouts pa WHERE pa.academic_id = a.id AND pa.status IN ('paid', 'approved')), 0) AS total_paid
         FROM academics a
-        WHERE a.status = 'approved'
+        WHERE a.status IN ('approved', 'suspended')
         ORDER BY a.name ASC
     ");
     while ($a = $acadStmt->fetch()) {
@@ -140,7 +127,7 @@ if ($action === 'add_payout') {
         $currentBalance = (float)$balStmt->fetchColumn();
 
         if ($amount > $currentBalance) {
-            sendError("المبلغ أكبر من الرصيد المستحق ({$currentBalance} ر.س).");
+            sendError("المبلغ أكبر من الرصيد المستحق (" . number_format($currentBalance, 2) . " ر.س).");
         }
 
         // Payout number e.g. PAYOUT-20260001

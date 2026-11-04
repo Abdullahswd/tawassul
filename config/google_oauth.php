@@ -4,29 +4,36 @@
  * Handles Google OAuth2 Logic
  */
 
-// Minimal .env parser
-$envFile = __DIR__ . '/../.env';
-$env = [];
-if (file_exists($envFile)) {
-    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) continue;
-        list($name, $value) = explode('=', $line, 2);
-        $env[trim($name)] = trim($value, " \t\n\r\0\x0B\"'");
-    }
-}
+require_once __DIR__ . '/env.php';
+require_once __DIR__ . '/auth.php';
 
-// Read from .env
-define('GOOGLE_CLIENT_ID', $env['GOOGLE_CLIENT_ID'] ?? '');
-define('GOOGLE_CLIENT_SECRET', $env['GOOGLE_CLIENT_SECRET'] ?? '');
+// Read credentials from centralized env()
+define('GOOGLE_CLIENT_ID', env('GOOGLE_CLIENT_ID', ''));
+define('GOOGLE_CLIENT_SECRET', env('GOOGLE_CLIENT_SECRET', ''));
 
-// Redirect URI matches the callback file location
-// If you face redirect_uri_mismatch, make sure this exactly matches what is in Google Console
-define('GOOGLE_REDIRECT_URI', 'https://academics.tawassu.com/google-callback.php');
-
+/**
+ * Returns Google OAuth Redirect URI.
+ * Reads from .env (GOOGLE_REDIRECT_URI). If empty or not set, dynamically falls back
+ * to the current environment URL (rootUrl() . '/google-callback.php').
+ */
 function getGoogleRedirectUri(): string
 {
-    return GOOGLE_REDIRECT_URI;
+    $uri = env('GOOGLE_REDIRECT_URI', '');
+    if (!empty($uri)) {
+        return $uri;
+    }
+
+    if (function_exists('rootUrl')) {
+        return rootUrl() . '/google-callback.php';
+    }
+
+    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host     = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    return $protocol . '://' . $host . '/google-callback.php';
+}
+
+if (!defined('GOOGLE_REDIRECT_URI')) {
+    define('GOOGLE_REDIRECT_URI', getGoogleRedirectUri());
 }
 
 function getGoogleLoginUrl(): string

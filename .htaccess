@@ -1,0 +1,17 @@
+# ============================================================
+#  Eduroad Platform - Root Security & Access Rules
+# ============================================================
+
+# 1. منع استعراض المجلدات والملفات (Directory Listing)
+Options -Indexes
+
+# 2. حظر الوصول المباشر إلى الملفات الحساسة والتنفيذية
+<FilesMatch "^(\.env|\.git|\.gitignore|\.htaccess|.*\.sql|.*\.log|composer\.(json|lock)|package(-lock)?\.json)$">
+    Require all denied
+</FilesMatch>
+
+# 3. منع الوصول للملفات المخفية (التي تبدأ بنقطة)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+

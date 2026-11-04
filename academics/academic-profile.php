@@ -13,11 +13,13 @@
 
   $academic = getAcademicById($academicId);
   if (!$academic || $academic['status'] !== 'approved') {
-      die("الأكاديمي غير موجود أو غير معتمد.");
+      $msg = ($academic && $academic['status'] === 'suspended') ? 'هذا الحساب الأكاديمي موقوف حالياً.' : 'الأكاديمي غير موجود أو غير متاح حالياً.';
+      header('Location: ' . rootUrl() . '/academics/academics-list.php?error=' . urlencode($msg));
+      exit;
   }
 
-  // Fetch qualifications
-  $qStmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY graduation_year ASC");
+  // Fetch qualifications (Ordered: بكالوريوس ➜ ماجستير ➜ دكتوراه)
+  $qStmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY FIELD(level, 'بكالوريوس', 'ماجستير', 'دكتوراه') ASC, graduation_year ASC, id ASC");
   $qStmt->execute([$academicId]);
   $quals = $qStmt->fetchAll();
 

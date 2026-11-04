@@ -28,12 +28,7 @@ if (!function_exists('db')) sendError('دالة db غير موجودة', 500);
 $db = db();
 if (!$db) sendError('فشل الاتصال بقاعدة البيانات', 500);
 
-// التأكد من وجود عمود logo (شعار البنك/المحفظة)
-try {
-    $db->exec("ALTER TABLE platform_payment_methods ADD COLUMN logo VARCHAR(255) DEFAULT NULL");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
+// تم نقل عمود logo إلى migrations/
 
 $action = trim($_POST['action'] ?? '');
 

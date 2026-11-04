@@ -94,8 +94,8 @@ for ($i = 0; $i < 12; $i++) {
 
 // 6. Users breakdown
 $u_active = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE status='active' AND role='student') + (SELECT COUNT(*) FROM academics WHERE status='approved')")->fetchColumn();
-$u_suspended = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE status='suspended' AND role='student') + (SELECT COUNT(*) FROM academics WHERE status='rejected')")->fetchColumn();
-$u_inactive = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE status='inactive' AND role='student') + (SELECT COUNT(*) FROM academics WHERE status='pending')")->fetchColumn();
+$u_suspended = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE status='suspended' AND role='student') + (SELECT COUNT(*) FROM academics WHERE status='suspended')")->fetchColumn();
+$u_inactive = (int) $db->query("SELECT (SELECT COUNT(*) FROM users WHERE status='inactive' AND role='student') + (SELECT COUNT(*) FROM academics WHERE status IN ('pending', 'rejected'))")->fetchColumn();
 $u_total = max(1, $u_active + $u_suspended + $u_inactive);
 
 $pct_u_active = round(($u_active / $u_total) * 100);
@@ -174,7 +174,7 @@ $services_report = array_map(function($s) {
         </div>
         <div class="stat-card animate-fadeInUp delay-2" style="padding:20px;border-top:3px solid #10b981">
           <div style="font-size:30px;margin-bottom:8px">💰</div>
-          <div class="card-value" style="font-size:28px" data-counter="<?= $total_revenue ?>" data-suffix=" ر.س">0</div>
+          <div class="card-value" style="font-size:28px" data-counter="<?= (float)$total_revenue ?>" data-decimals="2" data-suffix=" ر.س"><?= number_format((float)$total_revenue, 2) ?> ر.س</div>
           <div class="card-label">الإيرادات الكلية</div>
           <div class="progress-bar" style="margin-top:12px"><div class="progress-fill" style="width:<?= $rev_target_percentage ?>%;background:#10b981"></div></div>
           <div style="font-size:12px;color:var(--text-secondary);margin-top:6px"><?= $rev_target_percentage ?>% من الهدف السنوي</div>
@@ -245,7 +245,7 @@ $services_report = array_map(function($s) {
                     <tr>
                       <td><?= $s['name'] ?> <?= $s['icon'] ?></td>
                       <td><strong><?= $s['order_cnt'] ?></strong></td>
-                      <td><?= number_format($s['total_amount'], 0) ?> ر.س</td>
+                      <td><?= number_format((float)$s['total_amount'], 2) ?> ر.س</td>
                       <td><div class="progress-bar" style="min-width:120px"><div class="progress-fill" style="width:<?= $pct ?>%;background:#6366f1"></div></div></td>
                     </tr>
                   <?php endforeach; ?>
@@ -264,17 +264,17 @@ $services_report = array_map(function($s) {
           <div class="grid-responsive-4">
             <div class="stat-card" style="padding:20px;text-align:center">
               <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">أعلى شهر</div>
-              <div style="font-size:26px;font-weight:900;color:var(--success)"><?= number_format($highest_revenue_month, 0) ?> ر.س</div>
+              <div style="font-size:26px;font-weight:900;color:var(--success)"><?= number_format((float)$highest_revenue_month, 2) ?> ر.س</div>
               <div style="font-size:13px;color:var(--text-secondary)">هذه السنة</div>
             </div>
             <div class="stat-card" style="padding:20px;text-align:center">
               <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">متوسط الشهر</div>
-              <div style="font-size:26px;font-weight:900;color:var(--primary)"><?= number_format($average_revenue_month, 0) ?> ر.س</div>
+              <div style="font-size:26px;font-weight:900;color:var(--primary)"><?= number_format((float)$average_revenue_month, 2) ?> ر.س</div>
               <div style="font-size:13px;color:var(--text-secondary)">هذه السنة</div>
             </div>
             <div class="stat-card" style="padding:20px;text-align:center">
               <div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">أدنى شهر</div>
-              <div style="font-size:26px;font-weight:900;color:var(--warning)"><?= number_format($lowest_revenue_month, 0) ?> ر.س</div>
+              <div style="font-size:26px;font-weight:900;color:var(--warning)"><?= number_format((float)$lowest_revenue_month, 2) ?> ر.س</div>
               <div style="font-size:13px;color:var(--text-secondary)">هذه السنة</div>
             </div>
           </div>

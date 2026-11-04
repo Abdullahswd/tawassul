@@ -14,10 +14,10 @@ $ordersStmt = $db->prepare("
     LEFT JOIN services s ON o.service_id = s.id
     LEFT JOIN packages p ON o.package_id = p.id
     LEFT JOIN users u ON o.student_id = u.id
-    WHERE o.academic_id = ? OR (o.academic_id IS NULL AND o.status = 'assigned' AND o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?))
+    WHERE (o.academic_id = ? AND o.id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced')) OR (o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced')))
     ORDER BY o.created_at DESC
 ");
-$ordersStmt->execute([$currentAcademicId, $currentAcademicId]);
+$ordersStmt->execute([$currentAcademicId, $currentAcademicId, $currentAcademicId]);
 $orders = $ordersStmt->fetchAll();
 
 // Map orders to JS array

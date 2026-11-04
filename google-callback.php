@@ -60,6 +60,10 @@ if (isset($_GET['code'])) {
                     header('Location: login.php?error=' . urlencode('تم رفض حسابك من قِبل الإدارة. للاستفسار تواصل معنا.'));
                     exit;
                 }
+                if ($academic['status'] === 'suspended') {
+                    header('Location: login.php?error=' . urlencode('تم إيقاف / تجميد حسابك الأكاديمي من قِبل الإدارة. يرجى مراجعة إدارة المنصة.'));
+                    exit;
+                }
                 loginAcademic($academic);
                 header('Location: academics/academic-dashboard.php');
                 exit;
@@ -106,6 +110,10 @@ if (isset($_GET['code'])) {
                 
                 if ($academicByEmail['status'] === 'rejected') {
                     header('Location: login.php?error=' . urlencode('تم رفض حسابك من قِبل الإدارة. للاستفسار تواصل معنا.'));
+                    exit;
+                }
+                if ($academicByEmail['status'] === 'suspended') {
+                    header('Location: login.php?error=' . urlencode('تم إيقاف / تجميد حسابك الأكاديمي من قِبل الإدارة. يرجى مراجعة إدارة المنصة.'));
                     exit;
                 }
                 

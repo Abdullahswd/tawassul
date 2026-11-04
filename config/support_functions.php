@@ -15,57 +15,8 @@ if (!function_exists('db')) {
  * Create/ensure all support tables (safe auto-upgrade).
  */
 function ensureSupportTables(): void {
-    db()->exec("CREATE TABLE IF NOT EXISTS `support_faqs` (
-          `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `audience`   ENUM('student','academic') NOT NULL DEFAULT 'student',
-          `question`   VARCHAR(500) NOT NULL,
-          `answer`     TEXT NOT NULL,
-          `sort_order` INT NOT NULL DEFAULT 0,
-          `is_active`  TINYINT(1) NOT NULL DEFAULT 1,
-          `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          INDEX `idx_faq_aud` (`audience`, `is_active`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    db()->exec("CREATE TABLE IF NOT EXISTS `support_channels` (
-          `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `type`       ENUM('whatsapp','telegram','email','phone','instagram','twitter','website','other') NOT NULL DEFAULT 'other',
-          `label`      VARCHAR(150) NOT NULL,
-          `value`      VARCHAR(255) NOT NULL,
-          `icon`       VARCHAR(20) NOT NULL DEFAULT '📞',
-          `sort_order` INT NOT NULL DEFAULT 0,
-          `is_active`  TINYINT(1) NOT NULL DEFAULT 1,
-          `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    db()->exec("CREATE TABLE IF NOT EXISTS `support_conversations` (
-          `id`         INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `user_id`    INT UNSIGNED NOT NULL,
-          `user_type`  ENUM('student','academic') NOT NULL,
-          `subject`    VARCHAR(255) NOT NULL,
-          `status`     ENUM('open','pending','closed') NOT NULL DEFAULT 'open',
-          `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          INDEX `idx_conv_user` (`user_id`, `user_type`),
-          INDEX `idx_conv_status` (`status`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-
-    db()->exec("CREATE TABLE IF NOT EXISTS `support_messages` (
-          `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
-          `conversation_id` INT UNSIGNED NOT NULL,
-          `sender_type`     ENUM('user','admin') NOT NULL,
-          `sender_id`       INT UNSIGNED NOT NULL,
-          `content`         TEXT NULL,
-          `file_path`       VARCHAR(500) NULL,
-          `file_name`       VARCHAR(255) NULL,
-          `file_size`       INT UNSIGNED NULL,
-          `is_read`         TINYINT(1) NOT NULL DEFAULT 0,
-          `created_at`      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          PRIMARY KEY (`id`),
-          INDEX `idx_sm_conv` (`conversation_id`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+    // تم نقل جداول الدعم إلى migrations/
+    return;
 }
 
 /* ─────────────────────────────────────────────

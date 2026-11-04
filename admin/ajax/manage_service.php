@@ -18,41 +18,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') {
 
 $db     = db();
 
-// التأكد من وجود عمود price في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود platform_percent (نسبة المنصة) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN platform_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود discount_percent (نسبة الخصم) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود icon_image (صورة الأيقونة المرفوعة) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN icon_image VARCHAR(255) DEFAULT NULL");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود needs_multiple_academics (هل الخدمة تحتاج أكثر من أكاديمي) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN needs_multiple_academics TINYINT(1) NOT NULL DEFAULT 0");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
+// تم نقل تعديلات الجداول إلى migrations/
 $action = trim($_POST['action'] ?? '');
 
 /* ── UPLOAD ICON (multipart) ── */

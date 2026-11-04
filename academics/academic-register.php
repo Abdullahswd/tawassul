@@ -540,8 +540,8 @@ $svcRenderTree = function ($parentId, $level) use (&$svcRenderTree, $svcChildren
           <!-- Terms -->
           <div style="margin-top:24px;padding:18px;background:var(--bg-main);border-radius:12px">
             <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer">
-              <input type="checkbox" id="agreeTerms" style="margin-top:4px;width:18px;height:18px;accent-color:var(--primary);flex-shrink:0"/>
-              <span style="font-size:13px;color:var(--text-secondary);line-height:1.7">أوافق على <a href="#" style="color:var(--primary)">شروط وأحكام</a> المنصة وأتعهد بأن جميع المعلومات المقدمة صحيحة ودقيقة، وأن الشهادات الأكاديمية المرفوعة أصلية وموثقة.</span>
+              <input type="checkbox" id="agreeTerms" name="agreeTerms" value="1" style="margin-top:4px;width:18px;height:18px;accent-color:var(--primary);flex-shrink:0"/>
+              <span style="font-size:13px;color:var(--text-secondary);line-height:1.7">أوافق على <a href="policy.php" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;text-decoration:underline">شروط وأحكام</a> المنصة وأتعهد بأن جميع المعلومات المقدمة صحيحة ودقيقة، وأن الشهادات الأكاديمية المرفوعة أصلية وموثقة.</span>
             </label>
           </div>
         </div>
@@ -928,13 +928,61 @@ StepForm.next = function() {
     }
   }
 
-  // Step 2: Ensure at least one degree is entered
+
+// دالة التحقق من التسلسل الزمني لسنوات التخرج: بكالوريوس ➜ ماجستير ➜ دكتوراه
+function validateAcademicGraduationYears() {
+  const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
+  const hasMs = document.getElementById('hasMasters')?.checked || !!getDegreeResolvedName('ms', 'College') || !!document.querySelector('input[name="msUniversity"]')?.value;
+  const hasPhd = document.getElementById('hasPhd')?.checked || !!getDegreeResolvedName('phd', 'College') || !!document.querySelector('input[name="phdUniversity"]')?.value;
+
+  const bsYear = parseInt(document.querySelector('input[name="bsYear"]')?.value) || 0;
+  const msYear = parseInt(document.querySelector('input[name="msYear"]')?.value) || 0;
+  const phdYear = parseInt(document.querySelector('input[name="phdYear"]')?.value) || 0;
+  const currentYear = new Date().getFullYear();
+
+  // فحص النطاق المنطقي للسنوات
+  for (const [y, label, inputName] of [
+    [bsYear, 'البكالوريوس', 'bsYear'],
+    [msYear, 'الماجستير', 'msYear'],
+    [phdYear, 'الدكتوراه', 'phdYear']
+  ]) {
+    if (y > 0 && (y < 1960 || y > currentYear + 1)) {
+      Toast.show(`يرجى إدخال سنة تخرج صالحة لشهادة ${label} (بين 1960 و ${currentYear + 1})`, 'error');
+      document.querySelector(`input[name="${inputName}"]`)?.focus();
+      return false;
+    }
+  }
+
+  // الترتيب الصارم: بكالوريوس ➜ ماجستير ➜ دكتوراه
+  if (hasBs && hasMs && bsYear > 0 && msYear > 0 && msYear <= bsYear) {
+    Toast.show(`تنبيه: سنة تخرج الماجستير (${msYear}) يجب أن تكون بعد سنة تخرج البكالوريوس (${bsYear})`, 'error');
+    document.querySelector('input[name="msYear"]')?.focus();
+    return false;
+  }
+  if (hasMs && hasPhd && msYear > 0 && phdYear > 0 && phdYear <= msYear) {
+    Toast.show(`تنبيه: سنة تخرج الدكتوراه (${phdYear}) يجب أن تكون بعد سنة تخرج الماجستير (${msYear})`, 'error');
+    document.querySelector('input[name="phdYear"]')?.focus();
+    return false;
+  }
+  if (hasBs && hasPhd && bsYear > 0 && phdYear > 0 && phdYear <= bsYear) {
+    Toast.show(`تنبيه: سنة تخرج الدكتوراه (${phdYear}) يجب أن تكون بعد سنة تخرج البكالوريوس (${bsYear})`, 'error');
+    document.querySelector('input[name="phdYear"]')?.focus();
+    return false;
+  }
+
+  return true;
+}
+
+  // Step 2: Ensure at least one degree is entered & validate graduation years
   if (StepForm.currentStep === 2) {
     const hasBs = document.getElementById('hasBachelor')?.checked || !!getDegreeResolvedName('bs', 'College') || !!document.querySelector('input[name="bsUniversity"]')?.value;
     const hasMs = document.getElementById('hasMasters')?.checked || !!getDegreeResolvedName('ms', 'College') || !!document.querySelector('input[name="msUniversity"]')?.value;
     const hasPhd = document.getElementById('hasPhd')?.checked || !!getDegreeResolvedName('phd', 'College') || !!document.querySelector('input[name="phdUniversity"]')?.value;
     if (!hasBs && !hasMs && !hasPhd) {
       Toast.show('يرجى تحديد وتعبئة مؤهل أكاديمي واحد على الأقل', 'error');
+      return;
+    }
+    if (!validateAcademicGraduationYears()) {
       return;
     }
   }
@@ -975,6 +1023,11 @@ StepForm.submit = function() {
   if (checkedServices.length === 0) {
     Toast.show('يرجى اختيار خدمة واحدة على الأقل في قسم الخدمات', 'error');
     StepForm.goTo(3);
+    return;
+  }
+
+  if (!validateAcademicGraduationYears()) {
+    StepForm.goTo(2);
     return;
   }
 
@@ -1047,6 +1100,15 @@ StepForm.submit = function() {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  // فحص مباشر وفوري لسنة التخرج عند الخروج من حقول السنوات
+  ['bsYear', 'msYear', 'phdYear'].forEach(fieldName => {
+    const input = document.querySelector(`input[name="${fieldName}"]`);
+    if (input) {
+      input.addEventListener('change', () => {
+        validateAcademicGraduationYears();
+      });
+    }
+  });
   ['bs', 'ms', 'phd'].forEach(initDegreeHierarchy);
   StepForm.totalSteps = 4;
   StepForm.init();

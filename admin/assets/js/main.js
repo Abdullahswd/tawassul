@@ -601,7 +601,7 @@
   /* ============================================
     COUNTER ANIMATION
     ============================================ */
-  function animateCounter(el, target, prefix = '', suffix = '') {
+  function animateCounter(el, target, prefix = '', suffix = '', decimals = 0) {
     const duration = 1500;
     const start = performance.now();
     const startVal = 0;
@@ -610,8 +610,13 @@
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      const val = Math.round(startVal + (target - startVal) * eased);
-      el.textContent = prefix + val.toLocaleString('ar') + suffix;
+      const current = startVal + (target - startVal) * eased;
+      if (decimals > 0) {
+        el.textContent = prefix + current.toLocaleString('ar', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }) + suffix;
+      } else {
+        const val = Math.round(current);
+        el.textContent = prefix + val.toLocaleString('ar') + suffix;
+      }
       if (progress < 1) requestAnimationFrame(update);
     }
     requestAnimationFrame(update);
@@ -619,12 +624,15 @@
 
   function initCounters() {
     document.querySelectorAll('[data-counter]').forEach(el => {
-      const target = parseInt(el.dataset.counter);
+      const raw = el.dataset.counter || '0';
+      const hasDecimals = raw.includes('.') || el.dataset.decimals !== undefined;
+      const decimals = el.dataset.decimals !== undefined ? parseInt(el.dataset.decimals, 10) : (hasDecimals ? 2 : 0);
+      const target = parseFloat(raw);
       const prefix = el.dataset.prefix || '';
       const suffix = el.dataset.suffix || '';
       const observer = new IntersectionObserver(entries => {
         if (entries[0].isIntersecting) {
-          animateCounter(el, target, prefix, suffix);
+          animateCounter(el, target, prefix, suffix, decimals);
           observer.disconnect();
         }
       });
@@ -693,7 +701,7 @@
   function getStatusBadge(status) {
     const map = {
       active: '<span class="badge badge-success">✓ نشط</span>',
-      suspended: '<span class="badge badge-danger">⊘ معلق</span>',
+      suspended: '<span class="badge badge-danger" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:rgba(239,68,68,0.3)">🚫 موقوف</span>',
       inactive: '<span class="badge badge-secondary">○ غير نشط</span>',
       approved: '<span class="badge badge-success">✓ مقبول</span>',
       pending: '<span class="badge badge-warning">⏳ قيد المراجعة</span>',

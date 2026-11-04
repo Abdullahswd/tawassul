@@ -12,59 +12,7 @@ $scriptName = preg_replace('#/admin/pages/[^/]+\.php$#', '', $scriptName);
 $appBaseUrl = rtrim($scriptName, '/');
 
 // التأكد من وجود عمود price في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN price DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود platform_percent (نسبة المنصة) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN platform_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود discount_percent (نسبة الخصم) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود icon_image (صورة الأيقونة المرفوعة) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN icon_image VARCHAR(255) DEFAULT NULL");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// التأكد من وجود عمود needs_multiple_academics (هل الخدمة تحتاج أكثر من أكاديمي) في جدول services
-try {
-    $db->exec("ALTER TABLE services ADD COLUMN needs_multiple_academics TINYINT(1) NOT NULL DEFAULT 0");
-} catch (Exception $e) {
-    // العمود موجود مسبقاً
-}
-
-// ============================================================
-// قسم الخدمات المميزة — جدول منفصل: featured_services
-// يُنشأ تلقائياً ضمن كود PHP أثناء فتح هذه الصفحة
-// ============================================================
-try {
-    $db->exec("CREATE TABLE IF NOT EXISTS featured_services (
-        id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-        service_id INT UNSIGNED NOT NULL,
-        badge VARCHAR(100) DEFAULT NULL COMMENT 'شارة مميزة مثل: الأكثر طلباً',
-        sort_order INT NOT NULL DEFAULT 0,
-        is_active TINYINT(1) NOT NULL DEFAULT 1,
-        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_service (service_id),
-        KEY idx_active_sort (is_active, sort_order)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-} catch (Exception $e) {
-    // تجاهل خطأ الإنشاء (الجدول موجود مسبقاً)
-}
+// تم نقل تعديلات الجداول إلى migrations/
 
 // جلب الخدمات المميزة مع بيانات الخدمة الأصلية
 $featured_services = [];

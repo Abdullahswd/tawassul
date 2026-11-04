@@ -41,17 +41,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $messageType = 'error';
             }
         } elseif ($academic) {
-            $userType = 'academic';
-            $userName = $academic['name'];
-            $token = bin2hex(random_bytes(32));
-
-            $sent = sendPasswordResetEmail($email, $userName, $token, $userType);
-            if ($sent) {
-                $message = 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح! يرجى مراجعة صندوق الوارد.';
-                $messageType = 'success';
-            } else {
-                $message = 'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى التأكد من إعدادات خادم SMTP أو المحاولة لاحقاً.';
+            if ($academic['status'] === 'suspended') {
+                $message = 'هذا الحساب موقوف / مجمد حالياً من قِبل الإدارة. يرجى التواصل مع الدعم الفني للمساعدة.';
                 $messageType = 'error';
+            } elseif ($academic['status'] === 'rejected') {
+                $message = 'هذا الحساب مرفوض من قِبل الإدارة. للاستفسار يرجى مراجعة المنصة.';
+                $messageType = 'error';
+            } else {
+                $userType = 'academic';
+                $userName = $academic['name'];
+                $token = bin2hex(random_bytes(32));
+
+                $sent = sendPasswordResetEmail($email, $userName, $token, $userType);
+                if ($sent) {
+                    $message = 'تم إرسال رابط استعادة كلمة المرور إلى بريدك الإلكتروني بنجاح! يرجى مراجعة صندوق الوارد.';
+                    $messageType = 'success';
+                } else {
+                    $message = 'حدث خطأ أثناء إرسال البريد الإلكتروني. يرجى التأكد من إعدادات خادم SMTP أو المحاولة لاحقاً.';
+                    $messageType = 'error';
+                }
             }
         } else {
             // Friendly message

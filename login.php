@@ -43,6 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($academic && password_verify($password, $academic['password'])) {
                 if ($academic['status'] === 'rejected') {
                     $error = 'تم رفض حسابك من قِبل الإدارة. للاستفسار تواصل معنا.';
+                } elseif ($academic['status'] === 'suspended') {
+                    $error = 'تم إيقاف / تجميد حسابك الأكاديمي من قِبل الإدارة. يرجى مراجعة إدارة المنصة.';
                 } else {
                     loginAcademic($academic);
                     sendLoginNotificationEmail($academic, 'academic');

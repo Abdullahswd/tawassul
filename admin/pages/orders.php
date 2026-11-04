@@ -164,7 +164,7 @@ function renderOrders(data) {
       <td style="font-size:13px;color:var(--text-secondary)">${o.academic}</td>
       <td style="font-size:13px">${o.service}</td>
       <td><span class="badge badge-primary">${o.package}</span></td>
-      <td><strong>${o.amount.toLocaleString('ar')} ر.س</strong></td>
+      <td><strong>${Number(o.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</strong></td>
       <td>${getStatusBadge(o.status)}</td>
       <td style="color:var(--text-secondary);font-size:13px">${o.date}</td>
       <td>

@@ -57,6 +57,7 @@ unset($ac);
 $cnt_all = count($academics);
 $cnt_approved = (int) $db->query("SELECT COUNT(*) FROM academics WHERE status = 'approved'")->fetchColumn();
 $cnt_pending = (int) $db->query("SELECT COUNT(*) FROM academics WHERE status = 'pending'")->fetchColumn();
+$cnt_suspended = (int) $db->query("SELECT COUNT(*) FROM academics WHERE status = 'suspended'")->fetchColumn();
 $cnt_rejected = (int) $db->query("SELECT COUNT(*) FROM academics WHERE status = 'rejected'")->fetchColumn();
 
 // Base URL for assets
@@ -97,7 +98,7 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
         </div>
 
         <!-- Stats -->
-        <div class="grid-responsive-4">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:16px;margin-bottom:24px">
           <div class="stat-card animate-fadeInUp delay-1" style="padding:18px">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div>
@@ -110,9 +111,8 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
           <div class="stat-card animate-fadeInUp delay-2" style="padding:18px">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div>
-                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_approved ?>"><?= $cnt_approved ?>
-                </div>
-                <div class="card-label">مقبولون</div>
+                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_approved ?>"><?= $cnt_approved ?></div>
+                <div class="card-label">معتمدون</div>
               </div>
               <div class="card-icon" style="background:rgba(16,185,129,0.1);margin:0">✅</div>
             </div>
@@ -120,21 +120,28 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
           <div class="stat-card animate-fadeInUp delay-3" style="padding:18px">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div>
-                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_pending ?>"><?= $cnt_pending ?>
-                </div>
+                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_pending ?>"><?= $cnt_pending ?></div>
                 <div class="card-label">قيد المراجعة</div>
               </div>
               <div class="card-icon" style="background:rgba(245,158,11,0.1);margin:0">⏳</div>
             </div>
           </div>
+          <div class="stat-card animate-fadeInUp delay-3" style="padding:18px;border-top:3px solid #ef4444">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div class="card-value" style="font-size:26px;color:#ef4444" data-counter="<?= $cnt_suspended ?>"><?= $cnt_suspended ?></div>
+                <div class="card-label">موقوفون</div>
+              </div>
+              <div class="card-icon" style="background:rgba(239,68,68,0.1);margin:0">🚫</div>
+            </div>
+          </div>
           <div class="stat-card animate-fadeInUp delay-4" style="padding:18px">
             <div style="display:flex;align-items:center;justify-content:space-between">
               <div>
-                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_rejected ?>"><?= $cnt_rejected ?>
-                </div>
+                <div class="card-value" style="font-size:26px" data-counter="<?= $cnt_rejected ?>"><?= $cnt_rejected ?></div>
                 <div class="card-label">مرفوضون</div>
               </div>
-              <div class="card-icon" style="background:rgba(239,68,68,0.1);margin:0">❌</div>
+              <div class="card-icon" style="background:rgba(100,116,139,0.1);margin:0">❌</div>
             </div>
           </div>
         </div>
@@ -144,8 +151,9 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
           <div class="tabs-container">
             <div class="tabs-list">
               <button class="tab-btn active" data-tab="tab-all">الكل (<?= $cnt_all ?>)</button>
-              <button class="tab-btn" data-tab="tab-approved">مقبولون (<?= $cnt_approved ?>)</button>
+              <button class="tab-btn" data-tab="tab-approved">معتمدون (<?= $cnt_approved ?>)</button>
               <button class="tab-btn" data-tab="tab-pending">قيد المراجعة (<?= $cnt_pending ?>)</button>
+              <button class="tab-btn" data-tab="tab-suspended" style="color:#ef4444">موقوفون (<?= $cnt_suspended ?>)</button>
               <button class="tab-btn" data-tab="tab-rejected">مرفوضون (<?= $cnt_rejected ?>)</button>
             </div>
           </div>
@@ -215,6 +223,34 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
             <div id="pendingCardsList" style="padding:4px 0"></div>
           </div>
 
+          <!-- Tab: Suspended -->
+          <div id="tab-suspended" class="tab-panel">
+            <div class="table-container">
+              <div class="table-header">
+                <h3 class="table-title">الأكاديميون الموقوفون</h3>
+                <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="searchSuspended"
+                    placeholder="بحث في الموقوفين..." oninput="filterTable('suspended', this.value)" /></div>
+              </div>
+              <div style="overflow-x:auto">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>الأكاديمي</th>
+                      <th>التخصص</th>
+                      <th>الشهادة</th>
+                      <th>الطلبات</th>
+                      <th>التقييم</th>
+                      <th>تاريخ التسجيل</th>
+                      <th>الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-suspended"></tbody>
+                </table>
+              </div>
+              <div class="pagination" id="pag-suspended"></div>
+            </div>
+          </div>
+
           <!-- Tab: Rejected -->
           <div id="tab-rejected" class="tab-panel">
             <div class="table-container">
@@ -277,6 +313,14 @@ $appBase = rtrim(preg_replace('#/admin/pages/[^/]+$#', '', $_SERVER['SCRIPT_NAME
               <option>بكالوريوس</option>
               <option>ماجستير</option>
               <option>دكتوراه</option>
+            </select>
+          </div>
+          <div class="form-group"><label class="form-label">حالة الحساب</label>
+            <select class="form-input form-select" id="editStatus" style="padding-left:36px">
+              <option value="approved">معتمد (نشط) ✅</option>
+              <option value="pending">قيد المراجعة ⏳</option>
+              <option value="suspended">موقوف 🚫</option>
+              <option value="rejected">مرفوض ❌</option>
             </select>
           </div>
         </div>
@@ -345,10 +389,11 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
 
     /* ── Pagination state per tab ── */
     const PAGE_SIZE = 10;
-    const state = { all: 1, approved: 1, rejected: 1 };
+    const state = { all: 1, approved: 1, suspended: 1, rejected: 1 };
     const filtered = {
       all: [...MOCK_DATA.academics],
       approved: MOCK_DATA.academics.filter(a => a.status === 'approved'),
+      suspended: MOCK_DATA.academics.filter(a => a.status === 'suspended'),
       rejected: MOCK_DATA.academics.filter(a => a.status === 'rejected'),
     };
 
@@ -406,9 +451,14 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
             <div style="display:flex;gap:6px">
               <button class="btn btn-sm btn-outline btn-icon" title="عرض الوثائق والتفاصيل" onclick="viewAcademic(${a.id})">👁</button>
               ${a.status === 'pending' ? `
-                <button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,0.1);color:#10b981;border:none" onclick="approveAcademic(${a.id},'${escHtml(a.name)}')">✓</button>
-                <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" onclick="rejectAcademic(${a.id},'${escHtml(a.name)}')">✗</button>
+                <button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,0.1);color:#10b981;border:none" title="اعتماد" onclick="approveAcademic(${a.id},'${escHtml(a.name)}')">✓</button>
+                <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" title="رفض" onclick="rejectAcademic(${a.id},'${escHtml(a.name)}')">✗</button>
               ` : `
+                ${a.status === 'suspended' ? `
+                  <button class="btn btn-sm btn-icon" style="background:rgba(16,185,129,0.15);color:#059669;border:none" title="إعادة تنشيط الحساب" onclick="activateAcademic(${a.id},'${escHtml(a.name)}')">▶️</button>
+                ` : `
+                  <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.15);color:#ef4444;border:none" title="إيقاف الأكاديمي" onclick="suspendAcademic(${a.id},'${escHtml(a.name)}')">⏸️</button>
+                `}
                 <button class="btn btn-sm btn-outline btn-icon" title="تعديل" onclick="openEditModal(${a.id})">✏️</button>
                 <button class="btn btn-sm btn-icon" style="background:rgba(239,68,68,0.1);color:#ef4444;border:none" title="حذف" onclick="deleteAcademic(${a.id},'${escHtml(a.name)}')">🗑</button>
               `}
@@ -480,6 +530,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       const qLow = q.toLowerCase().trim();
       let base = MOCK_DATA.academics;
       if (tab === 'approved') base = base.filter(a => a.status === 'approved');
+      if (tab === 'suspended') base = base.filter(a => a.status === 'suspended');
       if (tab === 'rejected') base = base.filter(a => a.status === 'rejected');
       filtered[tab] = base.filter(a => {
         const matchQ = !qLow || a.name.toLowerCase().includes(qLow) || (a.specialty ?? '').toLowerCase().includes(qLow) || (a.email ?? '').toLowerCase().includes(qLow);
@@ -553,6 +604,11 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
         footer += `<button class="btn btn-success" onclick="approveAcademic(${a.id},'${escHtml(a.name)}');Modal.close('viewAcademicModal')">✓ قبول</button>
                <button class="btn btn-danger"  onclick="rejectAcademic(${a.id},'${escHtml(a.name)}');Modal.close('viewAcademicModal')">✗ رفض</button>`;
       } else {
+        if (a.status === 'suspended') {
+          footer += `<button class="btn btn-success" onclick="activateAcademic(${a.id},'${escHtml(a.name)}');Modal.close('viewAcademicModal')">✅ إعادة تنشيط الحساب</button>`;
+        } else if (a.status === 'approved') {
+          footer += `<button class="btn btn-danger" onclick="suspendAcademic(${a.id},'${escHtml(a.name)}');Modal.close('viewAcademicModal')">🚫 إيقاف الأكاديمي</button>`;
+        }
         footer += `<button class="btn btn-primary" onclick="Modal.close('viewAcademicModal');openEditModal(${a.id})">✏️ تعديل البيانات</button>`;
       }
       document.getElementById('academicModalFooter').innerHTML = footer;
@@ -568,6 +624,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       document.getElementById('editEmail').value = a.email;
       document.getElementById('editSpecialty').value = a.specialty ?? '';
       document.getElementById('editDegree').value = a.degree ?? 'بكالوريوس';
+      document.getElementById('editStatus').value = a.status || 'approved';
       Modal.open('editAcademicModal');
     }
 
@@ -578,6 +635,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       const email = document.getElementById('editEmail').value.trim();
       const specialty = document.getElementById('editSpecialty').value.trim();
       const degree = document.getElementById('editDegree').value;
+      const status = document.getElementById('editStatus').value;
 
       if (!name || !email) {
         Toast.show('يرجى تعبئة الاسم والبريد الإلكتروني', 'warning');
@@ -592,6 +650,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       formData.append('email', email);
       formData.append('specialty', specialty);
       formData.append('degree', degree);
+      formData.append('status', status);
 
       fetch('../ajax/manage_academic.php', {
         method: 'POST',
@@ -693,6 +752,56 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       });
     }
 
+    function suspendAcademic(id, name) {
+      Modal.confirm('إيقاف حساب الأكاديمي', `هل أنت متأكد من رغبتك في إيقاف حساب "${name}"؟ سيتم منعه من تسجيل الدخول واستلام أو قبول أي طلبات جديدة فوراً.`, () => {
+        const formData = new FormData();
+        formData.append('csrf_token', csrfTokenJs);
+        formData.append('action', 'update_status');
+        formData.append('id', id);
+        formData.append('status', 'suspended');
+
+        fetch('../ajax/manage_academic.php', {
+          method: 'POST',
+          body: formData
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) {
+              Toast.show(`تم إيقاف حساب ${name} بنجاح`, 'warning');
+              setTimeout(() => location.reload(), 800);
+            } else {
+              Toast.show(res.message || 'حدث خطأ', 'error');
+            }
+          })
+          .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+      });
+    }
+
+    function activateAcademic(id, name) {
+      Modal.confirm('إعادة تنشيط الحساب', `هل تريد إلغاء إيقاف حساب الأكاديمي "${name}" وإعادته معتمداً نشطاً؟`, () => {
+        const formData = new FormData();
+        formData.append('csrf_token', csrfTokenJs);
+        formData.append('action', 'update_status');
+        formData.append('id', id);
+        formData.append('status', 'approved');
+
+        fetch('../ajax/manage_academic.php', {
+          method: 'POST',
+          body: formData
+        })
+          .then(r => r.json())
+          .then(res => {
+            if (res.success) {
+              Toast.show(`تم إعادة تنشيط حساب ${name} بنجاح`, 'success');
+              setTimeout(() => location.reload(), 800);
+            } else {
+              Toast.show(res.message || 'حدث خطأ', 'error');
+            }
+          })
+          .catch(() => Toast.show('حدث خطأ في الاتصال بالخادم', 'error'));
+      });
+    }
+
     /* ── Helper ── */
     function escHtml(str) { return (str ?? '').replace(/'/g, "\\'"); }
 
@@ -742,6 +851,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
           // Re-render
           renderTable('all', filtered.all, state.all);
           renderTable('approved', filtered.approved, state.approved);
+          renderTable('suspended', filtered.suspended, state.suspended || 1);
           renderTable('rejected', filtered.rejected, state.rejected);
           renderPendingCards();
 
@@ -773,6 +883,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       } else {
         renderTable('all', filtered.all, 1);
         renderTable('approved', filtered.approved, 1);
+        renderTable('suspended', filtered.suspended, 1);
         renderTable('rejected', filtered.rejected, 1);
         renderPendingCards();
       }
@@ -788,6 +899,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       const searches = {
         all: document.getElementById('searchAll')?.value || '',
         approved: document.getElementById('searchApproved')?.value || '',
+        suspended: document.getElementById('searchSuspended')?.value || '',
         rejected: document.getElementById('searchRejected')?.value || ''
       };
 
@@ -823,6 +935,7 @@ const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content |
       formData.append('email', email);
       formData.append('specialty', specialty);
       formData.append('degree', degree);
+      formData.append('status', status);
       formData.append('bio', bio);
 
       fetch('../ajax/manage_academic.php', {

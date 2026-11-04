@@ -33,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
     // Validation
     if (!$firstName || !$lastName || !$email || !$phone || !$password) {
         $error = 'يرجى تعبئة جميع الحقول المطلوبة.';
+    } elseif (empty($_POST['agree_terms'])) {
+        $error = 'يجب الموافقة على سياسة الاستخدام والخصوصية للمتابعة.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'البريد الإلكتروني غير صحيح.';
     } elseif (strlen($password) < 6) {
@@ -163,14 +165,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
       box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
     }
     .terms-box {
-      margin-bottom: 28px;
-      padding: 16px 20px;
-      background: rgba(79, 70, 229, 0.03);
-      border-radius: 28px;
+      margin-bottom: 24px;
+      padding: 14px 18px;
+      background: rgba(79, 70, 229, 0.04);
+      border-radius: 18px;
       border: 1px solid var(--border-color);
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-align: right;
+    }
+    .terms-box input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .terms-box label {
+      cursor: pointer;
+      user-select: none;
+      margin: 0;
+      line-height: 1.5;
       font-size: 13px;
-      color: var(--text-muted);
-      text-align: center;
     }
     /* تحسين المسافات على اليمين واليسار داخل الحقول */
     .auth-card .form-input {
@@ -273,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
           <label>📞 رقم الجوال <span style="color:var(--danger)">*</span></label>
           <input type="tel" name="phone" class="form-input" dir="ltr"
                  value="<?= e($_POST['phone'] ?? '') ?>"
-                 placeholder="05XXXXXXXX" required>
+                 placeholder="أدخل رقم جوالك" required>
         </div>
 
         <div class="form-row">
@@ -290,9 +309,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
         </div>
 
         <div class="terms-box">
-          ✅ بالنقر على "إنشاء الحساب" فأنت توافق على 
-          <a href="#" style="color:var(--primary);font-weight:700">سياسة الخصوصية</a> و 
-          <a href="#" style="color:var(--primary);font-weight:700">شروط الاستخدام</a>.
+          <input type="checkbox" name="agree_terms" id="agree_terms" value="1" <?= !empty($_POST['agree_terms']) ? 'checked' : '' ?> required>
+          <label for="agree_terms">
+            أوافق على <a href="student/policy.php" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;text-decoration:underline">سياسة الاستخدام والخصوصية</a> الخاصة بالمنصة.
+          </label>
         </div>
 
         <button type="submit" class="btn btn-primary" id="regBtn"
@@ -344,6 +364,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['do_register'])) {
       const pw2 = document.getElementById('pw2').value;
       if (pw !== pw2) {
         alert('⚠️ كلمتا المرور غير متطابقتين.');
+        return false;
+      }
+      const agree = document.getElementById('agree_terms');
+      if (agree && !agree.checked) {
+        alert('⚠️ يجب الموافقة على سياسة الاستخدام والخصوصية للمتابعة.');
         return false;
       }
       const btn = document.getElementById('regBtn');

@@ -33,15 +33,66 @@ function uploadQualificationDoc($fileArray)
     if (!$fileArray || !isset($fileArray['error']) || $fileArray['error'] !== UPLOAD_ERR_OK) {
         return null;
     }
+
+    $maxSize = 10 * 1024 * 1024; // 10MB كحد أقصى
+    $fileSize = (int) ($fileArray['size'] ?? 0);
+    if ($fileSize <= 0 || $fileSize > $maxSize) {
+        return null;
+    }
+
+    // قائمة الامتدادات المسموحة لوثائق ومؤهلات الأكاديمي
+    $allowed = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+    $origName = basename((string) ($fileArray['name'] ?? ''));
+    $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+    if ($origName === '' || !in_array($ext, $allowed, true)) {
+        return null;
+    }
+
+    $tmpPath = (string) ($fileArray['tmp_name'] ?? '');
+    if (!$tmpPath || !is_uploaded_file($tmpPath)) {
+        return null;
+    }
+
+    // التحقق الصارم من النوع الحقيقي للملف لمنع تزييف الامتدادات
+    if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) {
+        $isRealImage = false;
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($tmpPath);
+            $isRealImage = in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true);
+        } else {
+            $info = @getimagesize($tmpPath);
+            $isRealImage = is_array($info) && !empty($info['mime'])
+                && in_array($info['mime'], ['image/jpeg', 'image/png', 'image/webp'], true);
+        }
+        if (!$isRealImage) {
+            return null;
+        }
+    } elseif ($ext === 'pdf') {
+        $head = (string) @file_get_contents($tmpPath, false, null, 0, 5);
+        if (strpos($head, '%PDF-') !== 0) {
+            return null;
+        }
+        if (class_exists('finfo')) {
+            $finfo = new finfo(FILEINFO_MIME_TYPE);
+            $mime = $finfo->file($tmpPath);
+            if (!in_array($mime, ['application/pdf', 'application/x-pdf', 'application/acrobat'], true)) {
+                return null;
+            }
+        }
+    }
+
     $uploadDir = __DIR__ . '/../../uploads/qualifications/';
     if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0777, true);
+        @mkdir($uploadDir, 0755, true);
     }
-    $fileName = basename($fileArray['name']);
-    $ext = pathinfo($fileName, PATHINFO_EXTENSION);
-    $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . ($ext ? '.' . $ext : '');
+    if (!is_dir($uploadDir) || !is_writable($uploadDir)) {
+        return null;
+    }
+
+    $uniqueName = 'qual_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $ext;
     $filePath = $uploadDir . $uniqueName;
-    if (move_uploaded_file($fileArray['tmp_name'], $filePath)) {
+    if (move_uploaded_file($tmpPath, $filePath)) {
         return 'uploads/qualifications/' . $uniqueName;
     }
     return null;
@@ -55,49 +106,17 @@ if (!$action) {
 
 $academicId = (int) ($_SESSION['academic_id'] ?? 0);
 
-// ── إضافة تلقائية للأعمدة (logo + الصورة الشخصية) إن لم تكن موجودة ──
-// تعمل عند أي استدعاء، وتعود بنتيجة لمعرفة إن نجحت أم لا
-function columnExists($conn, $table, $column)
-{
-    try {
-        // استخدام information_schema بدلاً من SHOW COLUMNS ... LIKE ?
-        // لأن SHOW لا يدعم المعاملات في وضع الـ native prepared statements
-        // فيعود استثناء دائماً حتى لو كان العمود موجوداً.
-        $stmt = $conn->prepare(
-            "SELECT COUNT(*) FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
-        );
-        $stmt->execute([$table, $column]);
-        return (int) $stmt->fetchColumn() > 0;
-    } catch (Exception $e) {
-        error_log("columnExists failed for $table.$column: " . $e->getMessage());
-        return false;
+if ($academicId > 0 && !in_array($action, ['register_academic', 'check_email', 'academic_login'], true)) {
+    $st = db()->prepare('SELECT status FROM academics WHERE id = ? LIMIT 1');
+    $st->execute([$academicId]);
+    $stVal = $st->fetchColumn();
+    if ($stVal === 'suspended') {
+        sendJSONResponse(false, 'تم إيقاف / تجميد حسابك الأكاديمي من قِبل الإدارة. لا يمكنك تنفيذ أي عمليات.');
+    } elseif ($stVal === 'rejected') {
+        sendJSONResponse(false, 'تم رفض حسابك من قِبل الإدارة.');
     }
 }
 
-function ensureColumn($conn, $table, $column, $definition)
-{
-    try {
-        if (!columnExists($conn, $table, $column)) {
-            $conn->exec("ALTER TABLE `$table` ADD COLUMN `$column` $definition");
-        }
-        return true;
-    } catch (Exception $e) {
-        error_log("ensureColumn failed for $table.$column: " . $e->getMessage());
-        return false;
-    }
-}
-
-try {
-    $dbEnsure = db();
-    if ($dbEnsure) {
-        ensureColumn($dbEnsure, 'academic_bank_accounts', 'logo', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($dbEnsure, 'academics', 'avatar', 'VARCHAR(255) DEFAULT NULL');
-        ensureColumn($dbEnsure, 'academic_qualifications', 'document_file', 'VARCHAR(255) DEFAULT NULL');
-    }
-} catch (Exception $e) {
-    // تجاهل
-}
 
 // رفع الصورة الشخصية للأكاديمي
 if ($action === 'upload_avatar') {
@@ -153,48 +172,34 @@ if ($action === 'update_profile') {
         sendJSONResponse(false, 'الجلسة منتهية، يرجى تسجيل الدخول مرة أخرى.');
     }
     $academicId = (int) $_SESSION['academic_id'];
-    $dbGet = db();
-    $stmtGet = $dbGet->prepare("SELECT * FROM academics WHERE id = ?");
+    $db = db();
+    $stmtGet = $db->prepare("SELECT * FROM academics WHERE id = ?");
     $stmtGet->execute([$academicId]);
     $academic = $stmtGet->fetch() ?: [];
-
 
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $bio = trim($_POST['bio'] ?? '');
     $available = (isset($_POST['availability']) && $_POST['availability'] === 'available') ? 'available' : 'busy';
+    $startingPrice = isset($_POST['starting_price']) ? floatval($_POST['starting_price']) : floatval($academic['starting_price'] ?? 0);
+    $iban = isset($_POST['iban']) ? trim($_POST['iban']) : ($academic['iban'] ?? '');
+    $bankName = isset($_POST['bank_name']) ? trim($_POST['bank_name']) : ($academic['bank_name'] ?? '');
+    $accountName = isset($_POST['account_name']) ? trim($_POST['account_name']) : ($academic['account_name'] ?? '');
 
     if (!$name || !$email || !$phone) {
-        sendJSONResponse(false, 'يرجى ملء الاسم، البريد الوإيميل، ورقم الهاتف.');
+        sendJSONResponse(false, 'يرجى ملء الاسم، البريد الإلكتروني، ورقم الهاتف.');
     }
 
     // Validate email uniqueness (excluding current academic)
     try {
-        $db = db();
         $chk = $db->prepare("SELECT id FROM academics WHERE email = ? AND id != ?");
         $chk->execute([$email, $academicId]);
         if ($chk->fetch()) {
             sendJSONResponse(false, 'هذا البريد الإلكتروني مستخدم مسبقاً من قبل أكاديمي آخر.');
         }
 
-        $sql = "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?";
-        $params = [$name, $email, $phone, $bio, $available];
-
-        // التأكد من وجود عمود الصورة الشخصية قبل محاولة التحديث
-        // (في السيرفرات المبنية من نسخة قديمة قد لا يكون موجوداً)
-        $dbAvatarChk = db();
-        if (!columnExists($dbAvatarChk, 'academics', 'avatar')) {
-            if (ensureColumn($dbAvatarChk, 'academics', 'avatar', 'VARCHAR(255) DEFAULT NULL')) {
-                // أُضيف الآن — نكمل
-            } else {
-                sendJSONResponse(false, 'تعذر حفظ الصورة الشخصية: عمود الصورة غير موجود في قاعدة البيانات، ولم تنجح الإضافة التلقائية (ينقص المستخدم صلاحية ALTER TABLE). يُرجى تشغيل ملف الترحيل migrations/2026_09_14_01_add_avatar_to_academics.sql على قاعدة البيانات.');
-            }
-        }
-
-        // تخزين/تحديث أو حذف الصورة الشخصية.
-        // الافتراضي: الإبقاء على الصورة الحالية (كي لا تُمسح عند حفظ
-        // تغييرات أخرى لا تشمل حقل avatar، مثل زر «حفظ التغييرات»).
+        // تخزين/تحديث أو حذف الصورة الشخصية
         $avatarPath = $academic['avatar'] ?? null;
         if (isset($_POST['avatar'])) {
             $avatarPath = trim($_POST['avatar']);
@@ -202,11 +207,9 @@ if ($action === 'update_profile') {
                 $avatarPath = null;
             }
         }
-        // إزالة الصورة إذا أُرسل العلم avatar_cleared
         if (!empty($_POST['avatar_cleared'])) {
             $avatarPath = null;
         }
-        // حذف الصورة القديمة من القرص إذا تم استبدالها بأخرى
         $oldAvatar = $academic['avatar'] ?? '';
         if (!empty($_POST['avatar']) && $oldAvatar && $avatarPath && $avatarPath !== $oldAvatar) {
             $oldFile = dirname(__DIR__) . '/../' . $oldAvatar;
@@ -214,30 +217,33 @@ if ($action === 'update_profile') {
                 @unlink($oldFile);
             }
         }
-        $sql .= ", avatar = ?";
-        $params[] = $avatarPath;
 
-        $sql .= " WHERE id = ?";
-        $params[] = $academicId;
-
+        $sql = "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?, starting_price = ?, iban = ?, bank_name = ?, account_name = ?, avatar = ? WHERE id = ?";
+        $params = [$name, $email, $phone, $bio, $available, $startingPrice, $iban, $bankName, $accountName, $avatarPath, $academicId];
         $db->prepare($sql)->execute($params);
 
         // حفظ الخدمات المحددة (شجرة الخدمات): استبدال القائمة القديمة بالمحددات الجديدة
-        // ملاحظة: PHP مع FormData: عند إرسال services[] واحد فقط قد يصل كنص، لذا نوحّد الصيغة
-        $servicesRaw = $_POST['services'] ?? [];
-        if (is_string($servicesRaw)) {
-            $servicesRaw = $servicesRaw !== '' ? [$servicesRaw] : [];
-        }
-        $serviceIds = array_values(array_unique(array_filter(array_map('intval', (array) $servicesRaw))));
-        $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
-        if (!empty($serviceIds)) {
-            $srvStmt = $db->prepare("INSERT IGNORE INTO academic_services (academic_id, service_id, custom_price) VALUES (?, ?, NULL)");
-            foreach ($serviceIds as $srvId) {
-                $srvStmt->execute([$academicId, $srvId]);
+        if (isset($_POST['services'])) {
+            $servicesRaw = $_POST['services'];
+            if (is_string($servicesRaw)) {
+                $servicesRaw = $servicesRaw !== '' ? [$servicesRaw] : [];
+            }
+            $serviceIds = array_values(array_unique(array_filter(array_map('intval', (array) $servicesRaw))));
+            $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
+            if (!empty($serviceIds)) {
+                $srvStmt = $db->prepare("INSERT IGNORE INTO academic_services (academic_id, service_id, custom_price) VALUES (?, ?, NULL)");
+                foreach ($serviceIds as $srvId) {
+                    $srvStmt->execute([$academicId, $srvId]);
+                }
             }
         }
 
-        sendJSONResponse(true, 'تم حفظ البيانات الشخصية بنجاح.');
+        // تحديث بيانات الجلسة الحالية
+        $_SESSION['academic_name']   = $name;
+        $_SESSION['academic_email']  = $email;
+        $_SESSION['academic_avatar'] = mb_substr($name, 0, 2);
+
+        sendJSONResponse(true, 'تم حفظ البيانات بنجاح.');
     } catch (Exception $e) {
         sendJSONResponse(false, 'فشل حفظ البيانات: ' . $e->getMessage());
     }
@@ -293,6 +299,28 @@ if ($action === 'register') {
 
     if (!$hasBachelor && !$hasMasters && !$hasPhd) {
         sendJSONResponse(false, 'يرجى تقديم مؤهل أكاديمي واحد على الأقل.');
+    }
+
+    // التحقق الصارم من الترتيب الزمني لسنوات التخرج: بكالوريوس ➜ ماجستير ➜ دكتوراه
+    $bsYear = $hasBachelor && !empty($_POST['bsYear']) ? intval($_POST['bsYear']) : 0;
+    $msYear = $hasMasters && !empty($_POST['msYear']) ? intval($_POST['msYear']) : 0;
+    $phdYear = $hasPhd && !empty($_POST['phdYear']) ? intval($_POST['phdYear']) : 0;
+    $currentYear = (int)date('Y');
+
+    foreach ([['البكالوريوس', $bsYear], ['الماجستير', $msYear], ['الدكتوراه', $phdYear]] as [$lbl, $y]) {
+        if ($y > 0 && ($y < 1960 || $y > $currentYear + 1)) {
+            sendJSONResponse(false, "يرجى إدخال سنة تخرج صالحة لشهادة $lbl (بين 1960 و " . ($currentYear + 1) . ").");
+        }
+    }
+
+    if ($hasBachelor && $hasMasters && $bsYear > 0 && $msYear > 0 && $msYear <= $bsYear) {
+        sendJSONResponse(false, "تنبيه: سنة تخرج الماجستير ($msYear) يجب أن تكون بعد سنة تخرج البكالوريوس ($bsYear).");
+    }
+    if ($hasMasters && $hasPhd && $msYear > 0 && $phdYear > 0 && $phdYear <= $msYear) {
+        sendJSONResponse(false, "تنبيه: سنة تخرج الدكتوراه ($phdYear) يجب أن تكون بعد سنة تخرج الماجستير ($msYear).");
+    }
+    if ($hasBachelor && $hasPhd && $bsYear > 0 && $phdYear > 0 && $phdYear <= $bsYear) {
+        sendJSONResponse(false, "تنبيه: سنة تخرج الدكتوراه ($phdYear) يجب أن تكون بعد سنة تخرج البكالوريوس ($bsYear).");
     }
 
     try {
@@ -436,19 +464,107 @@ if ($action === 'register') {
     }
 }
 
-// ── AUTH CHECK FOR REMAINING ACTIONS ────────────────────────
+// ─────────────────────────────────────────────────────────────
+// 2. CREATE SERVICE ORDER (FROM STUDENT)
+// ─────────────────────────────────────────────────────────────
 if ($action === 'create_order') {
-    // Requires logged-in student user
     if (!isset($_SESSION['user_id'])) {
         sendJSONResponse(false, 'يرجى تسجيل الدخول كطالب لطلب الخدمة.');
     }
-} else {
-    // Requires logged-in academic
-    if (!isset($_SESSION['academic_id'])) {
-        sendJSONResponse(false, 'غير مصرح: يرجى تسجيل الدخول كأكاديمي.');
+    $studentId = (int) $_SESSION['user_id'];
+    $academicTargetId = intval($_POST['academic_id'] ?? 0);
+    $serviceId = intval($_POST['service_id'] ?? 0);
+    $description = trim($_POST['description'] ?? '');
+    $deadline = trim($_POST['deadline'] ?? '');
+    $packageType = trim($_POST['package_type'] ?? 'البداية');
+
+    if ($academicTargetId <= 0 || $serviceId <= 0 || !$description || !$deadline) {
+        sendJSONResponse(false, 'يرجى تعبئة كافة حقول النموذج.');
     }
-    $academicId = $_SESSION['academic_id'];
+
+    try {
+        $db = db();
+
+        $packageId = null;
+        $amount = 349.00;
+
+        $pkgStmt = $db->prepare("SELECT id, price FROM packages WHERE name = ? LIMIT 1");
+        $pkgStmt->execute([$packageType]);
+        $pkg = $pkgStmt->fetch();
+        if ($pkg) {
+            $packageId = $pkg['id'];
+            $amount = floatval($pkg['price']);
+        } else {
+            $acPriceStmt = $db->prepare("SELECT starting_price FROM academics WHERE id = ?");
+            $acPriceStmt->execute([$academicTargetId]);
+            $acPrice = $acPriceStmt->fetchColumn();
+            if ($acPrice) {
+                $amount = floatval($acPrice);
+            }
+        }
+
+        $number = generateOrderNumber();
+
+        $stmt = $db->prepare(
+            'INSERT INTO orders
+                (order_number, student_id, academic_id, service_id, package_id, specialty,
+                    academic_level, language, description, deadline, amount, status, created_at)
+                VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
+        );
+
+        $stmt->execute([
+            $number,
+            $studentId,
+            $serviceId,
+            $packageId,
+            'عام',
+            $description,
+            $deadline,
+            $amount
+        ]);
+
+        $orderId = (int) $db->lastInsertId();
+
+        $fee = round($amount * 0.15, 2);
+        $net = round($amount - $fee, 2);
+        $payNum = generatePaymentNumber();
+
+        $payStmt = $db->prepare(
+            'INSERT INTO payments
+                (payment_number, order_id, student_id, amount, platform_fee, academic_net, method, status, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, "credit_card", "paid", NOW())'
+        );
+        $payStmt->execute([
+            $payNum,
+            $orderId,
+            $studentId,
+            $amount,
+            $fee,
+            $net
+        ]);
+
+        createNotification(
+            1,
+            'admin',
+            'طلب جديد بانتظار التعيين 📋',
+            'تم إنشاء طلب جديد برقم ' . $number . ' وهو بانتظار التعيين للأكاديميين.',
+            '📋',
+            'admin/pages/order-details.php?id=' . $number
+        );
+
+        sendNewOrderToAdminEmail($orderId);
+
+        sendJSONResponse(true, 'تم تقديم الطلب ودفع الرسوم بنجاح! تم تحويل الطلب للإدارة لتعيين الأكاديمي المناسب.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'فشل إرسال الطلب: ' . $e->getMessage());
+    }
 }
+
+// ── التحقق من تسجيل دخول الأكاديمي للعمليات اللاحقة ──────────
+if (!isset($_SESSION['academic_id'])) {
+    sendJSONResponse(false, 'غير مصرح: يرجى تسجيل الدخول كأكاديمي.');
+}
+$academicId = (int) $_SESSION['academic_id'];
 
 // ─────────────────────────────────────────────────────────────
 // 2. UPDATE ORDER STATUS
@@ -485,7 +601,7 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
         $is_authorized = true;
     } else {
         // Check if academic is assigned in order_assignments table
-        $assignStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND academic_id = ?");
+        $assignStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND academic_id = ? AND status NOT IN ('rejected', 'replaced')");
         $assignStmt->execute([$orderId, $academicId]);
         if ($assignStmt->fetchColumn() > 0) {
             $is_authorized = true;
@@ -538,7 +654,7 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
                 ->execute([$orderId, $academicId]);
 
             // Check if there are other accepted or pending academics
-            $remStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status != 'rejected'");
+            $remStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced')");
             $remStmt->execute([$orderId]);
             $remaining = (int) $remStmt->fetchColumn();
 
@@ -561,14 +677,81 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
             }
 
             sendJSONResponse(true, 'تم تسجيل اعتذارك عن هذه المهمة بنجاح.');
+        } elseif ($status === 'completed') {
+            // تحديث حالة إسناد هذا الأكاديمي إلى مكتمل
+            $db->prepare("UPDATE order_assignments SET status = 'completed', completed_at = NOW() WHERE order_id = ? AND academic_id = ?")
+                ->execute([$orderId, $academicId]);
+
+            // التحقق من عدد الأكاديميين المسندين للطلب (غير المعتذرين)
+            $allAssignedStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced')");
+            $allAssignedStmt->execute([$orderId]);
+            $totalAssigned = (int) $allAssignedStmt->fetchColumn();
+
+            // التحقق من عدد الأكاديميين الذين أكملوا مهمتهم
+            $completedStmt = $db->prepare("SELECT COUNT(*) FROM order_assignments WHERE order_id = ? AND status = 'completed'");
+            $completedStmt->execute([$orderId]);
+            $completedCount = (int) $completedStmt->fetchColumn();
+
+            // معالجة حالة الطلبات المسندة فقط عبر حقل academic_id دون سجلات في order_assignments
+            if ($totalAssigned === 0 && !empty($order['academic_id']) && (int)$order['academic_id'] === (int)$academicId) {
+                $totalAssigned = 1;
+                $completedCount = 1;
+            }
+
+            if ($totalAssigned > 0 && $completedCount >= $totalAssigned) {
+                // اكتمل العمل من قِبل جميع الأكاديميين المكلفين من الإدارة
+                updateOrderStatus($orderId, 'completed');
+
+                createNotification(
+                    $order['student_id'],
+                    'student',
+                    'اكتمل تنفيذ طلبك بالكامل 🎉',
+                    'أكمل جميع الأكاديميين المكلفين تنفيذ طلبك #' . $order['order_number'] . ' بنجاح.',
+                    '🎉',
+                    'student/order-details.php?id=' . $orderId
+                );
+
+                sendJSONResponse(true, 'تم اكتمال الطلب بنجاح بعد إنجازه من قبل جميع الأكاديميين المكلفين.');
+            } else {
+                // تم إنجاز هذا الجزء فقط، وما زال باقي الفريق يعمل
+                $remaining = max(1, $totalAssigned - $completedCount);
+                $acName = $db->query("SELECT name FROM academics WHERE id = " . (int)$academicId)->fetchColumn() ?: 'أحد الأكاديميين';
+
+                // إشعار الطالب بتقدم العمل
+                createNotification(
+                    $order['student_id'],
+                    'student',
+                    'إنجاز جديد في طلبك #' . $order['order_number'] . ' ⏳',
+                    'أنهى ' . $acName . ' الجزء الخاص به بنجاح، والطلب بانتظار إنجاز باقي الأكاديميين المكلفين (' . $remaining . ' متبقي).',
+                    '⏳',
+                    'student/order-details.php?id=' . $orderId
+                );
+
+                // إشعار الإدارة
+                $adminId = (int) $db->query("SELECT id FROM users WHERE role = 'admin' LIMIT 1")->fetchColumn();
+                if ($adminId) {
+                    createNotification(
+                        $adminId,
+                        'admin',
+                        'إنجاز أكاديمي في الطلب #' . $order['order_number'],
+                        'أنهى الأكاديمي ' . $acName . ' الجزء المخصص له في الطلب #' . $order['order_number'] . ' (' . $remaining . ' متبقي لاكتمال الطلب).',
+                        '📋',
+                        'admin/pages/order-details.php?id=' . $order['order_number']
+                    );
+                }
+
+                sendJSONResponse(true, 'تم تسجيل إكمالك للجزء المخصص لك بنجاح! سيتحول الطلب إلى مكتمل بعد إنجاز باقي الفريق (' . $remaining . ' متبقي).');
+            }
         } else {
-            // Other status updates (in_progress, revision, completed, etc.)
+            // تحديثات الحالات الأخرى (قيد التنفيذ، تحت المراجعة، إلخ)
+            $db->prepare("UPDATE order_assignments SET status = 'accepted' WHERE order_id = ? AND academic_id = ? AND status = 'assigned'")
+                ->execute([$orderId, $academicId]);
+
             updateOrderStatus($orderId, $status);
 
             $statusLabels = [
                 'in_progress' => 'طلبك الآن قيد التنفيذ.',
                 'revision' => 'طلبك حالياً تحت المراجعة والتدقيق.',
-                'completed' => 'اكتمل تنفيذ طلبك بنجاح.',
                 'cancelled' => 'تم إلغاء الطلب.'
             ];
             $msg = $statusLabels[$status] ?? 'تم تحديث حالة طلبك.';
@@ -589,62 +772,6 @@ if ($action === 'accept_assignment' || $action === 'reject_assignment' || $actio
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 3. UPDATE PROFILE/SETTINGS
-// ─────────────────────────────────────────────────────────────
-if ($action === 'update_profile') {
-    $name = trim($_POST['name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $bio = trim($_POST['bio'] ?? '');
-    $availability = trim($_POST['availability'] ?? 'available');
-    $startingPrice = floatval($_POST['starting_price'] ?? 0);
-    $iban = trim($_POST['iban'] ?? '');
-    $bankName = trim($_POST['bank_name'] ?? '');
-    $accountName = trim($_POST['account_name'] ?? '');
-    $services = $_POST['services'] ?? []; // Array of services
-    $avatar = trim($_POST['avatar'] ?? '');
-    $avatarCleared = isset($_POST['avatar_cleared']) ? (intval($_POST['avatar_cleared']) ? true : false) : false;
-
-    if (!$name || !$email || !$phone) {
-        sendJSONResponse(false, 'الاسم والبريد ورقم الجوال حقول مطلوبة.');
-    }
-
-    try {
-        $db = db();
-
-        // Check email uniqueness
-        $check = $db->prepare("SELECT id FROM academics WHERE email = ? AND id != ?");
-        $check->execute([$email, $academicId]);
-        if ($check->rowCount() > 0) {
-            sendJSONResponse(false, 'البريد الإلكتروني مستخدم بالفعل.');
-        }
-
-        // Update academic details
-        $stmt = $db->prepare(
-            "UPDATE academics SET name = ?, email = ?, phone = ?, bio = ?, availability = ?, starting_price = ?, iban = ?, bank_name = ?, account_name = ? WHERE id = ?"
-        );
-        $stmt->execute([$name, $email, $phone, $bio, $availability, $startingPrice, $iban, $bankName, $accountName, $academicId]);
-
-        // Sync Services
-        $db->prepare("DELETE FROM academic_services WHERE academic_id = ?")->execute([$academicId]);
-        if (!empty($services)) {
-            $ins = $db->prepare("INSERT INTO academic_services (academic_id, service_id) VALUES (?, ?)");
-            foreach ($services as $srvId) {
-                $ins->execute([$academicId, intval($srvId)]);
-            }
-        }
-
-        // Update session name/email
-        $_SESSION['academic_name'] = $name;
-        $_SESSION['academic_email'] = $email;
-        $_SESSION['academic_avatar'] = mb_substr($name, 0, 2);
-
-        sendJSONResponse(true, 'تم حفظ التعديلات بنجاح.');
-    } catch (Exception $e) {
-        sendJSONResponse(false, 'فشل الحفظ: ' . $e->getMessage());
-    }
-}
 
 // ─────────────────────────────────────────────────────────────
 // 4. CHANGE PASSWORD
@@ -751,106 +878,6 @@ if ($action === 'submit_withdraw') {
     }
 }
 
-// ─────────────────────────────────────────────────────────────
-// 6. CREATE SERVICE ORDER FROM STUDENT
-// ─────────────────────────────────────────────────────────────
-if ($action === 'create_order') {
-    $studentId = $_SESSION['user_id'];
-    $academicTargetId = intval($_POST['academic_id'] ?? 0);
-    $serviceId = intval($_POST['service_id'] ?? 0);
-    $description = trim($_POST['description'] ?? '');
-    $deadline = trim($_POST['deadline'] ?? '');
-    $packageType = trim($_POST['package_type'] ?? 'البداية'); // Default mock package
-
-    if ($academicTargetId <= 0 || $serviceId <= 0 || !$description || !$deadline) {
-        sendJSONResponse(false, 'يرجى تعبئة كافة حقول النموذج.');
-    }
-
-    try {
-        $db = db();
-
-        // Get package info or use academic starting price
-        $packageId = null;
-        $amount = 349.00; // default average
-
-        // Fetch package price from packages table
-        $pkgStmt = $db->prepare("SELECT id, price FROM packages WHERE name = ? LIMIT 1");
-        $pkgStmt->execute([$packageType]);
-        $pkg = $pkgStmt->fetch();
-        if ($pkg) {
-            $packageId = $pkg['id'];
-            $amount = floatval($pkg['price']);
-        } else {
-            // Get starting price of academic
-            $acPriceStmt = $db->prepare("SELECT starting_price FROM academics WHERE id = ?");
-            $acPriceStmt->execute([$academicTargetId]);
-            $acPrice = $acPriceStmt->fetchColumn();
-            if ($acPrice) {
-                $amount = floatval($acPrice);
-            }
-        }
-
-        // Generate Order Number
-        $number = generateOrderNumber();
-
-        // Insert order
-        $stmt = $db->prepare(
-            'INSERT INTO orders
-                (order_number, student_id, academic_id, service_id, package_id, specialty,
-                    academic_level, language, description, deadline, amount, status, created_at)
-                VALUES (?, ?, NULL, ?, ?, ?, "ماجستير", "العربية", ?, ?, ?, "pending_assignment", NOW())'
-        );
-
-        $stmt->execute([
-            $number,
-            $studentId,
-            $serviceId,
-            $packageId,
-            'عام',
-            $description,
-            $deadline,
-            $amount
-        ]);
-
-        $orderId = (int) $db->lastInsertId();
-
-        // Create Payment
-        $fee = round($amount * 0.15, 2);
-        $net = round($amount - $fee, 2);
-        $payNum = generatePaymentNumber();
-
-        $payStmt = $db->prepare(
-            'INSERT INTO payments
-                (payment_number, order_id, student_id, amount, platform_fee, academic_net, method, status, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, "credit_card", "paid", NOW())'
-        );
-        $payStmt->execute([
-            $payNum,
-            $orderId,
-            $studentId,
-            $amount,
-            $fee,
-            $net
-        ]);
-
-        // Send notification to admin (user ID 1)
-        createNotification(
-            1,
-            'admin',
-            'طلب جديد بانتظار التعيين 📋',
-            'تم إنشاء طلب جديد برقم ' . $number . ' وهو بانتظار التعيين للأكاديميين.',
-            '📋',
-            'admin/pages/order-details.php?id=' . $number
-        );
-
-        // Send email to admin (SMTP)
-        sendNewOrderToAdminEmail($orderId);
-
-        sendJSONResponse(true, 'تم تقديم الطلب ودفع الرسوم بنجاح! تم تحويل الطلب للإدارة لتعيين الأكاديمي المناسب.');
-    } catch (Exception $e) {
-        sendJSONResponse(false, 'فشل إرسال الطلب: ' . $e->getMessage());
-    }
-}
 
 // ─────────────────────────────────────────────────────────────
 // 7. MARK NOTIFICATIONS AS READ
@@ -882,9 +909,12 @@ if ($action === 'send_message') {
         // Ensure academic owns the order or is assigned to it
         $orderStmt = $db->prepare("
                 SELECT id, student_id FROM orders 
-                WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+                WHERE id = ? AND (
+                    (academic_id = ? AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced'))
+                    OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced'))
+                )
             ");
-        $orderStmt->execute([$orderId, $academicId, $academicId]);
+        $orderStmt->execute([$orderId, $academicId, $academicId, $academicId]);
         $order = $orderStmt->fetch();
 
         if (!$order) {
@@ -926,6 +956,70 @@ if ($action === 'send_message') {
 }
 
 // ─────────────────────────────────────────────────────────────
+// 8.5 SEND TEAM MESSAGE (Internal chat between academics & admin)
+// ─────────────────────────────────────────────────────────────
+if ($action === 'send_team_message') {
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $content = trim($_POST['content'] ?? '');
+    $hasFile = !empty($_FILES['file']['name']);
+
+    if ($orderId <= 0 || (!$content && !$hasFile)) {
+        sendJSONResponse(false, 'معلومات غير مكتملة.');
+    }
+
+    try {
+        $db = db();
+
+        // Ensure academic is assigned to the order
+        $orderStmt = $db->prepare("
+            SELECT id, order_number FROM orders 
+            WHERE id = ? AND (
+                (academic_id = ? AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced'))
+                OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced'))
+            )
+        ");
+        $orderStmt->execute([$orderId, $academicId, $academicId, $academicId]);
+        $order = $orderStmt->fetch();
+
+        if (!$order) {
+            sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
+        }
+
+        // Save file attachment if any
+        $fileInfo = saveChatAttachmentUpload($_FILES['file'] ?? null);
+
+        // Send team message
+        $msgId = sendTeamMessage($orderId, $academicId, 'academic', $content, $fileInfo);
+
+        // Get academic sender name
+        $acName = $db->query("SELECT name FROM academics WHERE id = $academicId")->fetchColumn() ?: 'أكاديمي زميل';
+
+        // Notify other assigned academics on the team (excluding sender)
+        $teamStmt = $db->prepare("
+            SELECT DISTINCT academic_id FROM order_assignments 
+            WHERE order_id = ? AND academic_id != ? AND status NOT IN ('rejected', 'replaced')
+        ");
+        $teamStmt->execute([$orderId, $academicId]);
+        $teammates = $teamStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        foreach ($teammates as $teammateId) {
+            createNotification(
+                (int)$teammateId,
+                'academic',
+                'رسالة من فريق العمل 👥',
+                'أرسل زميلك ' . $acName . ' رسالة في نقاش فريق العمل للطلب ' . $order['order_number'],
+                '👥',
+                'academics/academic-order-details.php?id=' . $orderId . '#tab-team'
+            );
+        }
+
+        sendJSONResponse(true, 'تم إرسال الرسالة إلى فريق العمل بنجاح.');
+    } catch (Exception $e) {
+        sendJSONResponse(false, 'حدث خطأ: ' . $e->getMessage());
+    }
+}
+
+// ─────────────────────────────────────────────────────────────
 // 9. UPLOAD ATTACHMENT
 // ─────────────────────────────────────────────────────────────
 if ($action === 'upload_attachment') {
@@ -942,25 +1036,67 @@ if ($action === 'upload_attachment') {
         // Ensure academic owns the order or is assigned to it
         $orderStmt = $db->prepare("
                 SELECT id FROM orders 
-                WHERE id = ? AND (academic_id = ? OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status != 'rejected'))
+                WHERE id = ? AND (
+                    (academic_id = ? AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced'))
+                    OR id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced'))
+                )
             ");
-        $orderStmt->execute([$orderId, $academicId, $academicId]);
+        $orderStmt->execute([$orderId, $academicId, $academicId, $academicId]);
         if (!$orderStmt->fetch()) {
             sendJSONResponse(false, 'الطلب غير موجود أو لا تملك صلاحية.');
         }
 
-        $uploadDir = __DIR__ . '/../../uploads/orders/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+        $maxSize = 10 * 1024 * 1024; // 10MB
+        $fileSize = (int) ($file['size'] ?? 0);
+        if ($fileSize <= 0 || $fileSize > $maxSize) {
+            sendJSONResponse(false, 'حجم الملف يجب ألا يتجاوز 10 ميجابايت.');
         }
 
-        $fileName = basename($file['name']);
-        $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . '_' . preg_replace('/[^a-zA-Z0-9.\-_]/', '', $fileName);
+        $allowed = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'txt'];
+        $origName = basename((string) ($file['name'] ?? ''));
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        if ($origName === '' || !in_array($ext, $allowed, true)) {
+            sendJSONResponse(false, 'نوع الملف غير مسموح به.');
+        }
+
+        $tmpPath = (string) ($file['tmp_name'] ?? '');
+        if (!$tmpPath || !is_uploaded_file($tmpPath)) {
+            sendJSONResponse(false, 'الملف المرفوع غير صالح.');
+        }
+
+        // فحص نوع الملف الحقيقي
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+            $isRealImg = false;
+            if (class_exists('finfo')) {
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime = $finfo->file($tmpPath);
+                $isRealImg = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
+            } else {
+                $info = @getimagesize($tmpPath);
+                $isRealImg = is_array($info) && !empty($info['mime']);
+            }
+            if (!$isRealImg) {
+                sendJSONResponse(false, 'الملف ليس صورة صالحة.');
+            }
+        } elseif ($ext === 'pdf') {
+            $head = (string) @file_get_contents($tmpPath, false, null, 0, 5);
+            if (strpos($head, '%PDF-') !== 0) {
+                sendJSONResponse(false, 'ملف PDF غير صالح.');
+            }
+        }
+
+        $uploadDir = __DIR__ . '/../../uploads/orders/';
+        if (!is_dir($uploadDir)) {
+            @mkdir($uploadDir, 0755, true);
+        }
+
+        $safeName = preg_replace('/[^a-zA-Z0-9.\-_]/', '_', $origName);
+        $uniqueName = time() . '_' . bin2hex(random_bytes(8)) . '_' . $safeName;
         $filePath = $uploadDir . $uniqueName;
 
-        if (move_uploaded_file($file['tmp_name'], $filePath)) {
+        if (move_uploaded_file($tmpPath, $filePath)) {
             $db->prepare("INSERT INTO order_attachments (order_id, file_name, file_path, file_type, file_size, uploaded_by) VALUES (?, ?, ?, ?, ?, 'academic')")
-                ->execute([$orderId, $fileName, 'uploads/orders/' . $uniqueName, $file['type'], $file['size']]);
+                ->execute([$orderId, $origName, 'uploads/orders/' . $uniqueName, (string)($file['type'] ?? ''), $fileSize]);
 
             sendJSONResponse(true, 'تم الرفع بنجاح.');
         } else {
@@ -1105,7 +1241,7 @@ if ($action === 'delete_bank_account') {
 if ($action === 'get_qualifications') {
     try {
         $db = db();
-        $stmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY id ASC");
+        $stmt = $db->prepare("SELECT * FROM academic_qualifications WHERE academic_id = ? ORDER BY FIELD(level, 'بكالوريوس', 'ماجستير', 'دكتوراه') ASC, graduation_year ASC, id ASC");
         $stmt->execute([$academicId]);
         sendJSONResponse(true, 'ok', ['qualifications' => $stmt->fetchAll()]);
     } catch (Exception $e) {
@@ -1129,15 +1265,50 @@ if ($action === 'add_qualification' || $action === 'update_qualification') {
         sendJSONResponse(false, 'يرجى إدخال التخصص والجامعة.');
     }
 
+    // التحقق الصارم من الترتيب الزمني لسنوات التخرج: بكالوريوس ➜ ماجستير ➜ دكتوراه
+    if ($year) {
+        $currentYear = (int)date('Y');
+        if ($year < 1960 || $year > $currentYear + 1) {
+            sendJSONResponse(false, 'يرجى إدخال سنة تخرج صالحة (بين 1960 و ' . ($currentYear + 1) . ').');
+        }
+
+        // جلب المؤهلات الأخرى لنفس الأكاديمي للتحقق من التسلسل الزمني
+        $qStmt = $db->prepare("SELECT id, level, graduation_year FROM academic_qualifications WHERE academic_id = ? AND id != ?");
+        $qStmt->execute([$academicId, $id]);
+        $existingQuals = $qStmt->fetchAll();
+
+        foreach ($existingQuals as $eq) {
+            $eqYear = !empty($eq['graduation_year']) ? intval($eq['graduation_year']) : 0;
+            if ($eqYear <= 0) continue;
+
+            if ($level === 'ماجستير') {
+                if ($eq['level'] === 'بكالوريوس' && $year <= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج الماجستير ($year) يجب أن تكون بعد سنة تخرج البكالوريوس ($eqYear).");
+                }
+                if ($eq['level'] === 'دكتوراه' && $year >= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج الماجستير ($year) يجب أن تكون قبل سنة تخرج الدكتوراه ($eqYear).");
+                }
+            } elseif ($level === 'دكتوراه') {
+                if ($eq['level'] === 'ماجستير' && $year <= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج الدكتوراه ($year) يجب أن تكون بعد سنة تخرج الماجستير ($eqYear).");
+                }
+                if ($eq['level'] === 'بكالوريوس' && $year <= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج الدكتوراه ($year) يجب أن تكون بعد سنة تخرج البكالوريوس ($eqYear).");
+                }
+            } elseif ($level === 'بكالوريوس') {
+                if ($eq['level'] === 'ماجستير' && $year >= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج البكالوريوس ($year) يجب أن تكون قبل سنة تخرج الماجستير ($eqYear).");
+                }
+                if ($eq['level'] === 'دكتوراه' && $year >= $eqYear) {
+                    sendJSONResponse(false, "تنبيه: سنة تخرج البكالوريوس ($year) يجب أن تكون قبل سنة تخرج الدكتوراه ($eqYear).");
+                }
+            }
+        }
+    }
+
     try {
         $db = db();
 
-        // التأكد من وجود عمود وثيقة المؤهل قبل الحفظ (السيرفرات القديمة تفتقده)
-        if (!columnExists($db, 'academic_qualifications', 'document_file')) {
-            if (!ensureColumn($db, 'academic_qualifications', 'document_file', 'VARCHAR(255) DEFAULT NULL')) {
-                sendJSONResponse(false, 'تعذر حفظ المؤهل: عمود الوثيقة (document_file) غير موجود في قاعدة البيانات ولم تنجح الإضافة التلقائية (ينقص المستخدم صلاحية ALTER TABLE). يُرجى تشغيل ملف الترحيل migrations/2026_09_14_02_add_document_file_to_academic_qualifications.sql على قاعدة البيانات.');
-            }
-        }
 
         $docFile = uploadQualificationDoc($_FILES['document_file'] ?? null);
 

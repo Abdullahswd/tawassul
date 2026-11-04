@@ -102,8 +102,14 @@ if ($action === 'edit') {
             sendError('الأكاديمي غير موجود', 404);
         }
 
-        $stmt = $db->prepare("UPDATE academics SET name = ?, email = ?, specialty = ?, degree = ? WHERE id = ?");
-        $stmt->execute([$name, $email, $specialty, $degree, $id]);
+        $status = trim($_POST['status'] ?? '');
+        if ($status !== '' && in_array($status, ['approved', 'rejected', 'pending', 'suspended'], true)) {
+            $stmt = $db->prepare("UPDATE academics SET name = ?, email = ?, specialty = ?, degree = ?, status = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $specialty, $degree, $status, $id]);
+        } else {
+            $stmt = $db->prepare("UPDATE academics SET name = ?, email = ?, specialty = ?, degree = ? WHERE id = ?");
+            $stmt->execute([$name, $email, $specialty, $degree, $id]);
+        }
         
         $affected = $stmt->rowCount();
         if ($affected > 0) {
@@ -167,7 +173,7 @@ if ($action === 'update_status') {
     $id     = (int)($_POST['id'] ?? 0);
     $status = trim($_POST['status'] ?? '');
 
-    if ($id <= 0 || !in_array($status, ['approved', 'rejected', 'pending'])) {
+    if ($id <= 0 || !in_array($status, ['approved', 'rejected', 'pending', 'suspended'])) {
         sendError('بيانات غير صالحة: معرف أو حالة غير صحيحة');
     }
 
@@ -182,7 +188,13 @@ if ($action === 'update_status') {
         $stmt->execute([$status, $id]);
         
         if ($stmt->rowCount() > 0) {
-            $msg = ($status === 'approved') ? 'تم قبول الأكاديمي' : (($status === 'rejected') ? 'تم رفض الأكاديمي' : 'تم تغيير الحالة إلى قيد المراجعة');
+            $msg = match($status) {
+                'approved'  => 'تم اعتماد وتفعيل حساب الأكاديمي بنجاح',
+                'rejected'  => 'تم رفض حساب الأكاديمي',
+                'suspended' => 'تم إيقاف / تجميد حساب الأكاديمي بنجاح',
+                'pending'   => 'تم نقل الأكاديمي إلى قيد المراجعة',
+                default     => 'تم تحديث حالة الأكاديمي بنجاح'
+            };
             echo json_encode(['success' => true, 'message' => $msg]);
         } else {
             echo json_encode(['success' => true, 'message' => 'الحالة مطابقة بالفعل']);

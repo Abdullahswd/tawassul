@@ -8,7 +8,7 @@ $db = db();
 
 // جلب جميع الخدمات المفعلة من قاعدة البيانات مع بيانات الأب والمستوى
 $services_stmt = $db->query("
-    SELECT s.id, s.parent_id, s.name, s.icon, s.description, s.price, s.level, s.is_active,
+    SELECT s.id, s.parent_id, s.name, s.icon, s.description, s.price, s.level, s.is_active, s.needs_multiple_academics,
            (SELECT name FROM services p WHERE p.id = s.parent_id) AS parent_name
     FROM services s
     WHERE s.is_active = 1
@@ -152,12 +152,17 @@ ob_start();
           : (usedFromPackage
               ? `<a href="create-order.php?service_id=${s.id}" class="btn btn-primary" style="padding:8px 18px;border-radius:12px;font-weight:700">🔁 اطلبها مجدداً بسعرها 🚀</a>`
               : `<a href="create-order.php?service_id=${s.id}" class="btn btn-primary" style="padding:8px 18px;border-radius:12px;font-weight:700">اطلب الآن 🚀</a>`);
+        const isMulti = Number(s.needs_multiple_academics) === 1;
+        const priceLabel = isMulti ? 'السعر (لكل أكاديمي)' : 'السعر المعين';
         return `
         <div class="service-card anim-fade-up" style="animation-delay:${idx * 0.05}s">
           <div>
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
               <div style="font-size:36px">${s.icon || '📚'}</div>
-              ${s.parent_name ? `<span style="font-size:11px;font-weight:700;background:var(--primary-light);color:var(--primary);padding:4px 10px;border-radius:20px">${s.parent_name}</span>` : ''}
+              <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                ${isMulti ? `<span style="font-size:11px;font-weight:800;background:#fef3c7;color:#b45309;padding:4px 9px;border-radius:14px;display:inline-flex;align-items:center;gap:4px;border:1px solid #fde68a" title="هذه الخدمة تتيح لك طلب فريق عمل من عدة أكاديميين">👥 أكثر من أكاديمي</span>` : ''}
+                ${s.parent_name ? `<span style="font-size:11px;font-weight:700;background:var(--primary-light);color:var(--primary);padding:4px 10px;border-radius:20px">${s.parent_name}</span>` : ''}
+              </div>
             </div>
             <h3 style="font-weight:800;font-size:18px;color:var(--text-primary);margin-bottom:8px">${s.name}</h3>
           </div>
@@ -166,7 +171,7 @@ ob_start();
               ${isRemaining ? '<div style="font-size:11px;color:#10b981;font-weight:600">مشمولة في باقتك</div><div style="font-weight:900;color:#10b981;font-size:18px">مجاناً</div>'
                 : (usedFromPackage
                   ? `<div style="font-size:11px;color:#d97706;font-weight:700">🔁 استُخدمت من باقتك — الطلب مجدداً بسعرها</div><div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>`
-                  : `<div style="font-size:11px;color:var(--text-muted);font-weight:600">السعر المعين</div><div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>`)}
+                  : `<div style="font-size:11px;color:var(--text-muted);font-weight:600">${priceLabel}</div><div style="font-weight:900;color:var(--success);font-size:18px">${Number(s.price).toFixed(2)} <span style="font-size:12px;font-weight:700">ر.س</span></div>`)}
             </div>
             ${actionBtn}
           </div>

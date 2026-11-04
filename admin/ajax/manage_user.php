@@ -5,7 +5,7 @@
  */
 
 error_reporting(E_ALL);
-ini_set('display_errors', 1);
+ini_set('display_errors', 0);
 header('Content-Type: application/json; charset=utf-8');
 
 // بدء الجلسة
@@ -18,10 +18,13 @@ function sendError($msg, $code = 400) {
     exit;
 }
 
-// التحقق من الصلاحية (يمكن تفعيله بعد التأكد من تسجيل الدخول)
-// if (!isset($_SESSION['user_id']) || $_SESSION['user_role'] !== 'admin') sendError('غير مصرح', 401);
+// التحقق الصارم من صلاحيات المدير
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
+    sendError('غير مصرح: يرجى تسجيل الدخول كمدير', 401);
+}
 
-// تحميل دوال قاعدة البيانات
+// تحميل دوال الجلسة وقاعدة البيانات
+require_once __DIR__ . '/../../config/auth.php';
 require_once __DIR__ . '/../../config/functions.php';
 if (!function_exists('db')) sendError('دالة db غير موجودة', 500);
 $db = db();
@@ -147,4 +150,3 @@ if ($action === 'update_status') {
 
 // إذا وصلنا هنا فالإجراء غير معروف
 sendError('إجراء غير معروف: ' . $action);
-?>

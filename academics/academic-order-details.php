@@ -20,9 +20,9 @@
       LEFT JOIN services s ON o.service_id = s.id
       LEFT JOIN packages p ON o.package_id = p.id
       LEFT JOIN users u ON o.student_id = u.id
-      WHERE o.order_number = ? AND (o.academic_id = ? OR (o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ?)))
+      WHERE o.order_number = ? AND ((o.academic_id = ? AND o.id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status = 'replaced')) OR (o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = ? AND status NOT IN ('rejected', 'replaced'))))
   ");
-  $stmt->execute([$orderNumber, $academicId, $academicId]);
+  $stmt->execute([$orderNumber, $academicId, $academicId, $academicId]);
   $order = $stmt->fetch();
 
   if (!$order) {
@@ -73,6 +73,10 @@
       // Mark messages as read
       $db->prepare("UPDATE messages SET is_read = 1 WHERE conversation_id = ? AND sender_type = 'student'")->execute([$conversationId]);
   }
+
+  // 2.5 Fetch Team Messages (Internal for academics & admin)
+  $teamMessages = getTeamMessages($orderId);
+  $isMultiAcademics = count($assignedTeam) > 1 || (int)($order['academics_count'] ?? 1) > 1;
 
   // 3. Fetch Attachments
   $attStmt = $db->prepare("SELECT * FROM order_attachments WHERE order_id = ? ORDER BY uploaded_at DESC");
@@ -199,51 +203,118 @@
             
             <!-- Chat Section -->
             <div class="card anim-up delay-1" style="padding:24px">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
-                <h3 style="font-size:17px;font-weight:700;color:var(--text-primary)">💬 المحادثة مع الطالب <?= count($assignedTeam) > 1 ? '(محادثة جماعية)' : '' ?></h3>
-                <?php if (count($assignedTeam) > 1): ?>
+              <?php if ($isMultiAcademics): ?>
+                <!-- Multi-academic Chat Tabs Header -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;border-bottom:1px solid var(--border-color);padding-bottom:12px;flex-wrap:wrap;gap:10px">
+                  <div style="display:flex;gap:10px;align-items:center">
+                    <button type="button" id="tabBtnStudentChat" onclick="switchChatTab('student')" class="btn btn-sm" style="font-weight:700;border-radius:10px;background:var(--primary);color:#fff;border:none;padding:8px 16px;cursor:pointer;transition:all 0.2s">
+                      💬 المحادثة مع الطالب
+                    </button>
+                    <button type="button" id="tabBtnTeamChat" onclick="switchChatTab('team')" class="btn btn-sm btn-outline" style="font-weight:700;border-radius:10px;padding:8px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all 0.2s">
+                      👥 نقاش فريق العمل (داخلي)
+                      <span style="font-size:10px;background:rgba(239,68,68,0.15);color:#ef4444;padding:2px 6px;border-radius:6px;font-weight:800">سري 🔒</span>
+                    </button>
+                  </div>
                   <span class="badge badge-primary" style="font-size:12px">👥 فريق من <?= count($assignedTeam) ?> أكاديميين</span>
-                <?php endif; ?>
-              </div>
-              
-              <div class="chat-box" id="chatBox">
-                <?php $lastMsgIdPhp = 0; ?>
-                <?php if (empty($messages)): ?>
-                  <div id="chatPlaceholder" style="text-align:center;color:var(--text-secondary);margin:auto">لا توجد رسائل سابقة. ابدأ المحادثة الآن.</div>
-                <?php else: ?>
-                  <?php foreach ($messages as $msg): ?>
-                    <?php 
-                    $isMe = ($msg['sender_type'] === 'academic' && $msg['sender_id'] == $academicId); 
-                    $lastMsgIdPhp = max($lastMsgIdPhp, (int)$msg['id']);
-                    ?>
-                    <div class="msg <?= $isMe ? 'msg-academic' : 'msg-student' ?>" data-msg-id="<?= (int)$msg['id'] ?>" data-date="<?= date('Y-m-d', strtotime($msg['sent_at'])) ?>">
-                      <div style="font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85">
-                        <?= $isMe ? 'أنت' : e($msg['sender_name']) ?> (<?= $msg['sender_type'] === 'academic' ? 'أكاديمي' : 'الطالب' ?>)
-                      </div>
-                      <?php if (!empty($msg['file_path'])): ?>
-                        <div style="margin-bottom:<?= !empty($msg['content']) ? '6px' : '0' ?>;display:flex;justify-content:<?= $isMe ? 'flex-end' : 'flex-start' ?>">
-                          <a href="<?= e($appBase . '/' . $msg['file_path']) ?>" target="_blank" download style="display:inline-flex;align-items:center;gap:8px;background:<?= $isMe ? 'rgba(255,255,255,0.2)' : 'var(--primary-light)' ?>;color:<?= $isMe ? '#fff' : 'var(--primary)' ?>;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px">
-                            <span style="font-size:16px">📎</span>
-                            <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($msg['file_name'] ?: 'ملف') ?></span>
-                          </a>
+                </div>
+              <?php else: ?>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+                  <h3 style="font-size:17px;font-weight:700;color:var(--text-primary)">💬 المحادثة مع الطالب</h3>
+                </div>
+              <?php endif; ?>
+
+              <!-- TAB 1: STUDENT CHAT PANE -->
+              <div id="chatPaneStudent">
+                <div class="chat-box" id="chatBox">
+                  <?php $lastMsgIdPhp = 0; ?>
+                  <?php if (empty($messages)): ?>
+                    <div id="chatPlaceholder" style="text-align:center;color:var(--text-secondary);margin:auto">لا توجد رسائل سابقة. ابدأ المحادثة الآن.</div>
+                  <?php else: ?>
+                    <?php foreach ($messages as $msg): ?>
+                      <?php 
+                      $isMe = ($msg['sender_type'] === 'academic' && $msg['sender_id'] == $academicId); 
+                      $lastMsgIdPhp = max($lastMsgIdPhp, (int)$msg['id']);
+                      ?>
+                      <div class="msg <?= $isMe ? 'msg-academic' : 'msg-student' ?>" data-msg-id="<?= (int)$msg['id'] ?>" data-date="<?= date('Y-m-d', strtotime($msg['sent_at'])) ?>">
+                        <div style="font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85">
+                          <?= $isMe ? 'أنت' : e($msg['sender_name']) ?> (<?= $msg['sender_type'] === 'academic' ? 'أكاديمي' : 'الطالب' ?>)
                         </div>
-                      <?php endif; ?>
-                      <?php if (!empty($msg['content'])): ?>
-                        <div><?= nl2br(e($msg['content'])) ?></div>
-                      <?php endif; ?>
-                      <span class="msg-time" style="text-align: <?= $isMe ? 'left' : 'right' ?>"><?= date('h:i A', strtotime($msg['sent_at'])) ?></span>
-                    </div>
-                  <?php endforeach; ?>
-                <?php endif; ?>
+                        <?php if (!empty($msg['file_path'])): ?>
+                          <div style="margin-bottom:<?= !empty($msg['content']) ? '6px' : '0' ?>;display:flex;justify-content:<?= $isMe ? 'flex-end' : 'flex-start' ?>">
+                            <a href="<?= e($appBase . '/' . $msg['file_path']) ?>" target="_blank" download style="display:inline-flex;align-items:center;gap:8px;background:<?= $isMe ? 'rgba(255,255,255,0.2)' : 'var(--primary-light)' ?>;color:<?= $isMe ? '#fff' : 'var(--primary)' ?>;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px">
+                              <span style="font-size:16px">📎</span>
+                              <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($msg['file_name'] ?: 'ملف') ?></span>
+                            </a>
+                          </div>
+                        <?php endif; ?>
+                        <?php if (!empty($msg['content'])): ?>
+                          <div><?= nl2br(e($msg['content'])) ?></div>
+                        <?php endif; ?>
+                        <span class="msg-time" style="text-align: <?= $isMe ? 'left' : 'right' ?>"><?= date('h:i A', strtotime($msg['sent_at'])) ?></span>
+                      </div>
+                    <?php endforeach; ?>
+                  <?php endif; ?>
+                </div>
+
+                <div style="margin-top:16px;display:flex;gap:10px;align-items:flex-end">
+                  <input type="file" id="chatFileInput" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
+                  <span id="chatFileName" style="display:none;font-size:11px;color:var(--text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                  <textarea id="chatInput" class="form-input" rows="2" placeholder="اكتب رسالتك للطالب هنا..." style="resize:none;flex:1"></textarea>
+                  <span title="إرفاق ملف (حتى 10MB)" style="cursor:pointer;font-size:22px;padding:10px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('chatFileInput').click()">📎</span>
+                  <button class="btn btn-primary" onclick="sendMessage()" style="padding:0 24px;height:auto">إرسال ✈️</button>
+                </div>
               </div>
 
-              <div style="margin-top:16px;display:flex;gap:10px;align-items:flex-end">
-                <input type="file" id="chatFileInput" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
-                <span id="chatFileName" style="display:none;font-size:11px;color:var(--text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-                <textarea id="chatInput" class="form-input" rows="2" placeholder="اكتب رسالتك هنا..." style="resize:none;flex:1"></textarea>
-                <span title="إرفاق ملف (حتى 10MB)" style="cursor:pointer;font-size:22px;padding:10px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('chatFileInput').click()">📎</span>
-                <button class="btn btn-primary" onclick="sendMessage()" style="padding:0 24px;height:auto">إرسال ✈️</button>
-              </div>
+              <?php if ($isMultiAcademics): ?>
+                <!-- TAB 2: INTERNAL TEAM CHAT PANE (Academics & Admin only - Student NEVER sees this) -->
+                <div id="chatPaneTeam" style="display:none">
+                  <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);border-radius:12px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
+                    <span style="font-size:24px">🔒</span>
+                    <div style="font-size:12.5px;color:var(--text-primary);line-height:1.5">
+                      <strong style="color:#d97706">مساحة نقاش داخلية خاصة بفريق العمل والإدارة:</strong> هذه الرسائل والملفات خاصة بالأكاديميين المكلفين فقط، <strong>ولا يمكن للطالب رؤيتها أو الوصول إليها إطلاقاً</strong>.
+                    </div>
+                  </div>
+
+                  <div class="chat-box" id="teamChatBox">
+                    <?php $lastTeamMsgIdPhp = 0; ?>
+                    <?php if (empty($teamMessages)): ?>
+                      <div id="teamChatPlaceholder" style="text-align:center;color:var(--text-secondary);margin:auto">لا توجد رسائل سابقة في نقاش الفريق. ابدأ التنسيق مع زملائك الآن!</div>
+                    <?php else: ?>
+                      <?php foreach ($teamMessages as $tMsg): ?>
+                        <?php 
+                        $isMe = ($tMsg['sender_type'] === 'academic' && $tMsg['sender_id'] == $academicId); 
+                        $lastTeamMsgIdPhp = max($lastTeamMsgIdPhp, (int)$tMsg['id']);
+                        ?>
+                        <div class="msg <?= $isMe ? 'msg-academic' : 'msg-student' ?>" data-team-msg-id="<?= (int)$tMsg['id'] ?>" data-date="<?= date('Y-m-d', strtotime($tMsg['sent_at'])) ?>">
+                          <div style="font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85">
+                            <?= $isMe ? 'أنت' : e($tMsg['sender_name']) ?> <?= $tMsg['sender_type'] === 'admin' ? '(الإدارة)' : '(زميل في الفريق)' ?>
+                          </div>
+                          <?php if (!empty($tMsg['file_path'])): ?>
+                            <div style="margin-bottom:<?= !empty($tMsg['content']) ? '6px' : '0' ?>;display:flex;justify-content:<?= $isMe ? 'flex-end' : 'flex-start' ?>">
+                              <a href="<?= e($appBase . '/' . $tMsg['file_path']) ?>" target="_blank" download style="display:inline-flex;align-items:center;gap:8px;background:<?= $isMe ? 'rgba(255,255,255,0.2)' : 'rgba(16,185,129,0.15)' ?>;color:<?= $isMe ? '#fff' : '#059669' ?>;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px">
+                                <span style="font-size:16px">📎</span>
+                                <span style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= e($tMsg['file_name'] ?: 'ملف') ?></span>
+                              </a>
+                            </div>
+                          <?php endif; ?>
+                          <?php if (!empty($tMsg['content'])): ?>
+                            <div><?= nl2br(e($tMsg['content'])) ?></div>
+                          <?php endif; ?>
+                          <span class="msg-time" style="text-align: <?= $isMe ? 'left' : 'right' ?>"><?= date('h:i A', strtotime($tMsg['sent_at'])) ?></span>
+                        </div>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </div>
+
+                  <div style="margin-top:16px;display:flex;gap:10px;align-items:flex-end">
+                    <input type="file" id="teamChatFileInput" style="display:none" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.jpg,.jpeg,.png,.gif,.webp,.txt">
+                    <span id="teamChatFileName" style="display:none;font-size:11px;color:var(--text-secondary);max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+                    <textarea id="teamChatInput" class="form-input" rows="2" placeholder="اكتب رسالة خاصة لزملائك في الفريق..." style="resize:none;flex:1"></textarea>
+                    <span title="إرفاق ملف للفريق (حتى 10MB)" style="cursor:pointer;font-size:22px;padding:10px;color:var(--text-secondary);flex-shrink:0" onclick="document.getElementById('teamChatFileInput').click()">📎</span>
+                    <button class="btn btn-primary" onclick="sendTeamMessage()" style="padding:0 24px;height:auto;background:#059669;border-color:#059669">إرسال للفريق 👥</button>
+                  </div>
+                </div>
+              <?php endif; ?>
             </div>
 
             <!-- Attachments Section -->
@@ -352,6 +423,16 @@
                     لا يمكنك تغيير حالة الطلب حالياً.
                   </div>
                 <?php else: ?>
+                  <?php if ($myAssignmentStatus === 'completed'): ?>
+                    <div style="padding:12px;background:#dcfce7;color:#166534;border-radius:10px;font-size:13px;font-weight:700;text-align:center;border:1px solid #86efac;margin-bottom:12px">
+                      ✅ لقد أنهيت الجزء المخصص لك بنجاح.
+                      <?php if ($order['status'] !== 'completed'): ?>
+                        <div style="font-size:11px;font-weight:600;margin-top:4px;color:#15803d">
+                          (الطلب بانتظار إنجاز باقي الأكاديميين المكلفين ليصبح مكتملاً نهائياً)
+                        </div>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
                   <select class="form-input form-select" id="orderStatus" style="padding-left:36px">
                     <option value="accepted" <?= $order['status']=='accepted'?'selected':'' ?>>مقبول وجاري العمل</option>
                     <option value="in_progress" <?= $order['status']=='in_progress'?'selected':'' ?>>قيد التنفيذ</option>
@@ -387,8 +468,55 @@
   const APP_BASE = <?= json_encode($appBase) ?>;
   const csrfTokenJs = document.querySelector('meta[name="csrf-token"]')?.content || '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>';
   const convIdJs = <?= (int)($conversationId ?: 0) ?>;
-  let lastMsgId = <?= (int)$lastMsgIdPhp ?>;
+  const isMultiAcademicsJs = <?= $isMultiAcademics ? 'true' : 'false' ?>;
+  let lastMsgId = <?= (int)($lastMsgIdPhp ?? 0) ?>;
+  let lastTeamMsgId = <?= (int)($lastTeamMsgIdPhp ?? 0) ?>;
   let chatSending = false;
+  let teamChatSending = false;
+  let currentActiveTab = 'student';
+
+  const teamChatBox = document.getElementById('teamChatBox');
+  if(teamChatBox) teamChatBox.scrollTop = teamChatBox.scrollHeight;
+
+  function switchChatTab(tab) {
+    currentActiveTab = tab;
+    const paneStudent = document.getElementById('chatPaneStudent');
+    const paneTeam = document.getElementById('chatPaneTeam');
+    const btnStudent = document.getElementById('tabBtnStudentChat');
+    const btnTeam = document.getElementById('tabBtnTeamChat');
+
+    if (tab === 'team') {
+      if (paneStudent) paneStudent.style.display = 'none';
+      if (paneTeam) paneTeam.style.display = 'block';
+      if (btnStudent) {
+        btnStudent.style.background = 'transparent';
+        btnStudent.style.color = 'var(--text-secondary)';
+        btnStudent.style.border = '1px solid var(--border-color)';
+      }
+      if (btnTeam) {
+        btnTeam.style.background = '#059669';
+        btnTeam.style.color = '#fff';
+        btnTeam.style.border = 'none';
+      }
+      if (teamChatBox) teamChatBox.scrollTop = teamChatBox.scrollHeight;
+      pollTeamChat();
+    } else {
+      if (paneStudent) paneStudent.style.display = 'block';
+      if (paneTeam) paneTeam.style.display = 'none';
+      if (btnStudent) {
+        btnStudent.style.background = 'var(--primary)';
+        btnStudent.style.color = '#fff';
+        btnStudent.style.border = 'none';
+      }
+      if (btnTeam) {
+        btnTeam.style.background = 'transparent';
+        btnTeam.style.color = 'var(--text-primary)';
+        btnTeam.style.border = '1px solid var(--border-color)';
+      }
+      if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+      pollChat();
+    }
+  }
 
   /* ─────────────────────────────────────────────
     تحديث فوري للمحادثة (AJAX Polling خفيف)
@@ -485,8 +613,86 @@
       if (nearBottom) scrollToChatBottom(true);
     } catch (e) { /* تجاهل أخطاء الشبكة المؤقتة */ }
   }
-  setInterval(pollChat, 5000);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) pollChat(); });
+  function appendTeamMessage(m) {
+    const ph = document.getElementById('teamChatPlaceholder');
+    if (ph) ph.remove();
+
+    const mDate = (m.sent_at || '').substring(0, 10);
+    const mTime = formatTime12((m.sent_at || '').substring(11, 16));
+    const isMe  = (m.sender_type === 'academic' && parseInt(m.sender_id, 10) === myAcademicId);
+
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + (isMe ? 'msg-academic' : 'msg-student');
+    wrap.dataset.teamMsgId = m.id;
+    wrap.dataset.date = mDate || '';
+
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:11px;font-weight:700;margin-bottom:4px;opacity:0.85';
+    name.textContent = (isMe ? 'أنت' : (m.sender_name || '')) + (m.sender_type === 'admin' ? ' (الإدارة)' : ' (زميل في الفريق)');
+    wrap.appendChild(name);
+
+    const body = document.createElement('div');
+    if (m.file_path) {
+      const fileRow = document.createElement('div');
+      fileRow.style.marginBottom = m.content ? '6px' : '0';
+      fileRow.style.display = 'flex';
+      fileRow.style.justifyContent = isMe ? 'flex-end' : 'flex-start';
+      const aLink = document.createElement('a');
+      aLink.href = APP_BASE + '/' + m.file_path;
+      aLink.target = '_blank';
+      aLink.download = '';
+      aLink.style.cssText = 'display:inline-flex;align-items:center;gap:8px;border-radius:10px;padding:8px 12px;font-size:12px;font-weight:700;text-decoration:none;max-width:220px';
+      if (isMe) { aLink.style.background = 'rgba(255,255,255,0.2)'; aLink.style.color = '#fff'; }
+      else { aLink.style.background = 'rgba(16,185,129,0.15)'; aLink.style.color = '#059669'; }
+      const ic = document.createElement('span'); ic.style.fontSize = '16px'; ic.textContent = '📎';
+      const nm = document.createElement('span'); nm.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'; nm.textContent = m.file_name || 'ملف';
+      aLink.appendChild(ic); aLink.appendChild(nm);
+      fileRow.appendChild(aLink);
+      body.appendChild(fileRow);
+    }
+    if (m.content) {
+      const textNode = document.createElement('div');
+      textNode.innerHTML = escapeHtml(m.content).replace(/\n/g, '<br>');
+      body.appendChild(textNode);
+    }
+    if (body.childNodes.length) wrap.appendChild(body);
+
+    const time = document.createElement('span');
+    time.className = 'msg-time';
+    time.style.textAlign = isMe ? 'left' : 'right';
+    time.textContent = mTime;
+    wrap.appendChild(time);
+
+    if (teamChatBox) teamChatBox.appendChild(wrap);
+  }
+
+  async function pollTeamChat() {
+    if (document.hidden || !isMultiAcademicsJs || teamChatSending) return;
+    try {
+      const res = await fetch('ajax/chat-poll.php?order=' + encodeURIComponent(orderNumberJs) + '&type=team&after=' + lastTeamMsgId, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok || !Array.isArray(data.messages) || !data.messages.length) return;
+      const nearBottom = teamChatBox ? (teamChatBox.scrollHeight - teamChatBox.scrollTop - teamChatBox.clientHeight) < 150 : false;
+      data.messages.forEach(appendTeamMessage);
+      lastTeamMsgId = data.last_id || lastTeamMsgId;
+      if (nearBottom && teamChatBox) teamChatBox.scrollTo({ top: teamChatBox.scrollHeight, behavior: 'smooth' });
+    } catch (e) { }
+  }
+
+  setInterval(function() {
+    pollChat();
+    if (isMultiAcademicsJs) pollTeamChat();
+  }, 5000);
+
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) {
+      pollChat();
+      if (isMultiAcademicsJs) pollTeamChat();
+    }
+  });
 
   function respondOrder(actionName) {
     const confirmMsg = actionName === 'accept_assignment' ? 'هل أنت متأكد من قبول هذه المهمة الأكاديمية؟' : 'هل أنت متأكد من الاعتذار عن هذه المهمة؟';
@@ -537,7 +743,10 @@
     .then(text => {
       try {
         const data = JSON.parse(text);
-        if(data.success) Toast.show(data.message, 'success');
+        if(data.success) {
+          Toast.show(data.message, 'success');
+          setTimeout(() => location.reload(), 1500);
+        }
         else Toast.show(data.message, 'error');
       } catch (e) {
         alert("استجابة غير متوقعة:\n" + text.substring(0, 500));
@@ -595,9 +804,66 @@
     });
   }
 
+  function sendTeamMessage() {
+    const input = document.getElementById('teamChatInput');
+    const fileInput = document.getElementById('teamChatFileInput');
+    if (!input) return;
+    const txt = input.value.trim();
+    const hasFile = fileInput && fileInput.files.length > 0;
+    if((!txt && !hasFile) || teamChatSending) return;
+
+    const formData = new FormData();
+    formData.append('csrf_token', csrfTokenJs);
+    formData.append('order_id', orderId);
+    formData.append('content', txt);
+    if (hasFile) formData.append('file', fileInput.files[0]);
+
+    input.disabled = true;
+    teamChatSending = true;
+
+    fetch('ajax/handler.php?action=send_team_message', {
+      method: 'POST',
+      body: formData
+    })
+    .then(res => res.text())
+    .then(text => {
+      input.disabled = false;
+      teamChatSending = false;
+      try {
+        const data = JSON.parse(text);
+        if (data.success) {
+          input.value = '';
+          if (fileInput) fileInput.value = '';
+          const fn = document.getElementById('teamChatFileName');
+          if (fn) fn.style.display = 'none';
+          input.focus();
+          pollTeamChat();
+        } else {
+          Toast.show(data.message, 'error');
+        }
+      } catch (e) {
+        alert("استجابة غير متوقعة:\n" + text.substring(0, 500));
+        console.error(text);
+      }
+    })
+    .catch(err => {
+      input.disabled = false; teamChatSending = false;
+      alert("تعذر إرسال الرسالة للفريق: " + err.message);
+    });
+  }
+
   // إظهار اسم الملف المحدد للإرسال
   (function () {
     const fi = document.getElementById('chatFileInput');
+    const tfi = document.getElementById('teamChatFileInput');
+    if (tfi) {
+      tfi.addEventListener('change', function () {
+        const fn = document.getElementById('teamChatFileName');
+        if (!fn) return;
+        if (tfi.files.length) { fn.textContent = '📄 ' + tfi.files[0].name; fn.style.display = ''; }
+        else fn.style.display = 'none';
+      });
+    }
     if (!fi) return;
     fi.addEventListener('change', function () {
       const fn = document.getElementById('chatFileName');

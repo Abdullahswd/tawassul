@@ -6,11 +6,13 @@
  * ============================================================
  */
 
-// NOTE: Replace these with your actual Pusher credentials from pusher.com
-define('PUSHER_APP_ID', '1800000'); // Example ID
-define('PUSHER_KEY', 'YOUR_PUSHER_KEY'); 
-define('PUSHER_SECRET', 'YOUR_PUSHER_SECRET');
-define('PUSHER_CLUSTER', 'eu');
+require_once __DIR__ . '/env.php';
+
+// NOTE: Set these in your .env file or server environment
+define('PUSHER_APP_ID',  env('PUSHER_APP_ID', '1800000'));
+define('PUSHER_KEY',     env('PUSHER_KEY', 'YOUR_PUSHER_KEY')); 
+define('PUSHER_SECRET',  env('PUSHER_SECRET', 'YOUR_PUSHER_SECRET'));
+define('PUSHER_CLUSTER', env('PUSHER_CLUSTER', 'eu'));
 
 /**
  * Trigger a Pusher event using cURL (No external libraries required)

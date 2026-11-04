@@ -20,6 +20,7 @@ if (!$order || $order['student_id'] !== $user['id']) {
 
 // إشعار الدفع المرفق مع الطلب (إن وُجد)
 $orderReceipt = (float)($order['amount'] ?? 0) > 0 ? getReceiptForOrder($order_id) : null;
+$orderRefund = getRefundForOrder($order_id);
 $appBase = rtrim(preg_replace('#/student/[^/]+$#', '', $_SERVER['SCRIPT_NAME'] ?? ''), '/');
 
 // Fetch assigned team of academics
@@ -133,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         createNotification(1, 'admin', 'تم إلغاء طلب ❌', 'قام الطالب بإلغاء الطلب #' . $order['order_number'] . ' (استرداد 100%)', '❌', 'admin/pages/order-details.php?id=' . $order['order_number']);
         
         // Notify Academics
-        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL");
+        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced') UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = orders.academic_id AND status = 'replaced')");
         $academics->execute([$order_id, $order_id]);
         foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
             createNotification($acid, 'academic', 'إلغاء الطلب 🚫', 'قام الطالب بإلغاء الطلب #' . $order['order_number'] . '، نرجو التوقف عن العمل عليه.', '🚫', 'academics/academic-order-details.php?id=' . $order['order_number']);
@@ -147,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         createNotification(1, 'admin', 'طلب إلغاء لطلب قيد التنفيذ ⚠️', 'طلب الطالب إلغاء الطلب #' . $order['order_number'] . ' الذي بدأ العمل عليه.', '⚠️', 'admin/pages/order-details.php?id=' . $order['order_number']);
         
         // Notify Academics
-        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL");
+        $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced') UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = orders.academic_id AND status = 'replaced')");
         $academics->execute([$order_id, $order_id]);
         foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
             createNotification($acid, 'academic', 'طلب إلغاء من الطالب ⚠️', 'طلب الطالب إلغاء الطلب #' . $order['order_number'] . '، نرجو التوقف عن العمل حتى يتم تقييم الطلب من الإدارة.', '⚠️', 'academics/academic-order-details.php?id=' . $order['order_number']);
@@ -166,7 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_additional_files'
             createNotification(1, 'admin', 'ملفات إضافية 📎', 'قام الطالب بإضافة ملفات جديدة للطلب #' . $order['order_number'], '📎', 'admin/pages/order-details.php?id=' . $order['order_number']);
             
             // Notify Academics
-            $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL");
+            $academics = $db->prepare("SELECT DISTINCT academic_id FROM order_assignments WHERE order_id = ? AND status NOT IN ('rejected', 'replaced') UNION SELECT academic_id FROM orders WHERE id = ? AND academic_id IS NOT NULL AND id NOT IN (SELECT order_id FROM order_assignments WHERE academic_id = orders.academic_id AND status = 'replaced')");
             $academics->execute([$order_id, $order_id]);
             foreach ($academics->fetchAll(PDO::FETCH_COLUMN) as $acid) {
                 if ($acid) {
@@ -346,6 +347,67 @@ require __DIR__ . '/partials/sidebar.php';
           
           <!-- Left Column -->
           <div class="lg:col-span-2 flex flex-col gap-6">
+
+            <?php if (!empty($orderRefund)): ?>
+              <?php if ($orderRefund['status'] === 'processed'): ?>
+                <!-- Refund Success Notice with Transfer Receipt -->
+                <div class="card" style="background:#f0fdf4;border:1.5px solid #86efac;padding:18px 22px;border-radius:14px;box-shadow:0 4px 6px -1px rgba(16,185,129,0.08)">
+                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px">
+                    <div style="display:flex;align-items:center;gap:14px">
+                      <span style="font-size:32px">💸</span>
+                      <div>
+                        <div style="font-size:15px;font-weight:800;color:#166534">تم استرجاع المبلغ لحسابك البنكي بنجاح ✅</div>
+                        <div style="font-size:13px;color:#15803d;margin-top:3px">
+                          المبلغ المسترد: <strong style="font-size:14px"><?= formatMoney($orderRefund['amount']) ?></strong>
+                          <?php if (!empty($orderRefund['processed_at'])): ?>
+                            • بتاريخ <?= formatDate($orderRefund['processed_at']) ?>
+                          <?php endif; ?>
+                          <?php if (!empty($orderRefund['transaction_ref'])): ?>
+                            • رقم الحوالة: <code style="background:rgba(22,101,52,0.1);padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:700"><?= e($orderRefund['transaction_ref']) ?></code>
+                          <?php endif; ?>
+                        </div>
+                        <?php if (!empty($orderRefund['admin_note'])): ?>
+                          <div style="font-size:12px;color:#15803d;margin-top:4px">
+                            <strong>ملاحظة الإدارة:</strong> <?= e($orderRefund['admin_note']) ?>
+                          </div>
+                        <?php endif; ?>
+                      </div>
+                    </div>
+                    <?php if (!empty($orderRefund['receipt_path'])): ?>
+                      <a href="<?= e($appBase . '/' . ltrim($orderRefund['receipt_path'], '/')) ?>" target="_blank" class="btn btn-primary" style="background:#166534;border:none;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:10px">
+                        📥 عرض / تحميل إشعار التحويل البنكي
+                      </a>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              <?php elseif ($orderRefund['status'] === 'pending'): ?>
+                <!-- Refund Pending Notice -->
+                <div class="card" style="background:#fefce8;border:1.5px solid #fde047;padding:16px 20px;border-radius:14px">
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <span style="font-size:28px">⏳</span>
+                    <div>
+                      <div style="font-size:14px;font-weight:800;color:#854d0e">طلب الاسترجاع قيد المعالجة من الإدارة المالية</div>
+                      <div style="font-size:12.5px;color:#a16207;margin-top:2px">
+                        المبلغ المقرر استرداده: <strong><?= formatMoney($orderRefund['amount']) ?></strong>. سيتم إشعارك فور إتمام التحويل البنكي لحسابك وإرفاق الإشعار.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <?php elseif ($orderRefund['status'] === 'rejected'): ?>
+                <!-- Refund Rejected Notice -->
+                <div class="card" style="background:#fef2f2;border:1.5px solid #fca5a5;padding:16px 20px;border-radius:14px">
+                  <div style="display:flex;align-items:center;gap:12px">
+                    <span style="font-size:28px">❌</span>
+                    <div>
+                      <div style="font-size:14px;font-weight:800;color:#991b1b">تم رفض طلب الاسترجاع</div>
+                      <div style="font-size:12.5px;color:#b91c1c;margin-top:2px">
+                        <?= !empty($orderRefund['admin_note']) ? 'السبب: ' . e($orderRefund['admin_note']) : 'يرجى التواصل مع الدعم الفني للاستفسار.' ?>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
             
             <!-- Order Header Card -->
             <div class="card">
@@ -389,6 +451,12 @@ require __DIR__ . '/partials/sidebar.php';
                   <div style="font-size:12px;color:var(--text-secondary)">التخصص المطلوب:</div>
                   <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-top:2px"><?= e($order['specialty']) ?></div>
                 </div>
+                <?php if (($order['academics_count'] ?? 1) > 1): ?>
+                <div>
+                  <div style="font-size:12px;color:var(--text-secondary)">فريق العمل المطلوب:</div>
+                  <div style="font-size:14px;font-weight:700;color:#b45309;margin-top:2px">👥 <?= (int)$order['academics_count'] ?> أكاديميين</div>
+                </div>
+                <?php endif; ?>
                 <div>
                   <div style="font-size:12px;color:var(--text-secondary)">المبلغ الإجمالي:</div>
                   <div style="font-size:16px;font-weight:900;color:var(--primary);margin-top:2px"><?= formatMoney($order['amount']) ?></div>
@@ -449,7 +517,7 @@ require __DIR__ . '/partials/sidebar.php';
           <!-- Academic Profile / Team -->
             <div class="card" style="padding:24px">
               <?php 
-              $acceptedTeam = array_filter($assignedTeam, fn($m) => $m['assignment_status'] === 'accepted');
+              $acceptedTeam = array_filter($assignedTeam, fn($m) => in_array($m['assignment_status'], ['accepted', 'completed']));
               $pendingTeam  = array_filter($assignedTeam, fn($m) => $m['assignment_status'] === 'assigned');
               ?>
               <?php if (!empty($acceptedTeam)): ?>
@@ -462,7 +530,14 @@ require __DIR__ . '/partials/sidebar.php';
                       <?= e($member['avatar_initials'] ?: mb_substr($member['name'], 0, 1, 'UTF-8')) ?>
                     </div>
                     <div style="flex:1">
-                      <div style="font-weight:700;font-size:14px;color:var(--text-primary)"><?= e($member['name']) ?></div>
+                      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                        <span style="font-weight:700;font-size:14px;color:var(--text-primary)"><?= e($member['name']) ?></span>
+                        <?php if ($member['assignment_status'] === 'completed'): ?>
+                          <span class="badge" style="background:#dcfce7;color:#166534;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">✅ أنجز مهمته</span>
+                        <?php else: ?>
+                          <span class="badge" style="background:#e0e7ff;color:#4338ca;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:700">⏳ قيد العمل</span>
+                        <?php endif; ?>
+                      </div>
                       <div style="font-size:12px;color:var(--text-secondary)"><?= e($member['specialty']) ?> · <?= e($member['degree']) ?></div>
                       <div style="font-size:12px;color:#f59e0b;font-weight:600">⭐ <?= number_format((float)$member['rating'], 1) ?> تقييم</div>
                     </div>

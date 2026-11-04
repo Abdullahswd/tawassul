@@ -142,7 +142,7 @@ $chart_revenue = array_values($revenue_by_month);
 
         <div class="stat-card animate-fadeInUp delay-4">
           <div class="card-icon" style="background:rgba(16,185,129,0.1)">💰</div>
-          <div class="card-value" data-counter="<?= (int)$stats['total_revenue'] ?>" data-suffix=" ر.س">0</div>
+          <div class="card-value" data-counter="<?= (float)$stats['total_revenue'] ?>" data-decimals="2" data-suffix=" ر.س"><?= number_format((float)$stats['total_revenue'], 2) ?> ر.س</div>
           <div class="card-label">إجمالي الأرباح</div>
           <div class="card-trend up">المدفوعات الناجحة</div>
           <div class="card-bg-blob" style="background:#10b981"></div>
@@ -266,7 +266,7 @@ function renderRecentOrders() {
         </div>
       </td>
       <td style="color:var(--text-secondary);font-size:13px">${o.service.slice(0,12)}...</td>
-      <td><strong>${o.amount.toLocaleString('ar')} ر.س</strong></td>
+      <td><strong>${Number(o.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</strong></td>
       <td>${getStatusBadge(o.status)}</td>
     </tr>
   `).join('');

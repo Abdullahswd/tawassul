@@ -16,25 +16,7 @@ require_once __DIR__ . '/auth.php';
    1. AUTO-SETUP: Ensure password_resets table exists
    ───────────────────────────────────────────────────────────── */
 function ensurePasswordResetsTable(): void {
-    static $ensured = false;
-    if ($ensured) return;
-
-    try {
-        db()->exec("CREATE TABLE IF NOT EXISTS `password_resets` (
-            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `email` VARCHAR(150) NOT NULL,
-            `user_type` ENUM('student', 'academic', 'admin') NOT NULL DEFAULT 'student',
-            `token` VARCHAR(100) NOT NULL,
-            `expires_at` DATETIME NOT NULL,
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            INDEX `idx_email` (`email`),
-            INDEX `idx_token` (`token`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $ensured = true;
-    } catch (Exception $e) {
-        error_log('ensurePasswordResetsTable error: ' . $e->getMessage());
-    }
+    return;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -44,20 +26,7 @@ function getSmtpConfig(): array {
     static $config = null;
     if ($config !== null) return $config;
 
-    // Load from .env if present
-    $envFile = dirname(__DIR__) . '/.env';
-    $env = [];
-    if (file_exists($envFile)) {
-        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if ($line === '' || strpos($line, '#') === 0) continue;
-            if (strpos($line, '=') !== false) {
-                list($k, $v) = explode('=', $line, 2);
-                $env[trim($k)] = trim($v, " \t\n\r\0\x0B\"'");
-            }
-        }
-    }
+    require_once __DIR__ . '/env.php';
 
     // Load from DB settings table
     $dbSettings = [];
@@ -70,33 +39,33 @@ function getSmtpConfig(): array {
         // DB not available or table missing
     }
 
-    $host = $env['SMTP_HOST'] ?? $dbSettings['smtp_host'] ?? 'smtp.gmail.com';
-    $port = (int)($env['SMTP_PORT'] ?? $dbSettings['smtp_port'] ?? 587);
-    $user = $env['SMTP_USER'] ?? $dbSettings['smtp_user'] ?? '';
-    $pass = $env['SMTP_PASS'] ?? $env['SMTP_PASSWORD'] ?? $dbSettings['smtp_password'] ?? '';
+    $host = env('SMTP_HOST', $dbSettings['smtp_host'] ?? 'smtp.gmail.com');
+    $port = (int) env('SMTP_PORT', $dbSettings['smtp_port'] ?? 587);
+    $user = env('SMTP_USER', $dbSettings['smtp_user'] ?? '');
+    $pass = env('SMTP_PASS', env('SMTP_PASSWORD', $dbSettings['smtp_password'] ?? ''));
     
     // Auto-detect encryption if not explicitly specified
-    $secure = strtolower($env['SMTP_SECURE'] ?? $dbSettings['smtp_encryption'] ?? '');
+    $secure = strtolower((string) env('SMTP_SECURE', $dbSettings['smtp_encryption'] ?? ''));
     if ($secure === '') {
         $secure = ($port === 465) ? 'ssl' : 'tls';
     }
 
-    $fromEmail = $env['MAIL_FROM_ADDRESS'] ?? $env['SMTP_FROM_EMAIL'] ?? $dbSettings['site_email'] ?? $user;
+    $fromEmail = env('MAIL_FROM_ADDRESS', env('SMTP_FROM_EMAIL', $dbSettings['site_email'] ?? $user));
     if (!$fromEmail) $fromEmail = 'noreply@eduroad.com';
 
-    $fromName = $env['MAIL_FROM_NAME'] ?? $env['SMTP_FROM_NAME'] ?? $dbSettings['site_name'] ?? 'منصة Eduroad';
-    $siteUrl  = $env['APP_URL'] ?? $dbSettings['site_url'] ?? (function_exists('rootUrl') ? rootUrl() : '');
+    $fromName = env('MAIL_FROM_NAME', env('SMTP_FROM_NAME', $dbSettings['site_name'] ?? 'منصة Eduroad'));
+    $siteUrl  = env('APP_URL', $dbSettings['site_url'] ?? (function_exists('rootUrl') ? rootUrl() : ''));
 
     $config = [
-        'host'       => trim($host),
+        'host'       => trim((string)$host),
         'port'       => $port,
-        'user'       => trim($user),
-        'pass'       => trim($pass),
+        'user'       => trim((string)$user),
+        'pass'       => trim((string)$pass),
         'secure'     => $secure,
-        'from_email'   => trim($fromEmail),
-        'from_address' => trim($fromEmail),
-        'from_name'    => trim($fromName),
-        'site_url'     => rtrim($siteUrl, '/'),
+        'from_email'   => trim((string)$fromEmail),
+        'from_address' => trim((string)$fromEmail),
+        'from_name'    => trim((string)$fromName),
+        'site_url'     => rtrim((string)$siteUrl, '/'),
     ];
 
     return $config;
@@ -533,27 +502,23 @@ function sendPasswordChangedConfirmationEmail(string $email, string $userName): 
  * 2c. Ensure login_otps table exists
  */
 function ensureLoginOtpsTable(): void {
-    static $ensured = false;
-    if ($ensured) return;
-
+    static $checked = false;
+    if ($checked) return;
     try {
         db()->exec("CREATE TABLE IF NOT EXISTS `login_otps` (
-            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
-            `email` VARCHAR(150) NOT NULL,
-            `user_type` ENUM('student', 'academic', 'admin') NOT NULL DEFAULT 'student',
-            `user_id` INT UNSIGNED NOT NULL,
-            `otp_code` VARCHAR(10) NOT NULL,
-            `attempts` TINYINT UNSIGNED NOT NULL DEFAULT 0,
-            `expires_at` DATETIME NOT NULL,
-            `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (`id`),
-            INDEX `idx_email_type` (`email`, `user_type`),
-            INDEX `idx_expires` (`expires_at`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
-        $ensured = true;
-    } catch (Exception $e) {
-        error_log('ensureLoginOtpsTable error: ' . $e->getMessage());
-    }
+          `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+          `email` varchar(150) NOT NULL,
+          `user_type` enum('student','academic','admin') NOT NULL DEFAULT 'student',
+          `user_id` int(10) unsigned DEFAULT NULL,
+          `otp_code` varchar(10) NOT NULL,
+          `attempts` tinyint(3) unsigned NOT NULL DEFAULT 0,
+          `expires_at` datetime NOT NULL,
+          `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (`id`),
+          KEY `idx_lookup` (`email`, `user_type`, `expires_at`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
+        $checked = true;
+    } catch (Exception $e) {}
 }
 
 /**
