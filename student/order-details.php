@@ -240,7 +240,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $comment = trim($_POST['comment'] ?? '');
     $acadId = (int)($order['academic_id'] ?? 0);
     if ($acadId && $order['status'] === 'completed') {
-        submitReview($order_id, $user['id'], $acadId, $rating, $comment);
+        addReview($order_id, $user['id'], $acadId, $rating, $comment);
         $_SESSION['flash_success'] = 'شكراً لك! تم حفظ تقييمك للأكاديمي بنجاح.';
         header("Location: order-details.php?id=$order_id&reviewed=1");
         exit;

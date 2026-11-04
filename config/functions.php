@@ -864,6 +864,13 @@ function addReview(int $orderId, int $studentId, int $academicId, int $rating, s
     $stmt->execute([$academicId]);
 }
 
+/**
+ * Alias for addReview
+ */
+function submitReview(int $orderId, int $studentId, int $academicId, int $rating, string $comment = ''): void {
+    addReview($orderId, $studentId, $academicId, $rating, $comment);
+}
+
 /* ─────────────────────────────────────────────
    NOTIFICATIONS
 ───────────────────────────────────────────── */
