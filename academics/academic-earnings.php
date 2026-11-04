@@ -47,18 +47,23 @@ $totalWithdrawn = $totalEarned - $balance;
 if ($totalWithdrawn < 0) $totalWithdrawn = 0;
 
 // Calculate eligible balance (only from payments where order is completed older than withdrawal_eligibility_days)
-$totalEligibleEarned = (float)$db->query("
-    SELECT SUM(p.academic_net)
-    FROM payments p
-    JOIN orders o ON p.order_id = o.id
-    WHERE o.academic_id = $academicId AND p.status = 'paid' AND p.is_transferred_to_academic = 1 AND DATEDIFF(NOW(), o.updated_at) >= $withdrawal_eligibility_days
-")->fetchColumn();
-$eligibleBalance = $totalEligibleEarned - $totalWithdrawn;
-if ($eligibleBalance < 0) $eligibleBalance = 0;
-// Make sure it doesn't exceed total balance
-if ($eligibleBalance > $balance) $eligibleBalance = $balance;
-$pendingEligibility = $balance - $eligibleBalance;
-if ($pendingEligibility < 0) $pendingEligibility = 0;
+if ($withdrawal_eligibility_days <= 0) {
+    $eligibleBalance = $balance;
+    $pendingEligibility = 0;
+} else {
+    $totalEligibleEarned = (float)$db->query("
+        SELECT SUM(p.academic_net / GREATEST(1, COALESCE(o.academics_count, 1)))
+        FROM payments p
+        JOIN orders o ON p.order_id = o.id
+        WHERE (o.academic_id = $academicId OR o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = $academicId AND status NOT IN ('rejected', 'replaced')))
+          AND p.status = 'paid' AND p.is_transferred_to_academic = 1 AND DATEDIFF(NOW(), o.updated_at) >= $withdrawal_eligibility_days
+    ")->fetchColumn();
+    $eligibleBalance = $totalEligibleEarned - $totalWithdrawn;
+    if ($eligibleBalance < 0) $eligibleBalance = 0;
+    if ($eligibleBalance > $balance) $eligibleBalance = $balance;
+    $pendingEligibility = $balance - $eligibleBalance;
+    if ($pendingEligibility < 0) $pendingEligibility = 0;
+}
 
 // Earnings this month (based on when the order was completed)
 $thisMonthEarnings = (float)$db->query("

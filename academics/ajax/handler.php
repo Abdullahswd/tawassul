@@ -861,16 +861,21 @@ if ($action === 'submit_withdraw') {
         $totalEarned = floatval($row['total_earned']);
         $totalWithdrawn = max(0, $totalEarned - $balance);
 
-        $totalEligibleEarned = (float) $db->query("
-                SELECT SUM(p.academic_net)
-                FROM payments p
-                JOIN orders o ON p.order_id = o.id
-                WHERE o.academic_id = $academicId AND p.status = 'paid' AND DATEDIFF(NOW(), COALESCE(o.updated_at, p.paid_at)) >= $withdrawal_eligibility_days
-            ")->fetchColumn();
-
-        $eligibleBalance = max(0, $totalEligibleEarned - $totalWithdrawn);
-        if ($eligibleBalance > $balance)
+        if ($withdrawal_eligibility_days <= 0) {
             $eligibleBalance = $balance;
+        } else {
+            $totalEligibleEarned = (float) $db->query("
+                    SELECT SUM(p.academic_net / GREATEST(1, COALESCE(o.academics_count, 1)))
+                    FROM payments p
+                    JOIN orders o ON p.order_id = o.id
+                    WHERE (o.academic_id = $academicId OR o.id IN (SELECT order_id FROM order_assignments WHERE academic_id = $academicId AND status NOT IN ('rejected', 'replaced')))
+                      AND p.status = 'paid' AND DATEDIFF(NOW(), COALESCE(o.updated_at, p.paid_at)) >= $withdrawal_eligibility_days
+                ")->fetchColumn();
+
+            $eligibleBalance = max(0, $totalEligibleEarned - $totalWithdrawn);
+            if ($eligibleBalance > $balance)
+                $eligibleBalance = $balance;
+        }
 
         if ($amount > $eligibleBalance) {
             sendJSONResponse(false, 'المبلغ يتجاوز الرصيد المؤهل للسحب.');

@@ -418,9 +418,7 @@ function updateOrderStatus(int $orderId, string $status): bool {
     
     // If order was just marked as completed, attempt to pay the academic & notify student via SMTP
     if ($success && $status === 'completed' && $old_status !== 'completed') {
-        if (!empty($order['academic_id'])) {
-            syncAcademicEarnings($orderId);
-        }
+        syncAcademicEarnings($orderId);
         sendOrderCompletedToStudentEmail($orderId);
     }
     
