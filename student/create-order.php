@@ -245,33 +245,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
       // تسجيل إشعار الدفع المرفق (خطوة الدفع) للطلبات المدفوعة
       if ($student_payable > 0) {
-        $rcptPath = saveReceiptUpload($_FILES['payment_receipt'] ?? null);
-        if ($rcptPath) {
-          $methodId = (int) ($_POST['payment_method_id'] ?? 0) ?: null;
-          $methodLabel = 'تحويل بنكي';
-          foreach ($paymentMethods as $pm) {
-              if ((int)$pm['id'] === $methodId) {
-                  $methodLabel = $pm['account_name'];
-                  break;
-              }
-          }
-          savePaymentReceipt([
-            'order_id'     => $order_id,
-            'student_id'   => $user['id'],
-            'method_id'    => $methodId,
-            'method_label' => $methodLabel,
-            'amount'       => $student_payable,
-            'receipt_path' => $rcptPath,
-          ]);
-          createNotification(
-            1,
-            'admin',
-            'إشعار دفع جديد 🧾',
-            'أرفق الطالب ' . $user['name'] . ' إشعار دفع مع الطلب ' . generateOrderNumber() . '.',
-            '🧾',
-            'admin/pages/payments.php#tab-students'
-          );
+        $rcptPath = saveReceiptUpload($_FILES['payment_receipt'] ?? null) ?: '';
+        $methodId = (int) ($_POST['payment_method_id'] ?? 0) ?: null;
+        $methodLabel = 'تحويل بنكي';
+        foreach ($paymentMethods as $pm) {
+            if ((int)$pm['id'] === $methodId) {
+                $methodLabel = $pm['account_name'];
+                break;
+            }
         }
+        savePaymentReceipt([
+          'order_id'     => $order_id,
+          'student_id'   => $user['id'],
+          'method_id'    => $methodId,
+          'method_label' => $methodLabel,
+          'amount'       => $student_payable,
+          'receipt_path' => $rcptPath,
+        ]);
+        createNotification(
+          1,
+          'admin',
+          'إشعار دفع جديد 🧾',
+          'طلب الطالب ' . $user['name'] . ' خدمة جديدة وبانتظار تدقيق الدفع للطلب #' . ($order_number ?? '') . '.',
+          '🧾',
+          'admin/pages/payments.php#tab-students'
+        );
       }
     }
 

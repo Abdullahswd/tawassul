@@ -67,65 +67,255 @@ foreach ($rev_stmt->fetchAll() as $r) {
 
 
 /* ─────────────────────────────
-  Payments table (FIXED safer JOINs)
+  Student Payments & Receipts (سجل مدفوعات وإشعارات الطلاب)
 ───────────────────────────── */
+
+ensureMissingPaymentReceipts();
+
+/* ── Unified Payment / Receipt Action (اعتماد أو رفض الدفعة والإشعار) ── */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['payment_action']) || isset($_POST['receipt_action']))) {
+    $action = ($_POST['payment_action'] ?? $_POST['receipt_action']) === 'approve' ? 'approve' : 'reject';
+    $pid = (int)($_POST['payment_id'] ?? 0);
+    $rid = (int)($_POST['receipt_id'] ?? 0);
+    $oid = (int)($_POST['order_id'] ?? 0);
+    $reason = trim($_POST['rejection_reason'] ?? '');
+
+    $payData = null;
+    if ($pid > 0) {
+        $stmt = $db->prepare('SELECT p.*, o.order_number FROM payments p LEFT JOIN orders o ON p.order_id = o.id WHERE p.id = ?');
+        $stmt->execute([$pid]);
+        $payData = $stmt->fetch();
+        if ($payData && empty($oid) && !empty($payData['order_id'])) {
+            $oid = (int)$payData['order_id'];
+        }
+    }
+
+    if (empty($oid) && $rid > 0) {
+        $rstmt = $db->prepare('SELECT * FROM payment_receipts WHERE id = ?');
+        $rstmt->execute([$rid]);
+        $rData = $rstmt->fetch();
+        if ($rData && !empty($rData['order_id'])) {
+            $oid = (int)$rData['order_id'];
+        }
+    }
+
+    if ($action === 'approve') {
+        if ($pid > 0) {
+            $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE id = ?")->execute([$pid]);
+        }
+        if ($oid > 0) {
+            $db->prepare("UPDATE orders SET status = 'pending_assignment' WHERE id = ? AND status IN ('awaiting_payment', 'new', 'pending')")
+              ->execute([$oid]);
+            $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE order_id = ? AND status != 'paid'")
+              ->execute([$oid]);
+            $db->prepare("UPDATE payment_receipts SET status = 'approved', rejection_reason = NULL WHERE order_id = ?")
+              ->execute([$oid]);
+
+            try {
+                syncAcademicEarnings($oid);
+            } catch (\Throwable $e) {
+                error_log("syncAcademicEarnings error: " . $e->getMessage());
+            }
+
+            try {
+                $ordNum = $payData['order_number'] ?? '';
+                if (empty($ordNum)) {
+                    $ordNum = $db->query("SELECT order_number FROM orders WHERE id = $oid")->fetchColumn() ?: '';
+                }
+                $studentId = $payData['student_id'] ?? $db->query("SELECT student_id FROM orders WHERE id = $oid")->fetchColumn();
+                if ($studentId) {
+                    createNotification(
+                        $studentId,
+                        'student',
+                        'تأكيد استلام الدفعة ✅',
+                        'تم اعتماد دفعتك بنجاح للطلب #' . $ordNum . ' وجاري تعيين أكاديمي لطلبك.',
+                        '💰',
+                        'student/order-details.php?id=' . $oid
+                    );
+                }
+            } catch (\Throwable $e) {
+                error_log("createNotification error: " . $e->getMessage());
+            }
+        }
+        if ($rid > 0) {
+            updatePaymentReceiptStatus($rid, 'approved');
+            $subId = $db->query("SELECT subscription_id FROM payment_receipts WHERE id = $rid")->fetchColumn();
+            if ($subId) {
+                $db->prepare("UPDATE package_subscriptions SET status = 'active' WHERE id = ?")->execute([$subId]);
+                $stdId = $db->query("SELECT student_id FROM payment_receipts WHERE id = $rid")->fetchColumn();
+                if ($stdId) {
+                    try {
+                        createNotification($stdId, 'student', 'اعتماد اشتراك الباقة ✅', 'تم اعتماد إيصال الدفع وتفعيل اشتراكك في الباقة بنجاح.', '📦', 'student/packages.php');
+                    } catch (\Throwable $e) {
+                        error_log("createNotification error: " . $e->getMessage());
+                    }
+                }
+            }
+        }
+        header('Location: payments.php?payment_updated=paid#tab-students');
+        exit;
+    } else {
+        $rejMsg = !empty($reason) ? $reason : 'تم رفض الدفعة من قبل الإدارة';
+        if ($pid > 0) {
+            $db->prepare("UPDATE payments SET status = 'failed' WHERE id = ?")->execute([$pid]);
+        }
+        if ($oid > 0) {
+            $db->prepare("UPDATE payment_receipts SET status = 'rejected', rejection_reason = ? WHERE order_id = ?")
+              ->execute([$rejMsg, $oid]);
+
+            try {
+                $ordNum = $payData['order_number'] ?? '';
+                if (empty($ordNum)) {
+                    $ordNum = $db->query("SELECT order_number FROM orders WHERE id = $oid")->fetchColumn() ?: '';
+                }
+                $studentId = $payData['student_id'] ?? $db->query("SELECT student_id FROM orders WHERE id = $oid")->fetchColumn();
+                if ($studentId) {
+                    $msg = 'تعذر تأكيد دفعتك للطلب #' . $ordNum . '. السبب: ' . $rejMsg;
+                    createNotification($studentId, 'student', 'فشل تأكيد الدفعة ❌', $msg, '❌', 'student/order-details.php?id=' . $oid);
+                }
+            } catch (\Throwable $e) {
+                error_log("createNotification error: " . $e->getMessage());
+            }
+        }
+        if ($rid > 0) {
+            updatePaymentReceiptStatus($rid, 'rejected', $rejMsg);
+        }
+        header('Location: payments.php?payment_updated=failed#tab-students');
+        exit;
+    }
+}
 
 $payments_stmt = $db->query("
     SELECT 
+        p.id AS raw_id,
         CONCAT('PAY-', LPAD(p.id,6,'0')) AS payment_id,
-        o.order_number AS order_number,
-        u.name AS student,
+        p.payment_number,
+        p.order_id,
+        p.student_id,
         p.amount,
+        p.platform_fee,
+        p.academic_net,
         p.method,
         p.status,
-        DATE(p.created_at) AS date
+        p.transaction_ref,
+        p.discount,
+        p.coupon_code,
+        p.paid_at,
+        p.created_at,
+        DATE(p.created_at) AS date,
+        COALESCE(o.order_number, '—') AS order_number,
+        o.status AS order_status,
+        o.academic_level,
+        o.specialty,
+        o.language,
+        o.deadline,
+        o.description AS order_description,
+        COALESCE(s.name, pkg.name, 'طلب خدمة أكاديمية') AS service_title,
+        COALESCE(u.name, '—') AS student,
+        COALESCE(u.email, '') AS student_email,
+        COALESCE(u.phone, '') AS student_phone,
+        COALESCE(
+            (SELECT pr_sub.id FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.receipt_path IS NOT NULL AND pr_sub.receipt_path != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            pr.id,
+            0
+        ) AS receipt_id,
+        COALESCE(
+            (SELECT pr_sub.receipt_path FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.receipt_path IS NOT NULL AND pr_sub.receipt_path != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            NULLIF(pr.receipt_path, ''),
+            NULLIF(p.receipt_path, ''),
+            (SELECT oa.file_path FROM order_attachments oa WHERE oa.order_id = p.order_id AND (oa.file_name LIKE '%.jpg' OR oa.file_name LIKE '%.png' OR oa.file_name LIKE '%.jpeg' OR oa.file_name LIKE '%.webp' OR oa.file_name LIKE '%.pdf' OR oa.file_name LIKE '%receipt%' OR oa.file_name LIKE '%إشعار%' OR oa.file_name LIKE '%اشعار%') ORDER BY oa.id DESC LIMIT 1),
+            ''
+        ) AS receipt_path,
+        COALESCE(
+            (SELECT pr_sub.method_label FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.method_label IS NOT NULL AND pr_sub.method_label != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            pr.method_label,
+            ''
+        ) AS method_label,
+        COALESCE(
+            (SELECT pr_sub.student_note FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.student_note IS NOT NULL AND pr_sub.student_note != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            pr.student_note,
+            ''
+        ) AS student_note,
+        COALESCE(
+            (SELECT pr_sub.rejection_reason FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.rejection_reason IS NOT NULL AND pr_sub.rejection_reason != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            pr.rejection_reason,
+            ''
+        ) AS rejection_reason,
+        COALESCE(
+            (SELECT pr_sub.status FROM payment_receipts pr_sub WHERE pr_sub.order_id = p.order_id AND pr_sub.receipt_path IS NOT NULL AND pr_sub.receipt_path != '' ORDER BY pr_sub.id DESC LIMIT 1),
+            pr.status,
+            ''
+        ) AS receipt_status
     FROM payments p
-    INNER JOIN orders o ON p.order_id = o.id
-    INNER JOIN users u ON p.student_id = u.id
+    LEFT JOIN orders o ON p.order_id = o.id
+    LEFT JOIN services s ON o.service_id = s.id
+    LEFT JOIN packages pkg ON o.package_id = pkg.id
+    LEFT JOIN users u ON p.student_id = u.id
+    LEFT JOIN (
+        SELECT pr1.*
+        FROM payment_receipts pr1
+        INNER JOIN (
+            SELECT MAX(id) AS max_id
+            FROM payment_receipts
+            WHERE order_id IS NOT NULL
+            GROUP BY order_id
+        ) pr2 ON pr1.id = pr2.max_id
+    ) pr ON p.order_id = pr.order_id
     ORDER BY p.created_at DESC
-    LIMIT 50
+    LIMIT 100
 ");
+$payments = $payments_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-$payments = $payments_stmt->fetchAll();
+$sub_receipts = $db->query("
+    SELECT 
+        0 AS raw_id,
+        CONCAT('RCPT-', LPAD(pr.id,6,'0')) AS payment_id,
+        CONCAT('RCPT-', LPAD(pr.id,6,'0')) AS payment_number,
+        0 AS order_id,
+        pr.student_id,
+        pr.amount,
+        0.00 AS platform_fee,
+        pr.amount AS academic_net,
+        'bank_transfer' AS method,
+        CASE WHEN pr.status = 'approved' THEN 'paid' WHEN pr.status = 'rejected' THEN 'failed' ELSE 'pending' END AS status,
+        '' AS transaction_ref,
+        0.00 AS discount,
+        '' AS coupon_code,
+        NULL AS paid_at,
+        pr.created_at,
+        DATE(pr.created_at) AS date,
+        CONCAT('اشتراك باقة #', pr.subscription_id) AS order_number,
+        pr.status AS order_status,
+        '' AS academic_level,
+        '' AS specialty,
+        '' AS language,
+        NULL AS deadline,
+        COALESCE(pr.student_note, '') AS order_description,
+        COALESCE(p.name, 'اشتراك باقة') AS service_title,
+        COALESCE(u.name, '—') AS student,
+        COALESCE(u.email, '') AS student_email,
+        COALESCE(u.phone, '') AS student_phone,
+        pr.id AS receipt_id,
+        pr.receipt_path,
+        pr.method_label,
+        pr.student_note,
+        pr.rejection_reason,
+        pr.status AS receipt_status
+    FROM payment_receipts pr
+    LEFT JOIN package_subscriptions ps ON pr.subscription_id = ps.id
+    LEFT JOIN packages p ON ps.package_id = p.id
+    LEFT JOIN users u ON pr.student_id = u.id
+    WHERE pr.order_id IS NULL AND pr.subscription_id IS NOT NULL
+    ORDER BY pr.created_at DESC
+    LIMIT 50
+")->fetchAll(PDO::FETCH_ASSOC);
 
-/* ─────────────────────────────
-  Payment receipts (إشعارات الدفع)
-──────────────────────────── */
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['receipt_id'], $_POST['receipt_action'])) {
-    $rid = (int) $_POST['receipt_id'];
-    $action = $_POST['receipt_action'] === 'approve' ? 'approved' : 'rejected';
-    $reason = $_POST['rejection_reason'] ?? null;
-    updatePaymentReceiptStatus($rid, $action, $reason);
-    
-    // Add a notification to the student about the receipt status
-    $stmt = $db->prepare('SELECT student_id, order_id FROM payment_receipts WHERE id = ?');
-    $stmt->execute([$rid]);
-    $receiptData = $stmt->fetch();
-    if ($receiptData) {
-        $msg = $action === 'approved' ? 'تم اعتماد إيصال الدفع بنجاح ✅ وجاري تعيين أكاديمي لطلبك.' : 'تم رفض إيصال الدفع. يرجى مراجعة السبب المرفق ❌.';
-        $link = $receiptData['order_id'] ? 'student/order-details.php?id=' . $receiptData['order_id'] : 'student/packages.php';
-        createNotification($receiptData['student_id'], 'student', 'تحديث حالة إيصال الدفع 🧾', $msg, '🧾', $link);
-        
-        // Auto-update order to pending_assignment if approved
-        if ($action === 'approved' && $receiptData['order_id']) {
-            $db->prepare("UPDATE orders SET status = 'pending_assignment' WHERE id = ? AND status = 'awaiting_payment'")
-              ->execute([$receiptData['order_id']]);
-              
-            // Mark payment as paid
-            $db->prepare("UPDATE payments SET status = 'paid', paid_at = NOW() WHERE order_id = ? AND status != 'paid'")
-              ->execute([$receiptData['order_id']]);
-              
-            // [FINANCIAL FIX]: Sync academic earnings if the order was already completed
-            syncAcademicEarnings($receiptData['order_id']);
-        }
-    }
-    
-    header('Location: payments.php?receipt_' . ($action === 'approved' ? 'approved' : 'rejected') . '=1');
-    exit;
+if (!empty($sub_receipts)) {
+    $payments = array_merge($payments, $sub_receipts);
+    usort($payments, fn($a, $b) => strcmp($b['created_at'], $a['created_at']));
 }
 
-$receipts = getAllPaymentReceipts();
+$receipts = $payments;
 
 /* ─────────────────────────────
   Refund Requests (طلبات الاسترجاع)
@@ -206,6 +396,12 @@ $receiptStatusLabels = [
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="../assets/css/style.css?v=<?= time() ?>" />
+  <style>
+    @media (max-width: 768px) {
+      .modal-two-col { grid-template-columns: 1fr !important; }
+      .decision-grid { grid-template-columns: 1fr !important; }
+    }
+  </style>
 </head>
 <body>
 <div class="mobile-overlay" id="mobileOverlay"></div>
@@ -224,6 +420,28 @@ $receiptStatusLabels = [
           <p class="page-header-subtitle">متابعة مدفوعات الطلاب، طلبات الاسترجاع، ومستحقات الأكاديميين</p>
         </div>
       </div>
+
+      <?php if (isset($_GET['payment_updated'])): ?>
+        <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;padding:12px 18px;border-radius:12px;margin-bottom:20px;font-weight:700;display:flex;align-items:center;gap:10px" class="animate-fadeInUp">
+          <span><?= $_GET['payment_updated'] === 'paid' ? '✅' : '❌' ?></span>
+          <span><?= $_GET['payment_updated'] === 'paid' ? 'تم اعتماد الدفعة بنجاح وتحديث حالة الطلب وإشعار الطالب.' : 'تم تسجيل الدفعة كعملية مرفوضة/فاشلة وإشعار الطالب بالسبب.' ?></span>
+        </div>
+      <?php elseif (isset($_GET['receipt_approved'])): ?>
+        <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;padding:12px 18px;border-radius:12px;margin-bottom:20px;font-weight:700;display:flex;align-items:center;gap:10px" class="animate-fadeInUp">
+          <span>✅</span>
+          <span>تم اعتماد إشعار الدفع بنجاح وتحديث حالة الطلب والدفعة.</span>
+        </div>
+      <?php elseif (isset($_GET['receipt_rejected'])): ?>
+        <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:12px 18px;border-radius:12px;margin-bottom:20px;font-weight:700;display:flex;align-items:center;gap:10px" class="animate-fadeInUp">
+          <span>❌</span>
+          <span>تم رفض إشعار الدفع وإرسال السبب للطالب لإعادة إرفاقه.</span>
+        </div>
+      <?php elseif (isset($_GET['refund_updated'])): ?>
+        <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;padding:12px 18px;border-radius:12px;margin-bottom:20px;font-weight:700;display:flex;align-items:center;gap:10px" class="animate-fadeInUp">
+          <span>💸</span>
+          <span>تم تحديث طلب الاسترجاع وإشعار الطالب بنجاح.</span>
+        </div>
+      <?php endif; ?>
 
       <div data-tabs>
         <div class="tabs-container animate-fadeInUp delay-1">
@@ -288,34 +506,51 @@ $receiptStatusLabels = [
             TAB 1: STUDENTS PAYMENTS
             ============================== -->
         <div id="tab-students" class="tab-panel">
-      <!-- Payments Table -->
+      <!-- Unified Students Payments & Receipts Table -->
       <div class="table-container animate-fadeInUp delay-3">
-        <div class="table-header">
-          <h3 class="table-title">سجل المدفوعات</h3>
-          <div class="search-box"><span class="search-icon">🔍</span><input type="text" id="paySearch" placeholder="بحث..." /></div>
-          <select class="form-input form-select" id="payStatusFilter" style="width:auto;padding-left:32px;font-size:14px">
-            <option value="">جميع الحالات</option>
-            <option value="paid">مدفوع</option>
-            <option value="pending">معلق</option>
-            <option value="failed">فاشل</option>
-          </select>
-          <select class="form-input form-select" id="payMethodFilter" style="width:auto;padding-left:32px;font-size:14px">
-            <option value="">جميع الطرق</option>
-            <option>بطاقة ائتمانية</option>
-            <option>تحويل بنكي</option>
-            <option>محفظة إلكترونية</option>
-          </select>
+        <div class="table-header" style="flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between">
+          <div>
+            <h3 class="table-title" style="font-size:18px;display:flex;align-items:center;gap:8px">
+              <span>💳</span> سجل مدفوعات وإشعارات الطلاب
+            </h3>
+            <p style="font-size:13px;color:var(--text-secondary);margin-top:2px">عرض وتدقيق جميع مدفوعات الطلبات والاشتراكات، معاينة إشعارات التحويل، والاعتماد أو الرفض بالسبب من مكان واحد.</p>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <div class="search-box" style="min-width:240px">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="paySearch" placeholder="بحث بالطلب، العملية، الطالب..." />
+            </div>
+            <select class="form-input form-select" id="payStatusFilter" style="width:auto;padding-left:32px;font-size:13px">
+              <option value="">جميع الحالات</option>
+              <option value="pending">⏳ معلق (بانتظار الاعتماد)</option>
+              <option value="paid">✅ معتمد ومسدد</option>
+              <option value="failed">❌ مرفوض / فاشل</option>
+            </select>
+            <select class="form-input form-select" id="payMethodFilter" style="width:auto;padding-left:32px;font-size:13px">
+              <option value="">جميع طرق الدفع</option>
+              <option value="bank_transfer">تحويل بنكي</option>
+              <option value="credit_card">بطاقة ائتمانية</option>
+              <option value="wallet">محفظة إلكترونية</option>
+              <option value="apple_pay">Apple Pay</option>
+              <option value="stc_pay">STC Pay</option>
+            </select>
+            <select class="form-input form-select" id="payReceiptFilter" style="width:auto;padding-left:32px;font-size:13px">
+              <option value="">جميع الإشعارات</option>
+              <option value="has_receipt">📎 يوجد إشعار مرفق</option>
+              <option value="no_receipt">⚠️ بدون إشعار</option>
+            </select>
+          </div>
         </div>
 
         <div style="overflow-x:auto">
           <table class="data-table">
             <thead>
               <tr>
-                <th>رقم العملية</th>
-                <th>الطلب</th>
+                <th>الطلب والعملية</th>
                 <th>الطالب</th>
                 <th>المبلغ</th>
-                <th>طريقة الدفع</th>
+                <th>طريقة وحساب الدفع</th>
+                <th>الإشعار المرفق</th>
                 <th>الحالة</th>
                 <th>التاريخ</th>
                 <th>الإجراءات</th>
@@ -327,87 +562,16 @@ $receiptStatusLabels = [
 
         <!-- Totals Row -->
         <div style="padding:16px 24px;background:var(--bg-main);border-top:1px solid var(--border-color);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
-          <div style="font-size:13px;color:var(--text-secondary)">عرض 1-<?= count($payments) ?> من <strong><?= $total_cnt ?></strong> عملية</div>
+          <div style="font-size:13px;color:var(--text-secondary)">
+            إجمالي المعروض: <strong id="payVisibleCount"><?= count($payments) ?></strong> عملية
+          </div>
           <div style="display:flex;gap:24px">
-            <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">إجمالي المبالغ</div><div style="font-size:18px;font-weight:800;color:var(--success)"><?= number_format((float)$total_revenue, 2, '.', ',') ?> ر.س</div></div>
-            <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">العمليات الناجحة</div><div style="font-size:18px;font-weight:800;color:var(--primary)"><?= $success_cnt ?></div></div>
-            <div style="text-align:center"><div style="font-size:13px;color:var(--text-secondary)">العمليات الفاشلة</div><div style="font-size:18px;font-weight:800;color:var(--danger)"><?= $failed_cnt ?></div></div>
-          </div>
-          <div class="pagination-pages">
-            <button class="page-btn">‹</button>
-            <button class="page-btn active">1</button>
-            <button class="page-btn">2</button>
-            <button class="page-btn">›</button>
+            <div style="text-align:center"><div style="font-size:12px;color:var(--text-secondary)">إجمالي الإيرادات</div><div style="font-size:16px;font-weight:800;color:var(--success)"><?= number_format((float)$total_revenue, 2, '.', ',') ?> ر.س</div></div>
+            <div style="text-align:center"><div style="font-size:12px;color:var(--text-secondary)">مدفوعات معلقة</div><div style="font-size:16px;font-weight:800;color:var(--warning)"><?= number_format((float)$pending_amount, 2, '.', ',') ?> ر.س</div></div>
+            <div style="text-align:center"><div style="font-size:12px;color:var(--text-secondary)">العمليات الناجحة</div><div style="font-size:16px;font-weight:800;color:var(--primary)"><?= $success_cnt ?></div></div>
           </div>
         </div>
 
-      </div>
-
-      <!-- ===================== Payment Receipts (إشعارات الدفع) ===================== -->
-      <div class="table-container animate-fadeInUp delay-2" style="margin-top:28px">
-        <div class="table-header">
-          <h3 class="table-title">🧾 إشعارات الدفع المرفقة من الطلاب</h3>
-          <p style="font-size:13px;color:var(--text-secondary)">راجع إشعارات التحويل وأعتمدها لتأكيد الدفع</p>
-        </div>
-        <div style="overflow-x:auto">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>الطالب</th>
-                <th>النوع</th>
-                <th>حساب الدفع</th>
-                <th>المبلغ</th>
-                <th>التاريخ</th>
-                <th>الإشعار</th>
-                <th>الحالة</th>
-                <th>الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              <?php if (empty($receipts)): ?>
-                <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-secondary)">لا توجد إشعارات دفع بعد</td></tr>
-              <?php endif; ?>
-              <?php foreach ($receipts as $rc): $sl = $receiptStatusLabels[$rc['status']] ?? $receiptStatusLabels['pending']; ?>
-                <tr>
-                  <td style="font-weight:700"><?= e($rc['student_name'] ?? '—') ?></td>
-                  <td><?= $rc['order_id'] ? '📋 طلب ' . e($rc['order_number'] ?? '') : '📦 باقة ' . e($rc['package_name'] ?? '') ?></td>
-                  <td style="font-size:13px"><?= e($rc['method_label'] ?: '—') ?></td>
-                  <td style="font-weight:800"><?= number_format((float)$rc['amount'], 2) ?> ر.س</td>
-                  <td style="font-size:13px"><?= formatDate($rc['created_at']) ?></td>
-                  <td>
-                    <a href="<?= e($adminAppBase . '/' . $rc['receipt_path']) ?>" target="_blank" class="btn btn-outline" style="padding:6px 12px;font-size:12px">عرض 👁️</a>
-                    <?php if (!empty($rc['student_note'])): ?>
-                      <div style="margin-top:6px; font-size:11px; color:#475569; max-width:150px; background:#f1f5f9; padding:6px; border-radius:6px; border:1px solid #cbd5e1; line-height:1.4">
-                        <strong class="block text-[10px] text-slate-500 mb-1">💬 ملاحظة الطالب للتصحيح:</strong>
-                        <?= e($rc['student_note']) ?>
-                      </div>
-                    <?php endif; ?>
-                  </td>
-                  <td><span style="background:<?= $sl[1] ?>;color:<?= $sl[2] ?>;border:1px solid <?= $sl[3] ?>;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:800"><?= $sl[0] ?></span></td>
-                  <td>
-                    <?php if ($rc['status'] === 'pending'): ?>
-                      <div style="display:flex;gap:6px">
-                        <form method="POST" style="margin:0">
-                          <input type="hidden" name="receipt_id" value="<?= (int)$rc['id'] ?>">
-                          <input type="hidden" name="receipt_action" value="approve">
-                          <button type="submit" style="background:#10b981;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">اعتماد ✓</button>
-                        </form>
-                        <form method="POST" style="margin:0;display:flex;align-items:center;gap:4px">
-                          <input type="hidden" name="receipt_id" value="<?= (int)$rc['id'] ?>">
-                          <input type="hidden" name="receipt_action" value="reject">
-                          <input type="text" name="rejection_reason" placeholder="سبب الرفض..." required style="width:110px;font-size:11px;padding:4px;border:1px solid #fca5a5;border-radius:4px;outline:none">
-                          <button type="submit" style="background:#ef4444;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer">رفض ✕</button>
-                        </form>
-                      </div>
-                    <?php else: ?>
-                      <span style="font-size:12px;color:var(--text-secondary)">—</span>
-                    <?php endif; ?>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            </tbody>
-          </table>
-        </div>
       </div>
     </div> <!-- END TAB 1 -->
 
@@ -625,20 +789,27 @@ $receiptStatusLabels = [
   </div>
 </div>
 
-<!-- Payment Details Modal -->
-<div class="modal-overlay" id="paymentDetailsModal">
-  <div class="modal-box" style="max-width:500px">
-    <div class="modal-header">
-      <h3 class="modal-title">تفاصيل الدفعة</h3>
+<!-- Master Student Payment & Receipt Modal -->
+<div class="modal-overlay" id="studentPaymentModal">
+  <div class="modal-box" style="max-width:960px;width:95%;max-height:92vh;display:flex;flex-direction:column;padding:0;overflow:hidden">
+    <div class="modal-header" style="padding:16px 24px;border-bottom:1px solid var(--border-color);background:var(--bg-card);display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <h3 class="modal-title" id="spModalTitle" style="font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px;margin:0">
+          <span>💳</span> تفاصيل الدفعة والطلب
+        </h3>
+        <span id="spModalOrderBadge"></span>
+        <span id="spModalStatusBadge"></span>
+      </div>
       <button class="modal-close" data-modal-close>✕</button>
     </div>
-    <div class="modal-body" id="paymentDetailsBody" style="line-height:1.8">
-      <!-- Injected via JS -->
+    <div class="modal-body" id="spModalBody" style="padding:22px 24px;overflow-y:auto;flex:1;background:var(--bg-card)">
+      <!-- Injected dynamically via JS -->
     </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" data-modal-close>إغلاق</button>
+    <div class="modal-footer" style="padding:12px 24px;border-top:1px solid var(--border-color);background:var(--bg-main);display:flex;justify-content:flex-end">
+      <button type="button" class="btn btn-outline" data-modal-close>إغلاق النافذة</button>
     </div>
   </div>
+</div>
 </div>
 
 <!-- Admin Payout Messages Modal -->
@@ -660,6 +831,8 @@ $receiptStatusLabels = [
 
 <script src="../assets/js/main.js?v=<?= time() ?>"></script>
 <script>
+const adminAppBase = <?= json_encode($adminAppBase) ?>;
+const csrfToken = <?= json_encode($_SESSION['csrf_token'] ?? '') ?>;
 MOCK_DATA.payments = <?= json_encode($payments) ?>;
 MOCK_DATA.chartData = {
   revenue: <?= json_encode(array_values($rev_by_month)) ?>,
@@ -686,73 +859,393 @@ const METHOD_ICONS = {
 
 function renderPayments(data) {
   const tbody = document.getElementById('paymentsTableBody');
+  const countEl = document.getElementById('payVisibleCount');
+  if (countEl) countEl.textContent = data.length;
   if (!tbody) return;
+
+  if (data.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--text-secondary);font-size:14px">لم يتم العثور على أي عمليات مطابقة لمعايير البحث.</td></tr>`;
+    return;
+  }
+
   tbody.innerHTML = data.map((p, i) => {
-    const methodAr = METHOD_NAMES[p.method] || p.method;
+    const methodAr = METHOD_NAMES[p.method] || p.method || 'تحويل بنكي';
     const methodIcon = METHOD_ICONS[p.method] || '💰';
+    const isOrder = p.order_id && p.order_id !== '0' && p.order_id !== 0;
+    const orderLink = isOrder ? `order-details.php?id=${p.order_id}` : null;
+    const orderNum = p.order_number || '—';
+    const payCode = p.payment_id || ('PAY-' + p.raw_id);
+    const serviceName = p.service_title || 'خدمة أكاديمية';
+
+    // Receipt column display
+    let receiptCell = '';
+    if (p.receipt_path) {
+      receiptCell = `
+        <div style="display:flex;align-items:center;gap:6px">
+          <button type="button" class="btn btn-xs btn-outline" style="color:#059669;border-color:#10b981;font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;font-size:11px" onclick="openStudentPaymentModal('${payCode}')">
+            <span>👁️</span> الإشعار
+          </button>
+          ${p.student_note ? `<span title="ملاحظة الطالب: ${escHtml(p.student_note)}" style="cursor:help;font-size:12px">💬</span>` : ''}
+        </div>
+      `;
+    } else {
+      receiptCell = `<span style="display:inline-block;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:6px;font-size:11px;font-weight:600">⚠️ لم يرفق</span>`;
+    }
+
+    // Status Badge
+    const statusHtml = getStatusBadge(p.status === 'paid' ? 'paid' : p.status === 'pending' ? 'pending_pay' : 'failed');
+
+    // Actions
+    let actionsHtml = `<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">`;
+    actionsHtml += `<button class="btn btn-sm btn-primary" onclick="openStudentPaymentModal('${payCode}')" style="padding:4px 10px;font-size:12px;font-weight:700;display:inline-flex;align-items:center;gap:4px">🔍 التفاصيل والاعتماد</button>`;
+
+    if (p.status === 'pending') {
+      actionsHtml += `
+        <form method="POST" style="margin:0;display:inline" onsubmit="return confirm('هل أنت متأكد من اعتماد واستلام هذه الدفعة وتفعيل الطلب؟')">
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <input type="hidden" name="payment_id" value="${p.raw_id || 0}">
+          <input type="hidden" name="receipt_id" value="${p.receipt_id || 0}">
+          <input type="hidden" name="order_id" value="${p.order_id || 0}">
+          <input type="hidden" name="payment_action" value="approve">
+          <button type="submit" class="btn btn-sm" style="background:#10b981;color:#fff;border:none;font-weight:700;padding:4px 9px;font-size:12px;cursor:pointer" title="اعتماد مباشر">✓</button>
+        </form>
+      `;
+    }
+    actionsHtml += `</div>`;
+
     return `
-    <tr>
-      <td><span style="font-family:monospace;font-size:13px;background:var(--bg-main);padding:3px 8px;border-radius:6px">${p.payment_id || p.id}</span></td>
-      <td><a href="order-details.php" style="color:var(--primary);font-weight:600;text-decoration:none">${p.order_number || p.order}</a></td>
-      <td>
+      <tr>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <div style="display:flex;align-items:center;gap:6px">
+              ${isOrder ? `<a href="${orderLink}" style="color:var(--primary);font-weight:800;text-decoration:none;font-size:13px">#${escHtml(orderNum)}</a>` : `<span style="font-weight:700;font-size:13px">${escHtml(orderNum)}</span>`}
+            </div>
+            <span style="font-family:monospace;font-size:11px;color:var(--text-secondary)">${escHtml(payCode)}</span>
+            <span style="font-size:11px;color:#475569;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(serviceName)}">📋 ${escHtml(serviceName)}</span>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="table-avatar" style="background:${getAvatarColor(i)};width:32px;height:32px;border-radius:8px;font-size:11px;flex-shrink:0">${(p.student || '').slice(0,2)}</div>
+            <div style="display:flex;flex-direction:column">
+              <span style="font-weight:700;font-size:13px">${escHtml(p.student)}</span>
+              ${p.student_phone ? `<span style="font-size:11px;color:var(--text-secondary)" dir="ltr">${escHtml(p.student_phone)}</span>` : ''}
+            </div>
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column">
+            <strong style="font-size:14px;color:var(--text-primary)">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</strong>
+            ${p.discount && Number(p.discount) > 0 ? `<span style="font-size:10px;color:var(--success)">خصم ${Number(p.discount)} ر.س</span>` : ''}
+          </div>
+        </td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:2px">
+            <span style="font-size:12px;font-weight:600">${methodIcon} ${escHtml(methodAr)}</span>
+            ${p.method_label ? `<span style="font-size:11px;color:var(--text-secondary)">${escHtml(p.method_label)}</span>` : ''}
+          </div>
+        </td>
+        <td>${receiptCell}</td>
+        <td>${statusHtml}</td>
+        <td><span style="color:var(--text-secondary);font-size:12px" dir="ltr">${escHtml(p.date)}</span></td>
+        <td>${actionsHtml}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openStudentPaymentModal(key) {
+  const p = MOCK_DATA.payments.find(x => 
+    (x.payment_id || x.id) === key || 
+    String(x.raw_id) === String(key) || 
+    String(x.receipt_id) === String(key) ||
+    x.order_number === key
+  );
+  if (!p) return;
+
+  const titleEl = document.getElementById('spModalTitle');
+  const orderBadgeEl = document.getElementById('spModalOrderBadge');
+  const statusBadgeEl = document.getElementById('spModalStatusBadge');
+  const bodyEl = document.getElementById('spModalBody');
+
+  const orderNum = p.order_number || '—';
+  const payCode = p.payment_id || ('PAY-' + p.raw_id);
+  const isOrder = p.order_id && p.order_id !== '0' && p.order_id !== 0;
+  const orderUrl = isOrder ? `order-details.php?id=${p.order_id}` : null;
+
+  orderBadgeEl.innerHTML = isOrder 
+    ? `<a href="${orderUrl}" target="_blank" style="background:rgba(99,102,241,0.12);color:var(--primary);font-weight:700;font-size:12px;padding:3px 8px;border-radius:6px;text-decoration:none;display:inline-flex;align-items:center;gap:4px">📋 #${escHtml(orderNum)} <span style="font-size:10px">↗</span></a>`
+    : `<span class="badge badge-info" style="font-size:12px">${escHtml(orderNum)}</span>`;
+
+  statusBadgeEl.innerHTML = getStatusBadge(p.status === 'paid' ? 'paid' : p.status === 'pending' ? 'pending_pay' : 'failed');
+
+  const methodAr = METHOD_NAMES[p.method] || p.method || 'تحويل بنكي';
+  const methodIcon = METHOD_ICONS[p.method] || '💰';
+  const accountLabel = p.method_label ? `<span style="color:var(--text-secondary);font-size:12px;margin-right:6px">(${escHtml(p.method_label)})</span>` : '';
+
+  const cleanReceiptPath = p.receipt_path ? p.receipt_path.replace(/\\/g, '/').replace(/^\/+/, '') : null;
+  const receiptFullUrl = cleanReceiptPath ? `${adminAppBase}/${cleanReceiptPath}` : null;
+
+  let receiptHtml = '';
+  if (receiptFullUrl) {
+    const isPdf = cleanReceiptPath.toLowerCase().endsWith('.pdf');
+    if (isPdf) {
+      receiptHtml = `
+        <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:24px;text-align:center">
+          <div style="font-size:44px;margin-bottom:10px">📄</div>
+          <div style="font-weight:700;font-size:14px;margin-bottom:6px">إشعار دفع بصيغة PDF</div>
+          <p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">قام الطالب بإرفاق مستند PDF كإشعار تحويل بنكي</p>
+          <a href="${receiptFullUrl}" target="_blank" class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px">
+            <span>👁️</span> فتح وقراءة مستند الإشعار (PDF) ↗
+          </a>
+        </div>
+      `;
+    } else {
+      receiptHtml = `
+        <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:12px;display:flex;flex-direction:column;align-items:center">
+          <a href="${receiptFullUrl}" target="_blank" title="انقر لفتح الصورة بالحجم الكامل" style="display:block;width:100%;max-height:360px;overflow:hidden;border-radius:8px;background:#000;text-align:center">
+            <img src="${receiptFullUrl}" alt="إشعار الدفع" style="max-height:360px;width:auto;max-width:100%;margin:0 auto;display:block;object-fit:contain;transition:transform 0.2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+          </a>
+          <div style="width:100%;display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-color);flex-wrap:wrap;gap:8px">
+            <span style="font-size:11px;color:var(--text-secondary)">🔎 انقر على الصورة لمعاينتها بحجمها الكامل</span>
+            <a href="${receiptFullUrl}" target="_blank" class="btn btn-outline btn-sm" style="font-size:11px;display:inline-flex;align-items:center;gap:4px">
+              <span>↗</span> فتح في نافذة مستقلة
+            </a>
+          </div>
+        </div>
+      `;
+    }
+  } else {
+    receiptHtml = `
+      <div style="background:#fffbeb;border:1px dashed #f59e0b;border-radius:12px;padding:24px 16px;text-align:center;color:#92400e">
+        <div style="font-size:36px;margin-bottom:8px">⚠️</div>
+        <div style="font-weight:800;font-size:14px;margin-bottom:4px">لم يتم إرفاق إشعار تحويل</div>
+        <p style="font-size:12px;line-height:1.6;margin:0">
+          لم يقم الطالب برفع صورة أو مستند إشعار التحويل البنكي لهذا الطلب حتى الآن.
+          يمكنك الانتظار لحين قيامه بالإرفاق، أو رفض الدفعة مع كتابة ملاحظة توجيهية للطالب لرفع الإشعار من حسابه.
+        </p>
+      </div>
+    `;
+  }
+
+  // Student note callout
+  let studentNoteHtml = '';
+  if (p.student_note && p.student_note.trim() !== '') {
+    studentNoteHtml = `
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-top:14px;font-size:12px;color:#1e40af;line-height:1.5">
+        <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px">💬 ملاحظة الطالب المرفقة مع الإشعار:</strong>
+        <span style="color:#1e3a8a">${escHtml(p.student_note)}</span>
+      </div>
+    `;
+  }
+
+  // Previous rejection reason
+  let rejectionReasonHtml = '';
+  if (p.rejection_reason && p.rejection_reason.trim() !== '') {
+    rejectionReasonHtml = `
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;margin-top:14px;font-size:12px;color:#991b1b;line-height:1.5">
+        <strong style="display:flex;align-items:center;gap:6px;margin-bottom:4px">❌ سبب الرفض المسجل مسبقاً:</strong>
+        <span>${escHtml(p.rejection_reason)}</span>
+      </div>
+    `;
+  }
+
+  // Action Panel at bottom
+  let actionPanelHtml = '';
+  if (p.status === 'pending') {
+    actionPanelHtml = `
+      <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:14px;padding:18px 20px;margin-top:22px">
+        <div style="font-size:14px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+          <span>⚙️</span> اتخاذ القرار الإداري بشأن الدفعة
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1.25fr;gap:18px;align-items:stretch" class="decision-grid">
+          <!-- Approval Option -->
+          <div style="background:var(--bg-card);border:1px solid rgba(16,185,129,0.3);border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="font-weight:800;color:var(--success);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+                <span>✅</span> اعتماد واستلام المبلغ
+              </div>
+              <p style="font-size:12px;color:var(--text-secondary);line-height:1.5;margin-bottom:14px">
+                عند التأكد من صحة التحويل، سيتم تأكيد الدفعة فوراً، وتحديث حالة الطلب إلى (بانتظار التعيين) لإسناده لأكاديمي، وإرسال إشعار فوري للطالب.
+              </p>
+            </div>
+            <form method="POST" style="margin:0" onsubmit="return confirm('هل أنت متأكد من اعتماد واستلام دفعة الطلب وتفعيله للأكاديميين؟')">
+              <input type="hidden" name="csrf_token" value="${csrfToken}">
+              <input type="hidden" name="payment_id" value="${p.raw_id || 0}">
+              <input type="hidden" name="receipt_id" value="${p.receipt_id || 0}">
+              <input type="hidden" name="order_id" value="${p.order_id || 0}">
+              <input type="hidden" name="payment_action" value="approve">
+              <button type="submit" class="btn btn-success" style="width:100%;background:#10b981;color:#fff;border:none;padding:10px;font-weight:800;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                ✓ اعتماد الدفعة وتفعيل الطلب
+              </button>
+            </form>
+          </div>
+
+          <!-- Rejection Option -->
+          <div style="background:var(--bg-card);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px">
+            <div style="font-weight:800;color:var(--danger);margin-bottom:6px;display:flex;align-items:center;gap:6px">
+              <span>❌</span> رفض الدفعة مع إرسال السبب
+            </div>
+            <p style="font-size:11px;color:var(--text-secondary);line-height:1.4;margin-bottom:8px">
+              اختر أو اكتب سبب الرفض؛ وسيتم إرسال إشعار فوري للطالب مع السبب المرفق ليقوم بإعادة الرفع.
+            </p>
+            <form method="POST" style="margin:0" onsubmit="return validateRejectionForm(this)">
+              <input type="hidden" name="csrf_token" value="${csrfToken}">
+              <input type="hidden" name="payment_id" value="${p.raw_id || 0}">
+              <input type="hidden" name="receipt_id" value="${p.receipt_id || 0}">
+              <input type="hidden" name="order_id" value="${p.order_id || 0}">
+              <input type="hidden" name="payment_action" value="reject">
+
+              <!-- Quick chips -->
+              <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+                <button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:2px 6px;border-radius:10px" onclick="setRejectionReason(this, 'الإشعار المرفق غير واضح أو مقطوع')">الإشعار غير واضح</button>
+                <button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:2px 6px;border-radius:10px" onclick="setRejectionReason(this, 'المبلغ المحول غير مطابق لقيمة الطلب')">المبلغ غير مطابق</button>
+                <button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:2px 6px;border-radius:10px" onclick="setRejectionReason(this, 'لم يصل مبلغ الحوالة إلى الحساب البنكي حتى الآن')">الحوالة لم تصل</button>
+                <button type="button" class="btn btn-xs btn-outline" style="font-size:10px;padding:2px 6px;border-radius:10px" onclick="setRejectionReason(this, 'يرجى إرفاق إشعار رسمي من تطبيق البنك يتضمن رقم العملية وتاريخها')">طلب إشعار رسمي</button>
+              </div>
+
+              <textarea name="rejection_reason" id="modalRejectionReason" rows="2" required placeholder="اكتب سبب الرفض هنا..." class="form-control" style="width:100%;padding:8px 10px;font-size:12px;border:1px solid #fca5a5;border-radius:8px;background:var(--bg-main);margin-bottom:8px;resize:vertical"></textarea>
+              <button type="submit" class="btn btn-danger" style="width:100%;background:#ef4444;color:#fff;border:none;padding:9px;font-weight:800;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+                ✕ رفض الدفعة وإرسال السبب للطالب
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (p.status === 'paid') {
+    actionPanelHtml = `
+      <div style="background:#dcfce7;border:1px solid #86efac;color:#166534;border-radius:12px;padding:14px 18px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
         <div style="display:flex;align-items:center;gap:10px">
-          <div class="table-avatar" style="background:${getAvatarColor(i)};width:32px;height:32px;border-radius:8px;font-size:12px">${p.student.slice(0,2)}</div>
-          <span>${p.student}</span>
+          <span style="font-size:22px">✅</span>
+          <div>
+            <div style="font-weight:800;font-size:14px">هذه الدفعة معتمدة ومستلمة بنجاح</div>
+            <div style="font-size:12px;opacity:0.9">تم تأكيد استلام المبلغ بالكامل وتفعيل الطلب. ${p.paid_at ? 'تاريخ السداد: ' + p.paid_at : ''}</div>
+          </div>
         </div>
-      </td>
-      <td><strong style="font-size:15px">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</strong></td>
-      <td><span style="font-size:16px">${methodIcon}</span> ${methodAr}</td>
-      <td>${getStatusBadge(p.status === 'paid' ? 'paid' : p.status === 'pending' ? 'pending_pay' : 'failed')}</td>
-      <td style="color:var(--text-secondary);font-size:13px">${p.date}</td>
-      <td>
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-sm btn-outline" onclick="viewPaymentDetails('${p.payment_id || p.id}')">👁 عرض</button>
-          ${p.status === 'failed' ? `<button class="btn btn-sm btn-warning" onclick="Toast.show('جاري إعادة محاولة الدفع...','warning')">🔄 إعادة</button>` : ''}
+        ${isOrder ? `<a href="${orderUrl}" target="_blank" class="btn btn-outline btn-sm" style="background:#fff;border-color:#166534;color:#166534;font-weight:700">متابعة إنجاز الطلب ↗</a>` : ''}
+      </div>
+    `;
+  } else {
+    actionPanelHtml = `
+      <div style="background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;border-radius:12px;padding:14px 18px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px">❌</span>
+          <div>
+            <div style="font-weight:800;font-size:14px">هذه الدفعة مسجلة كعملية مرفوضة / فاشلة</div>
+            <div style="font-size:12px;opacity:0.9">${p.rejection_reason ? 'السبب: ' + escHtml(p.rejection_reason) : 'تم رفض العملية من قبل الإدارة.'}</div>
+          </div>
         </div>
-      </td>
-    </tr>
-  `}).join('');
+        <form method="POST" style="margin:0" onsubmit="return confirm('هل تريد التراجع وإعادة اعتماد هذه الدفعة وتفعيل الطلب؟')">
+          <input type="hidden" name="csrf_token" value="${csrfToken}">
+          <input type="hidden" name="payment_id" value="${p.raw_id || 0}">
+          <input type="hidden" name="receipt_id" value="${p.receipt_id || 0}">
+          <input type="hidden" name="order_id" value="${p.order_id || 0}">
+          <input type="hidden" name="payment_action" value="approve">
+          <button type="submit" class="btn btn-sm" style="background:#10b981;color:#fff;border:none;font-weight:700;padding:6px 14px;border-radius:8px">
+            🔄 إعادة الاعتماد وتفعيل الطلب
+          </button>
+        </form>
+      </div>
+    `;
+  }
+
+  bodyEl.innerHTML = `
+    <div style="display:grid;grid-template-columns:1.15fr 0.85fr;gap:20px" class="modal-two-col">
+      <!-- Right Side: Details & Info -->
+      <div>
+        <!-- Order & Item Card -->
+        <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px;margin-bottom:16px">
+          <div style="font-size:13px;font-weight:800;color:var(--text-secondary);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+            <span>📋 بيانات الطلب والخدمة</span>
+            ${isOrder ? `<a href="${orderUrl}" target="_blank" style="color:var(--primary);font-size:12px;font-weight:700;text-decoration:none">صفحة الطلب ↗</a>` : ''}
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary);width:35%">الخدمة / الباقة</td><td style="padding:6px 0;font-weight:700;color:var(--text-primary)">${escHtml(p.service_title || 'خدمة أكاديمية')}</td></tr>
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">رقم الطلب</td><td style="padding:6px 0;font-weight:700;color:var(--primary)">#${escHtml(orderNum)}</td></tr>
+            ${p.specialty ? `<tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">التخصص والمستوى</td><td style="padding:6px 0">${escHtml(p.specialty)} ${p.academic_level ? ' • ' + escHtml(p.academic_level) : ''}</td></tr>` : ''}
+            ${p.deadline ? `<tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">الموعد النهائي</td><td style="padding:6px 0;color:var(--danger);font-weight:600">${escHtml(p.deadline)}</td></tr>` : ''}
+            ${p.order_description ? `<tr><td style="padding:6px 0;color:var(--text-secondary);vertical-align:top">متطلبات الطلب</td><td style="padding:6px 0;line-height:1.5;max-height:80px;overflow-y:auto;display:block">${escHtml(p.order_description)}</td></tr>` : ''}
+          </table>
+        </div>
+
+        <!-- Student & Financial Card -->
+        <div style="background:var(--bg-main);border:1px solid var(--border-color);border-radius:12px;padding:16px">
+          <div style="font-size:13px;font-weight:800;color:var(--text-secondary);margin-bottom:10px">
+            👤 بيانات الطالب والعملية المالية
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px">
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary);width:35%">اسم الطالب</td><td style="padding:6px 0;font-weight:700;color:var(--text-primary)">${escHtml(p.student)}</td></tr>
+            ${p.student_email ? `<tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">البريد الإلكتروني</td><td style="padding:6px 0" dir="ltr">${escHtml(p.student_email)}</td></tr>` : ''}
+            ${p.student_phone ? `<tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">رقم الهاتف</td><td style="padding:6px 0" dir="ltr">${escHtml(p.student_phone)}</td></tr>` : ''}
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">المبلغ الإجمالي</td><td style="padding:6px 0;font-weight:900;font-size:16px;color:var(--success)">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</td></tr>
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">طريقة السداد والحساب</td><td style="padding:6px 0;font-weight:600">${methodIcon} ${escHtml(methodAr)} ${accountLabel}</td></tr>
+            <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:6px 0;color:var(--text-secondary)">رقم العملية المنظومي</td><td style="padding:6px 0;font-family:monospace;font-size:12px">${escHtml(payCode)}</td></tr>
+            <tr><td style="padding:6px 0;color:var(--text-secondary)">تاريخ إنشاء العملية</td><td style="padding:6px 0" dir="ltr">${escHtml(p.created_at || p.date)}</td></tr>
+          </table>
+
+          ${studentNoteHtml}
+          ${rejectionReasonHtml}
+        </div>
+      </div>
+
+      <!-- Left Side: Receipt Proof -->
+      <div>
+        <div style="font-size:13px;font-weight:800;color:var(--text-secondary);margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span>🧾</span> صورة ومستند إشعار التحويل البنكي
+        </div>
+        ${receiptHtml}
+      </div>
+    </div>
+
+    <!-- Actions & Decisions Section -->
+    ${actionPanelHtml}
+  `;
+
+  Modal.open('studentPaymentModal');
 }
 
 function viewPaymentDetails(paymentId) {
-  const p = MOCK_DATA.payments.find(x => (x.payment_id || x.id) === paymentId);
-  if (!p) return;
-  const body = document.getElementById('paymentDetailsBody');
-  
-  const statusHtml = getStatusBadge(p.status === 'paid' ? 'paid' : p.status === 'pending' ? 'pending_pay' : 'failed');
-  const methodAr = METHOD_NAMES[p.method] || p.method;
-  const methodIcon = METHOD_ICONS[p.method] || '💰';
-  
-  body.innerHTML = `
-    <div style="background:var(--bg-main);padding:16px;border-radius:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
-      <div>
-        <div style="font-size:12px;color:var(--text-secondary)">رقم الدفعة</div>
-        <div style="font-size:16px;font-family:monospace;font-weight:700">${p.payment_id || p.id}</div>
-      </div>
-      <div>${statusHtml}</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:14px">
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">رقم الطلب</td><td style="padding:10px 0;text-align:left;font-weight:600"><a href="order-details.php" style="color:var(--primary);text-decoration:none">${p.order_number || p.order}</a></td></tr>
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">الطالب</td><td style="padding:10px 0;text-align:left;font-weight:600">${p.student}</td></tr>
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">طريقة الدفع</td><td style="padding:10px 0;text-align:left;font-weight:600">${methodIcon} ${methodAr}</td></tr>
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">المبلغ الإجمالي</td><td style="padding:10px 0;text-align:left;font-weight:700;color:var(--text-primary)">${Number(p.amount).toLocaleString('ar', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ر.س</td></tr>
-      <tr style="border-bottom:1px solid var(--border-color)"><td style="padding:10px 0;color:var(--text-secondary)">تاريخ الإنشاء</td><td style="padding:10px 0;text-align:left" dir="ltr">${p.date}</td></tr>
-    </table>
-  `;
-  Modal.open('paymentDetailsModal');
+  openStudentPaymentModal(paymentId);
+}
+
+function setRejectionReason(btn, text) {
+  const textarea = document.getElementById('modalRejectionReason');
+  if (textarea) {
+    textarea.value = text;
+    textarea.focus();
+  }
+}
+
+function validateRejectionForm(form) {
+  const reason = form.querySelector('[name="rejection_reason"]').value.trim();
+  if (!reason) {
+    Toast.show('يرجى إدخال سبب الرفض لتوضيحه للطالب', 'error');
+    return false;
+  }
+  return confirm('هل أنت متأكد من رفض هذه الدفعة وإرسال السبب للطالب؟');
 }
 
 function applyPayFilters() {
-  const q = document.getElementById('paySearch').value.toLowerCase();
+  const q = document.getElementById('paySearch').value.toLowerCase().trim();
   const st = document.getElementById('payStatusFilter').value;
   const mt = document.getElementById('payMethodFilter').value;
+  const rc = document.getElementById('payReceiptFilter') ? document.getElementById('payReceiptFilter').value : '';
+
   const filtered = MOCK_DATA.payments.filter(p => {
-    const pId = p.payment_id || p.id || '';
-    const pOrder = p.order_number || p.order || '';
-    const matchQ = !q || pId.toLowerCase().includes(q) || p.student.includes(q) || pOrder.toLowerCase().includes(q);
+    const pId = String(p.payment_id || p.id || '').toLowerCase();
+    const pOrder = String(p.order_number || '').toLowerCase();
+    const pStd = String(p.student || '').toLowerCase();
+    const pPhone = String(p.student_phone || '').toLowerCase();
+    const pSrv = String(p.service_title || '').toLowerCase();
+
+    const matchQ = !q || pId.includes(q) || pOrder.includes(q) || pStd.includes(q) || pPhone.includes(q) || pSrv.includes(q);
     const matchSt = !st || p.status === st;
     const matchMt = !mt || p.method === mt;
-    return matchQ && matchSt && matchMt;
+    const matchRc = !rc || (rc === 'has_receipt' ? !!p.receipt_path : !p.receipt_path);
+
+    return matchQ && matchSt && matchMt && matchRc;
   });
   renderPayments(filtered);
 }
@@ -760,6 +1253,7 @@ function applyPayFilters() {
 document.getElementById('paySearch')?.addEventListener('input', applyPayFilters);
 document.getElementById('payStatusFilter')?.addEventListener('change', applyPayFilters);
 document.getElementById('payMethodFilter')?.addEventListener('change', applyPayFilters);
+document.getElementById('payReceiptFilter')?.addEventListener('change', applyPayFilters);
 
 document.addEventListener('DOMContentLoaded', () => {
   renderPayments(MOCK_DATA.payments);

@@ -75,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_message'])) {
     exit;
 }
 
-// Handle Receipt Re-upload
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reupload_receipt'])) {
+// Handle Receipt Upload / Re-upload
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['reupload_receipt']) || (isset($_POST['action']) && $_POST['action'] === 'reupload_receipt'))) {
     $pay_method = (int)($_POST['pay_method'] ?? 0);
     $msg = trim($_POST['reupload_message'] ?? '');
     
@@ -85,40 +85,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reupload_receipt'])) 
     $rcStmt->execute([$order_id, $user['id']]);
     $oldRc = $rcStmt->fetch();
     
-    if ($oldRc) {
-        $fileName = $oldRc['receipt_path'];
-        $finalMethodId = $oldRc['method_id'] ?? 0;
-        $finalMethodLabel = $oldRc['method_label'] ?? '';
-        
-        if ($pay_method > 0) {
-            $finalMethodId = $pay_method;
-            $finalMethodLabel = getPaymentMethodLabel($pay_method);
-        }
+    $fileName = $oldRc['receipt_path'] ?? '';
+    $finalMethodId = $oldRc['method_id'] ?? null;
+    $finalMethodLabel = $oldRc['method_label'] ?? 'تحويل بنكي';
+    
+    if ($pay_method > 0) {
+        $finalMethodId = $pay_method;
+        $finalMethodLabel = getPaymentMethodLabel($pay_method) ?: 'تحويل بنكي';
+    }
 
-        if (isset($_FILES['new_receipt']) && $_FILES['new_receipt']['error'] === UPLOAD_ERR_OK) {
-            $fileExt = strtolower(pathinfo($_FILES['new_receipt']['name'], PATHINFO_EXTENSION));
-            if (in_array($fileExt, ['jpg','jpeg','png','pdf'])) {
-                $newFile = uniqid('receipt_', true) . '.' . $fileExt;
-                if (move_uploaded_file($_FILES['new_receipt']['tmp_name'], __DIR__ . '/../uploads/receipts/' . $newFile)) {
-                    $fileName = 'uploads/receipts/' . $newFile;
-                }
-            }
+    if (isset($_FILES['new_receipt']) && $_FILES['new_receipt']['error'] === UPLOAD_ERR_OK) {
+        $saved = saveReceiptUpload($_FILES['new_receipt']);
+        if ($saved) {
+            $fileName = $saved;
         }
-        
+    }
+    
+    if ($oldRc) {
         $db->prepare("UPDATE payment_receipts SET receipt_path = ?, method_id = ?, method_label = ?, status = 'pending', rejection_reason = NULL, student_note = ? WHERE id = ?")
            ->execute([$fileName, $finalMethodId, $finalMethodLabel, $msg, $oldRc['id']]);
-           
-        $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
-        $convStmt->execute([$order_id, $user['id']]);
-        $cId = (int)$convStmt->fetchColumn();
-        if ($msg !== '' && $cId) {
-            sendMessage($cId, $user['id'], 'student', $msg, null);
-        }
-        
-        createNotification(1, 'admin', 'إعادة رفع أو تصحيح إيصال دفع 🧾', 'قام الطالب ' . $user['name'] . ' بتصحيح إيصال دفع للطلب #' . $order['order_number'], '🧾', 'admin/pages/order-details.php?id=' . $order['order_number']);
-        header("Location: order-details.php?id=$order_id");
-        exit;
+    } else {
+        $db->prepare("INSERT INTO payment_receipts (order_id, student_id, method_id, method_label, amount, receipt_path, status, student_note) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)")
+           ->execute([$order_id, $user['id'], $finalMethodId, $finalMethodLabel, (float)$order['amount'], $fileName, $msg]);
     }
+       
+    $convStmt = $db->prepare("SELECT id FROM conversations WHERE order_id = ? AND student_id = ? LIMIT 1");
+    $convStmt->execute([$order_id, $user['id']]);
+    $cId = (int)$convStmt->fetchColumn();
+    if ($msg !== '' && $cId) {
+        sendMessage($cId, $user['id'], 'student', $msg, null);
+    }
+    
+    createNotification(1, 'admin', 'إشعار دفع جديد / تصحيح إيصال 🧾', 'قام الطالب ' . $user['name'] . ' برفع إشعار دفع للطلب #' . $order['order_number'], '🧾', 'admin/pages/payments.php#tab-students');
+    $_SESSION['flash_success'] = 'تم رفع إشعار الدفع بنجاح وجاري تدقيقه من الإدارة.';
+    header("Location: order-details.php?id=$order_id");
+    exit;
 }
 
 // Handle Order Cancellation

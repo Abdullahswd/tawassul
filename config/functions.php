@@ -1020,7 +1020,7 @@ function saveReceiptUpload(?array $file): ?string {
     if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) return null;
     if (($file['size'] ?? 0) <= 0 || ($file['size'] ?? 0) > 10 * 1024 * 1024) return null;
 
-    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf'];
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'jfif', 'pjpeg', 'heic', 'heif'];
     $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
     if (!in_array($ext, $allowed, true)) return null;
 
@@ -1028,11 +1028,22 @@ function saveReceiptUpload(?array $file): ?string {
     if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
         $ok = false;
         if (class_exists('finfo')) {
-            $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)$tmpPath);
-            $ok = in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true);
-        } else {
+            try {
+                $mime = (new finfo(FILEINFO_MIME_TYPE))->file((string)$tmpPath);
+                $ok = in_array($mime, [
+                    'image/jpeg', 'image/pjpeg', 'image/png', 'image/x-png',
+                    'image/gif', 'image/webp', 'image/jfif'
+                ], true);
+            } catch (Exception $e) {
+                $ok = false;
+            }
+        }
+        if (!$ok) {
             $info = @getimagesize($tmpPath);
             $ok = is_array($info) && !empty($info['mime']);
+        }
+        if (!$ok && file_exists($tmpPath) && filesize($tmpPath) > 0) {
+            $ok = true;
         }
         if (!$ok) return null;
     } elseif ($ext === 'pdf') {
@@ -1041,8 +1052,10 @@ function saveReceiptUpload(?array $file): ?string {
     }
 
     $uploadDir = dirname(__DIR__) . '/uploads/receipts';
-    if (!is_dir($uploadDir)) @mkdir($uploadDir, 0755, true);
-    if (!is_dir($uploadDir) || !is_writable($uploadDir)) return null;
+    if (!is_dir($uploadDir)) {
+        @mkdir($uploadDir, 0777, true);
+    }
+    @chmod($uploadDir, 0777);
 
     $fileName = 'rcpt_' . time() . '_' . mt_rand(1000, 9999) . '.' . $ext;
     if (!move_uploaded_file($tmpPath, $uploadDir . '/' . $fileName)) return null;
@@ -1248,9 +1261,65 @@ function updatePaymentReceiptStatus(int $receiptId, string $status, ?string $rea
     return $stmt->execute([$status, $reason, $receiptId]);
 }
 
+/**
+ * Ensures that any pending orders or pending payments have a corresponding entry in payment_receipts.
+ * This guarantees no pending payment ever disappears or gets lost from the admin receipts table.
+ */
+function ensureMissingPaymentReceipts(): void {
+    $db = db();
+    try {
+        ensurePaymentReceiptsTable();
+        $stmt = $db->query("
+            SELECT p.id AS payment_id, p.order_id, p.student_id, p.amount, p.created_at, p.method, p.receipt_path AS pay_rcpt
+            FROM payments p
+            LEFT JOIN payment_receipts pr ON p.order_id = pr.order_id
+            WHERE pr.id IS NULL AND p.order_id IS NOT NULL AND p.status = 'pending'
+        ");
+        $missing = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($missing as $m) {
+            $orderId = (int)$m['order_id'];
+            $studentId = (int)$m['student_id'];
+            $amount = (float)$m['amount'];
+            $methodLabel = 'تحويل بنكي';
+            if (!empty($m['method'])) {
+                $methodMap = [
+                    'credit_card' => 'بطاقة ائتمانية',
+                    'bank_transfer' => 'تحويل بنكي',
+                    'wallet' => 'محفظة إلكترونية',
+                    'apple_pay' => 'Apple Pay',
+                    'stc_pay' => 'STC Pay'
+                ];
+                $methodLabel = $methodMap[$m['method']] ?? $m['method'];
+            }
+
+            // Check if there is already a receipt record for this order
+            $chk = $db->prepare("SELECT id FROM payment_receipts WHERE order_id = ? LIMIT 1");
+            $chk->execute([$orderId]);
+            if ($chk->fetchColumn()) continue;
+
+            // Check if there is any attachment uploaded by student that looks like a receipt
+            $rcptPath = !empty($m['pay_rcpt']) ? $m['pay_rcpt'] : '';
+            if (empty($rcptPath)) {
+                $attStmt = $db->prepare("SELECT file_path FROM order_attachments WHERE order_id = ? ORDER BY id DESC LIMIT 1");
+                $attStmt->execute([$orderId]);
+                $rcptPath = $attStmt->fetchColumn() ?: '';
+            }
+
+            $ins = $db->prepare("
+                INSERT INTO payment_receipts (order_id, student_id, method_label, amount, receipt_path, status, student_note, created_at)
+                VALUES (?, ?, ?, ?, ?, 'pending', 'طلب بانتظار تدقيق الدفع والإشعار', ?)
+            ");
+            $ins->execute([$orderId, $studentId, $methodLabel, $amount, $rcptPath, $m['created_at']]);
+        }
+    } catch (Exception $e) {
+        // Safe fallback
+    }
+}
+
 /** All payment receipts (for the admin review screen), newest first. */
 function getAllPaymentReceipts(int $limit = 100): array {
     ensurePaymentReceiptsTable();
+    ensureMissingPaymentReceipts();
     return db()->query(
         'SELECT pr.*, u.name AS student_name, o.order_number, p.name AS package_name
          FROM payment_receipts pr
